@@ -1,19 +1,26 @@
-// Barre KPI — valeurs statiques de la maquette.
-// `Avg Ann. Spread` et `Avg Close Prob.` restent à "—" : ils seront calculés
-// à partir des deals une fois la donnée branchée (étape 2 / Supabase).
-const CELLS = [
-  { label: "Active Situations", value: "213", color: "var(--text)", sub: "7 categories · 14 countries" },
-  { label: "Avg Ann. Spread", value: "—", color: "var(--navy)", sub: "Spread-weighted" },
-  { label: "Avg Close Prob.", value: "—", color: "var(--cobalt)", sub: "AI multi-factor model" },
-  { label: "Live Alerts", value: "12", color: "var(--crimson)", sub: "3 urgent · 9 info" },
-  { label: "Merger Arb", value: "20", color: "var(--navy)", sub: "Cash · Stock · Collar" },
-  { label: "Distressed", value: "10", color: "var(--crimson)", sub: "BK · OOC · 363" },
-];
+import { getDeals } from "@/lib/deals";
 
-export default function KpiBar() {
+// Barre KPI — calculée côté serveur à partir des deals (count, spread moyen
+// des deals à spread positif, proba de close moyenne). Les autres cellules
+// reprennent les valeurs décoratives de la maquette.
+export default async function KpiBar() {
+  const deals = await getDeals();
+  const arb = deals.filter((d) => d.s > 0);
+  const avgSpread = arb.length ? (arb.reduce((s, d) => s + d.s, 0) / arb.length).toFixed(1) + "%" : "—";
+  const avgProb = deals.length ? (deals.reduce((s, d) => s + d.p, 0) / deals.length).toFixed(0) + "%" : "—";
+
+  const cells = [
+    { label: "Active Situations", value: String(deals.length), color: "var(--text)", sub: "7 categories · 14 countries" },
+    { label: "Avg Ann. Spread", value: avgSpread, color: "var(--navy)", sub: "Spread-weighted" },
+    { label: "Avg Close Prob.", value: avgProb, color: "var(--cobalt)", sub: "AI multi-factor model" },
+    { label: "Live Alerts", value: "12", color: "var(--crimson)", sub: "3 urgent · 9 info" },
+    { label: "Merger Arb", value: "20", color: "var(--navy)", sub: "Cash · Stock · Collar" },
+    { label: "Distressed", value: "10", color: "var(--crimson)", sub: "BK · OOC · 363" },
+  ];
+
   return (
     <div className="kpi-bar">
-      {CELLS.map((c) => (
+      {cells.map((c) => (
         <div className="kpi-cell" key={c.label}>
           <div className="kpi-label">{c.label}</div>
           <div className="kpi-value" style={{ color: c.color }}>

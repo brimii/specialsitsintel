@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useModal } from "./modals/ModalProvider";
@@ -19,9 +20,11 @@ const NAV = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { open } = useModal();
+  const [mobOpen, setMobOpen] = useState(false);
 
   return (
-    <nav>
+    <>
+      <nav>
       <div className="logo">
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <div
@@ -74,6 +77,34 @@ export default function Sidebar() {
           Log in
         </button>
       </div>
-    </nav>
+
+      <button
+        className={`hamburger${mobOpen ? " open" : ""}`}
+        onClick={() => setMobOpen((o) => !o)}
+        aria-label="Menu"
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+      </nav>
+
+      <div className={`mob-nav${mobOpen ? " open" : ""}`}>
+        {NAV.map((item) => {
+          const active = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`mob-nav-item${active ? " active" : ""}`}
+              onClick={() => setMobOpen(false)}
+            >
+              <span>{item.icon}</span>
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+    </>
   );
 }
