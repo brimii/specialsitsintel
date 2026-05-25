@@ -159,3 +159,319 @@ export const GLOS: GlossaryTerm[] = [
   {t:"Loan-to-Own",d:"Strategy: purchase distressed debt at discount with intention to convert to equity in restructuring. Seeks control of reorganized entity. Risk: equitable subordination if court finds creditor misconduct."},
 ];
 
+
+export type Macro = { l: string; v: string; d: string; tr: string; col: string };
+export type RegimePoint = { t: string; d: string };
+export type RegimeExposure = { l: string; v: number; dir: string; c: string };
+export type RegimeHistory = { p: string; d: string };
+export type Regime = {
+  cat: string;
+  title: string;
+  icon: string;
+  col: string;
+  bg: string;
+  bd: string;
+  sub: string;
+  current: string;
+  curCol: string;
+  curBg: string;
+  curNote: string;
+  best: RegimePoint[];
+  worst: RegimePoint[];
+  exposures: RegimeExposure[];
+  history: RegimeHistory[];
+};
+export type CurrentRegime = {
+  icon: string;
+  name: string;
+  desc: string;
+  vix: number;
+  fedfunds: number;
+  asOf: string;
+};
+export type HistDeal = {
+  cat: string;
+  yr: string;
+  nm: string;
+  acq: string;
+  v: string;
+  ret: string;
+  dur: string;
+  desc: string;
+  out: string;
+  lesson: string;
+  sym?: string;
+};
+
+export const CUR_REGIME: CurrentRegime = {
+  name:'Risk-On with Rate Plateau',
+  icon:'⛅',
+  desc:'Equity markets at all-time highs on AI earnings + soft landing confirmation. Fed on hold at 4.50% — no cuts until Q4 2026. M&A activity surging: 18 new deals >$1B in May alone. Merger arb spreads tight in cleared deals, selective opportunities in contested situations and early-stage deals.',
+  asOf:'May 20, 2026',
+  vix:13.2,
+  fedfunds:4.50
+};
+
+export const MACRO: Macro[] = [
+  {l:'VIX',v:'13.2',d:'-2.4 vs 3m',tr:'down',col:'g'},
+  {l:'10Y UST',v:'4.28%',d:'-4bps vs 1m',tr:'down',col:'g'},
+  {l:'HY OAS',v:'298bps',d:'-7bps vs 1m',tr:'down',col:'g'},
+  {l:'Fed Funds',v:'4.50%',d:'Hold — no cut Q3',tr:'flat',col:'g'},
+  {l:'M&A Deal Flow',v:'$1.4T',d:'YTD, +22% YoY',tr:'up',col:'g'},
+  {l:'HFRI Merger Arb',v:'+6.8%',d:'YTD May 2026',tr:'up',col:'g'},
+  {l:'Default Rate (HY)',v:'3.6%',d:'+50bps vs 1y',tr:'up',col:'a'},
+  {l:'LBO Activity',v:'$310B',d:'YTD, +8% YoY',tr:'up',col:'g'},
+  {l:'CFIUS Block Rate',v:'9%',d:'vs 3% LT avg',tr:'up',col:'r'},
+  {l:'AI Capex Wave',v:'$320B',d:'2026E hyperscaler',tr:'up',col:'g'},
+];
+
+export const REGIMES: Regime[] = [
+  {cat:'MERGER',title:'Merger Arbitrage',icon:'⊞',col:'#1e3a72',bg:'rgba(30,58,114,.1)',bd:'rgba(30,58,114,.25)',sub:'Cash · Stock · Tender',
+   current:'Mixed',curCol:'#9c6d2a',curBg:'rgba(245,166,35,.15)',
+   curNote:'Spreads compressed in cleared deals; widening in contested. Half-Kelly default.',
+   best:[
+    {t:'Stable interest rates',d:'Predictable LBO financing and tight bid-ask. Funds can lever positions efficiently.'},
+    {t:'Low equity volatility (VIX < 18)',d:'Spreads behave; deal break correlation low. Risk-adjusted returns optimal.'},
+    {t:'Accommodative antitrust posture',d:'Block rate near 3% historical average. Second Requests rare. Timelines predictable.'},
+    {t:'Healthy IG/HY credit',d:'OAS tight = financing certain. Reverse termination fees rare. Deals close at announced terms.'},
+   ],
+   worst:[
+    {t:'Risk-off / VIX spike > 30',d:'Spreads widen indiscriminately. Funds forced to delever. Negative carry on undisturbed reversion.'},
+    {t:'Hawkish antitrust (post-2021)',d:'Block rate 8%+. Second Requests routine. Timelines extend 6-18 months. Spread widening on FTC language.'},
+    {t:'Credit dislocation (OAS > 500bps)',d:'LBO financing pulls. MAC clause invocations spike. Reverse termination fees increase.'},
+    {t:'Geopolitical shock + CFIUS',d:'Cross-border tech/semi deals hit CFIUS. Binary block risk on $10B+ deals (US Steel, Broadcom/Qualcomm).'},
+   ],
+   exposures:[
+    {l:'Rates',v:35,dir:'short',c:'a'},
+    {l:'Volatility',v:60,dir:'short',c:'r'},
+    {l:'Credit',v:45,dir:'long',c:'a'},
+    {l:'Liquidity',v:25,dir:'long',c:'g'},
+    {l:'Cycle',v:30,dir:'neutral',c:'g'},
+   ],
+   history:[
+    {p:'2009-2014',d:'<b>Golden era.</b> Low rates, low vol, accommodative antitrust. HFRI Merger Arb +7-9% annualized. Half-Kelly safe.'},
+    {p:'2018-2019',d:'<b>Trade war disruption.</b> CFIUS block rate spike. Broadcom/Qualcomm blocked. Cross-border deals impaired.'},
+    {p:'2022-2023',d:'<b>Lina Khan FTC era.</b> Block rate 8%. Microsoft/Activision, Albertsons/Kroger all challenged. Spreads gapped wider.'},
+    {p:'2024-2025',d:'<b>Moderation.</b> FTC leadership transition. Block rate normalizing. Spread compression in cleared deals; selectivity rewarded.'},
+   ]},
+
+  {cat:'ACTIVISM',title:'Event-Driven Activism',icon:'✦',col:'#9d7cf8',bg:'rgba(157,124,248,.1)',bd:'rgba(157,124,248,.25)',sub:'13D · Board Campaigns · SOTP',
+   current:'Favorable',curCol:'#1e3a72',curBg:'rgba(30,58,114,.15)',
+   curNote:'Conglomerate discounts widening + management pressure rising. Elliott, Starboard active.',
+   best:[
+    {t:'Low growth / sideways markets',d:'When organic growth lacks, structural change drives returns. SOTP arbitrage and capital return the alpha source.'},
+    {t:'Elevated conglomerate discount',d:'Discount > 20% historical. Activists nominate boards, force separation. GE, J&J, Honeywell playbooks.'},
+    {t:'Rising rates / financial discipline',d:'Buyback yield > cost of capital. Activists push capital return. Excess cash deployment thesis works.'},
+    {t:'Sector rotation regimes',d:'Conglomerates suffer in style rotations (growth → value). Separations unlock pure-play multiple expansion.'},
+   ],
+   worst:[
+    {t:'Strong bull markets (TINA)',d:'Index funds dominate. Activist pressure diluted. CEO entrenchment easier when stock up. Disney/Peltz lost on TINA.'},
+    {t:'Crisis market (2008, 2020)',d:'Activists pull back. Defensive M&A, poison pills universally adopted. Engagement froze in March 2020.'},
+    {t:'Heavy retail flow / meme dynamics',d:'Institutional vote share diluted. Proxy advisory (ISS, GL) less determinative. Activist thesis disrupted.'},
+    {t:'Hot tech bubbles',d:'Conglomerate discounts compress as growth multiples expand. SOTP thesis fails. Buy-and-hold beats SOTP.'},
+   ],
+   exposures:[
+    {l:'Rates',v:60,dir:'long',c:'g'},
+    {l:'Volatility',v:30,dir:'neutral',c:'g'},
+    {l:'Credit',v:25,dir:'neutral',c:'g'},
+    {l:'Liquidity',v:55,dir:'long',c:'a'},
+    {l:'Cycle',v:50,dir:'short',c:'a'},
+   ],
+   history:[
+    {p:'2013-2015',d:'<b>Peak era.</b> Trian/PEP, Ackman/HLF, Icahn/AAPL. Mega-cap engagement worked. HFRI Activist +10-14% annualized.'},
+    {p:'2020-2021',d:'<b>SPAC boom diluted activism.</b> Cheap capital reduced activist leverage. Disney/Peltz defeated on TINA.'},
+    {p:'2023-2024',d:'<b>Resurgence.</b> Elliott/Honeywell, Ancora/NSC, Starboard/Salesforce. Conglomerate discounts back in focus.'},
+    {p:'2025+',d:'<b>European push.</b> Elliott/BP, expanding into UK and EU where activism historically harder. Regulatory landscape softening.'},
+   ]},
+
+  {cat:'DISTRESSED',title:'Distressed Credit & M&A',icon:'⊟',col:'#a83232',bg:'rgba(240,85,85,.1)',bd:'rgba(240,85,85,.22)',sub:'Chapter 11 · OOC · 363',
+   current:'Building',curCol:'#9c6d2a',curBg:'rgba(245,166,35,.15)',
+   curNote:'Default rate rising (3.4% vs 2.1% trough). Maturity wall 2026-27. Selective opportunities now, full cycle ahead.',
+   best:[
+    {t:'Credit stress regime (HY OAS > 500bps)',d:'Forced selling creates fulcrum discounts. PE-backed retail/energy stress provides deep value.'},
+    {t:'Recession or pre-recession',d:'Default rate spikes 4-8%. Massive opportunity set. 2009, 2020 distressed vintages delivered 25%+ IRR.'},
+    {t:'Sector-specific distress',d:'Energy 2014-16, retail 2017-19, commercial real estate 2024-26. Sector-specific edge compounds.'},
+    {t:'Falling rate environment',d:'Distressed exits via refinancing become viable again. Reorganized equities re-rate on lower discount rate.'},
+   ],
+   worst:[
+    {t:'Late-cycle credit boom',d:'No defaults = no opportunities. Spreads tight. Cov-lite deals = lower recovery. Yellow Corp couldn\'t emerge.'},
+    {t:'Persistent QE / liquidity flood',d:'Zombies refinance. Default rate suppressed. Distressed funds raise but can\'t deploy. 2015-2019 funds underperformed.'},
+    {t:'Rapidly rising rates with credit panic',d:'Mark-to-market losses on existing positions overwhelm new vintage IRR. 2022 distressed funds drew down 15-25%.'},
+    {t:'Strong bull equity markets',d:'Reorganized equities orphaned. Wrong-hands selling intense. Fulcrum-as-equity strategy struggles to monetize.'},
+   ],
+   exposures:[
+    {l:'Rates',v:70,dir:'short',c:'r'},
+    {l:'Volatility',v:45,dir:'long',c:'a'},
+    {l:'Credit',v:85,dir:'long',c:'r'},
+    {l:'Liquidity',v:75,dir:'short',c:'r'},
+    {l:'Cycle',v:80,dir:'short',c:'r'},
+   ],
+   history:[
+    {p:'2009-2011',d:'<b>Legendary vintage.</b> Lehman/Bear aftermath. Oaktree, Apollo, Cerberus IRRs 25%+. Generational entry.'},
+    {p:'2015-2016',d:'<b>Energy distress.</b> Oil crash → 100+ E&P bankruptcies. Sector specialists generated 20%+ returns.'},
+    {p:'2020',d:'<b>COVID dislocation.</b> Brief but extreme. Hertz, Chesapeake, retail. Funds with dry powder generated 30%+ returns.'},
+    {p:'2024-2026',d:'<b>Maturity wall building.</b> Default rate 3.4% rising. WeWork, Yellow, Spirit, Bayer setting up. PE-leveraged retail leading.'},
+   ]},
+
+  {cat:'SPINOFF',title:'Spin-offs & Separations',icon:'⊕',col:'#3760a0',bg:'rgba(55,96,160,.1)',bd:'rgba(55,96,160,.22)',sub:'IRC §355 · Stub · Wrong-Hands',
+   current:'Favorable',curCol:'#1e3a72',curBg:'rgba(30,58,114,.15)',
+   curNote:'Elevated conglomerate discounts + management willingness. GE, J&J, Honeywell, Sanofi pipeline.',
+   best:[
+    {t:'Value rotation regimes',d:'When market favors pure-plays over conglomerates, SOTP discount compresses on separation. GE Vernova +60% post-spin.'},
+    {t:'Conglomerate discount > 20%',d:'Wide discount = clear unlock thesis. J&J/Kenvue, GE trifecta, Honeywell three-way prove the playbook.'},
+    {t:'Index reconstitution windows',d:'Wrong-hands selling at predictable moments. Buying SpinCo at index exit is highest-probability entry.'},
+    {t:'Activist-driven separations',d:'Elliott, Trian, Starboard catalyzing separations. Better SpinCo management teams and capital allocation.'},
+   ],
+   worst:[
+    {t:'Conglomerate premium regimes',d:'Tech bubbles compress SOTP discount. Bigger = better. Buying separated company at premium destroys thesis.'},
+    {t:'Crisis markets',d:'SpinCo new debt issuance distressed. Distribution timing horrible. Wrong-hands sellers panic. Form 10 SpinCos crater.'},
+    {t:'Sector cyclical downturn at spin',d:'Standalone SpinCo into sector downturn = double whammy. Solventum post-spin into medtech weakness -15%.'},
+    {t:'Heavy passive flows',d:'Index inclusion lag = persistent selling. Solventum took 18 months to find institutional ownership balance.'},
+   ],
+   exposures:[
+    {l:'Rates',v:40,dir:'short',c:'a'},
+    {l:'Volatility',v:35,dir:'long',c:'g'},
+    {l:'Credit',v:30,dir:'neutral',c:'g'},
+    {l:'Liquidity',v:65,dir:'short',c:'a'},
+    {l:'Cycle',v:55,dir:'neutral',c:'a'},
+   ],
+   history:[
+    {p:'2011-2015',d:'<b>Wave of separations.</b> Kraft/Mondelez, Time Warner, Hewlett Packard split. Joel Greenblatt validated.'},
+    {p:'2020-2021',d:'<b>Tech bubble era.</b> SOTP discounts compressed. Multi-business tech (Alphabet, Meta) traded at premium.'},
+    {p:'2023-2024',d:'<b>Mega-spin era.</b> GE trifecta, Kenvue, Solventum. Mixed outcomes — GE Vernova winning, Kenvue losing.'},
+    {p:'2025+',d:'<b>Activist-driven pipeline.</b> Honeywell, Sanofi, Bayer breakup, IAC/Angi. Activists catalyzing structural value.'},
+   ]},
+
+  {cat:'REORG',title:'Restructuring (OOC)',icon:'⊜',col:'#9c6d2a',bg:'rgba(245,166,35,.1)',bd:'rgba(245,166,35,.22)',sub:'Exchange · Consent · A&E',
+   current:'Active',curCol:'#9c6d2a',curBg:'rgba(245,166,35,.15)',
+   curNote:'Maturity wall 2025-27 forcing OOC. Lumen, Altice, DISH/DirecTV active.',
+   best:[
+    {t:'Maturity walls approaching',d:'Companies forced to refinance or restructure. Telecom, media, retail in 2024-26 cycle. Lumen completed $15B OOC.'},
+    {t:'Moderate credit stress',d:'OAS 350-500bps = workable for OOC. Severe stress > 500bps forces full bankruptcy. Sweet spot for OOC.'},
+    {t:'Stable but rising rates',d:'A&E (amend-and-extend) effective when rates stabilize. Companies trade higher coupons for runway.'},
+    {t:'Stressed but viable sectors',d:'Where operational fix exists (telecom fiber buildout, retail rationalization). Not terminal decline.'},
+   ],
+   worst:[
+    {t:'Severe credit crisis',d:'Liquidity vanishes. No OOC possible — straight to bankruptcy. Funds get stuck with restructuring claims at depressed values.'},
+    {t:'Holdout-heavy capital structure',d:'Single 2L holder can block OOC. Forces costly pre-pack or contentious bankruptcy. Drahi/Altice friction example.'},
+    {t:'Rapid rate cuts',d:'OOC negotiated at higher rates becomes uncompetitive post-cut. Mark-to-market losses on new securities.'},
+    {t:'Terminal sector decline',d:'OOC just delays inevitable. Yellow Corp, Sears — operational decline outpaced restructuring runway.'},
+   ],
+   exposures:[
+    {l:'Rates',v:75,dir:'short',c:'r'},
+    {l:'Volatility',v:40,dir:'long',c:'a'},
+    {l:'Credit',v:80,dir:'long',c:'r'},
+    {l:'Liquidity',v:70,dir:'short',c:'r'},
+    {l:'Cycle',v:65,dir:'short',c:'a'},
+   ],
+   history:[
+    {p:'2009-2012',d:'<b>Post-GFC OOC wave.</b> Banks, REITs, retailers. Massive exchange offer volume. Specialists generated 18-22%.'},
+    {p:'2015-2016',d:'<b>Energy A&E era.</b> E&P companies pushed maturities. Continental, Whiting, Sandridge avoided bankruptcy via OOC.'},
+    {p:'2020',d:'<b>COVID OOCs.</b> Brief surge — airlines, cruise, retail. Government support truncated cycle.'},
+    {p:'2024-2026',d:'<b>Telecom/media wave.</b> Lumen $15B done. Altice USA, EchoStar/DISH active. CRE OOCs accelerating.'},
+   ]},
+];
+
+export const HIST: HistDeal[] = [
+  {cat:'MERGER',yr:'1989',nm:'RJR Nabisco LBO',acq:'KKR',v:'$31B',ret:'15%',dur:'4 mo',
+   desc:'The defining LBO of the 1980s. Bidding war between KKR, Shearson Lehman (Ross Johnson), and Forstmann Little. Final $109/share. Stock had been $55 pre-rumor. Subject of "Barbarians at the Gate".',
+   out:'KKR won at $109/share. Highly leveraged structure (24x debt/EBITDA). Eventually broken up — Nabisco spun off 1999, RJR sold to Japan Tobacco. KKR underperformed S&P over hold period.',
+   lesson:'Established mega-LBO playbook AND showed that scale + leverage doesn\'t guarantee returns. Created the modern PE industry.'},
+  {cat:'MERGER',yr:'1998',nm:'Daimler-Chrysler',acq:'Daimler-Benz',v:'$36B',ret:'-65%',dur:'9 yr hold',
+   desc:'"Merger of equals" between Daimler-Benz and Chrysler — first transatlantic mega-merger. Pitched as global automotive champion. Stock-for-stock deal at $57/share for Chrysler.',
+   out:'Cultural integration failed. Chrysler bled cash. Daimler sold Chrysler to Cerberus 2007 for $7.4B (vs $36B paid). One of the most destructive M&A failures in history.',
+   lesson:'Cross-border "mergers of equals" are usually acquisitions in disguise. Cultural fit > strategic logic.'},
+  {cat:'DISTRESSED',yr:'2009',nm:'General Motors Ch.11',acq:'US Treasury / UAW',v:'$82B',ret:'+450%',dur:'363 days',
+   desc:'Largest industrial bankruptcy in US history. GM Old Co → New GM via 363 sale. US Treasury took 60% stake. UAW VEBA trust got 17.5%. Bondholders got 10% + warrants. Old equity wiped.',
+   out:'New GM IPO Nov 2010 at $33/share. Treasury exited 2013 at avg $30 (small loss). UAW VEBA monetized stake at huge gain. Bondholders\' equity package: 4-7x recovery vs initial debt prices.',
+   lesson:'Government-orchestrated bankruptcies follow different rules. Political stakeholders > absolute priority. Distressed PMs who bought GM bonds at 8 cents made fortunes.'},
+  {cat:'DISTRESSED',yr:'2008',nm:'Lehman Brothers',acq:'Barclays / Nomura',v:'$691B assets',ret:'+200%',dur:'12 yr+',
+   desc:'Largest bankruptcy ever ($691B assets). Investment bank failed Sep 15 2008. Barclays bought North American broker-dealer. Nomura bought Asia + Europe. Most assets liquidated over 12 years.',
+   out:'Senior unsecured creditors recovered 41-45 cents. Junior subordinated bonds: 0-5 cents. Lehman estate generated $115B distributions through 2022. Created modern systemic risk regulation.',
+   lesson:'Even "too big to fail" can fail. Distressed PMs who held Lehman senior at 8-15 cents recovered 41-45 cents = 3-5x return. Patience pays in mega-bankruptcies.'},
+  {cat:'ACTIVISM',yr:'2007',nm:'TCI vs CSX',acq:'TCI / 3G',v:'$36B cap',ret:'+85%',dur:'2 yr',
+   desc:'Children\'s Investment Fund (TCI, Chris Hohn) + 3G Capital launched US activist campaign against rail operator CSX. Demanded board seats, operational changes. Famously aggressive proxy fight.',
+   out:'Won 4 board seats June 2008 vote. CSX adopted recommended operational changes. Stock +85% over 2-year campaign window. Foundational European activist crossing into US large-cap.',
+   lesson:'Activism scaled internationally. Foreign funds CAN win US proxy fights. CSX became template for transportation activism (CP/CN, NSC).'},
+  {cat:'ACTIVISM',yr:'2013',nm:'Carl Icahn vs Apple',acq:'Icahn Enterprises',v:'$500B+ cap',ret:'+85%',dur:'2 yr',
+   desc:'Icahn 0.8% stake ($3.6B) demanding $150B buyback. Public Twitter campaign. Met Tim Cook for "cordial dinner". Push for cash return on $150B+ balance sheet.',
+   out:'Apple expanded buyback program from $60B to $200B+. Stock +85% over 2-year period. Icahn exited 2016 at ~7x return.',
+   lesson:'Activism works even at mega-cap scale. Small stakes can drive massive capital allocation changes. Icahn turned mega-cap activism mainstream.'},
+  {cat:'SPINOFF',yr:'2014',nm:'eBay / PayPal',acq:'eBay Spin',v:'$50B',ret:'+45%',dur:'12 mo post',
+   desc:'Activist (Carl Icahn) pushed eBay to spin off PayPal. Combined company viewed at SOTP discount. PayPal seen as constrained by eBay relationship. Distribution July 2015 at $36/share.',
+   out:'PayPal independence catalyzed M&A integration with new merchants (away from eBay). Stock 2x in 18 months post-spin. eBay also performed well as pure-play marketplace.',
+   lesson:'Classic activist-catalyzed spin-off creating two pure-plays from one conglomerate. Each business performed better separately. Template for tech separations.'},
+  {cat:'SPINOFF',yr:'2015',nm:'HP / HPE / HPI',acq:'HP Split',v:'$60B combined',ret:'+30% / +50%',dur:'3 yr post',
+   desc:'Meg Whitman split HP into HP Inc (printers, PCs) and Hewlett Packard Enterprise (servers, networking, services). November 2015 distribution.',
+   out:'HPE further broke itself up: spun Software to Micro Focus (2017), Services to DXC (2017). Both descendants performed materially better than combined HP. Total value unlock estimated at $20B+.',
+   lesson:'Demonstrated that "tech conglomerate" model was structurally broken. Cleaner pure-plays + better capital allocation = sustained outperformance.'},
+  {cat:'MERGER',yr:'2018',nm:'AT&T / Time Warner',acq:'AT&T',v:'$85B',ret:'-40%',dur:'6 yr',
+   desc:'AT&T acquired Time Warner after winning DOJ antitrust trial (vertical merger). $85B mega-deal. Strategic logic: content + distribution. Subsequently spun off WarnerMedia to merge with Discovery (2022) creating Warner Bros Discovery.',
+   out:'AT&T stock -50% from announcement to spin. WBD -65% post-merger. Strategic combination unwound at massive value destruction. ~$50B+ shareholder value destroyed.',
+   lesson:'Even cleared deals can destroy value. Telecom/media convergence was a multi-trillion dollar mistake industry-wide. Now reverse trend — content companies separating from distribution.'},
+  {cat:'MERGER',yr:'2022',nm:'Microsoft / Activision',acq:'Microsoft',v:'$68.7B',ret:'+95%',dur:'21 mo',
+   desc:'Largest gaming acquisition ever. Cleared FTC challenge (judge ruled in favor), then CMA in UK initially blocked, requiring restructuring (cloud gaming carve-out). Closed Oct 2023.',
+   out:'ATVI shareholders got $95/share cash. Stock $66 pre-announcement. Some periods of deal traded at $75 (10%+ spread on uncertainty). Cleared at full $95 = 44% gain from undisturbed.',
+   lesson:'Regulatory uncertainty creates spread opportunities. CMA divergence from EU/US post-Brexit became major dealflow risk factor. Behavioral remedies expanded acceptance.'},
+  {cat:'ACTIVISM',yr:'2017',nm:'P&G Proxy Fight (Peltz)',acq:'Trian',v:'$240B cap',ret:'+30%',dur:'18 mo',
+   desc:'Nelson Peltz/Trian sought single board seat at P&G. Closest mega-cap proxy fight in history. Initially lost by 0.2% but won recount. Most expensive proxy fight ever (~$100M combined).',
+   out:'P&G appointed Peltz to board March 2018. Stock outperformed S&P by 25% over next 24 months. Trian exited 2021. Activist agenda partially implemented.',
+   lesson:'Even mega-cap CPG can be activist target. Proxy fights at $200B+ scale viable. Board representation, not just engagement, drove results.'},
+  {cat:'REORG',yr:'2014',nm:'Detroit Bankruptcy',acq:'City Restructuring',v:'$18B debt',ret:'Variable',dur:'17 mo',
+   desc:'Largest municipal bankruptcy in US history. Detroit filed Chapter 9. Pension obligations vs bondholder claims central conflict. "Grand Bargain" with DIA art collection became precedent.',
+   out:'GO bondholders: 74% recovery. Pensions cut 4.5% nominal. DIA art protected. Exit August 2014. Distressed muni specialists generated 60%+ IRR.',
+   lesson:'Chapter 9 (municipal bankruptcy) has unique rules. Political + pension dynamics override credit analysis. Created template for Puerto Rico, future muni distress.'},
+  {cat:'MERGER',yr:'2000',nm:'AOL / Time Warner',acq:'AOL',v:'$165B',ret:'-90%',dur:'10 yr',
+   desc:'Stock-for-stock at peak of dot-com bubble. AOL acquired Time Warner using inflated AOL stock as currency. Created world\'s largest media company on paper.',
+   out:'Combined company lost $99B in 2002 alone (largest corporate loss ever). Spun apart 2009. Estimated $200B+ shareholder value destruction. Defines "deal at top of cycle".',
+   lesson:'Stock-deal mechanics matter. Acquirers paying with overvalued stock destroyed value at unprecedented scale. Every banker references AOL/TWX as warning.'},
+  {cat:'DISTRESSED',yr:'2017',nm:'Toys R Us Liquidation',acq:'Bondholders',v:'$5B debt',ret:'Variable',dur:'9 mo',
+   desc:'Iconic PE-backed retail bankruptcy. KKR/Bain/Vornado leveraged buyout 2005 with $6.6B debt. Decade of $400M+ annual interest payments starved investment. Filed Sep 2017.',
+   out:'Initial reorganization attempted but failed. Liquidation March 2018 — all US stores closed. Secured creditors got ~70 cents. Unsecured: 5-15 cents. Equity zero. 30,000 jobs lost.',
+   lesson:'PE-leveraged retail is structurally fragile. Cannot service legacy debt + invest in digital transformation. Template for Sears, Payless, etc.'},
+  {cat:'SPINOFF',yr:'2002',nm:'Kraft / Mondelez',acq:'Altria Spin',v:'$60B',ret:'+85%',dur:'5 yr',
+   desc:'Altria (Philip Morris) spun off Kraft Foods to remove tobacco liability from food business. Subsequent split: Kraft → Kraft Foods Group + Mondelez International (2012).',
+   out:'Both Kraft Heinz (2015 merger) and Mondelez became standalone large-caps. Total shareholder return from original Kraft +85% over 5 years vs S&P +40%. Validated tobacco-food separation thesis.',
+   lesson:'Liability separations can unlock significant value. Tobacco taint discount removed once segregated. Template for opioid (Bayer), litigation (J&J/Kenvue) separations.'},
+  {cat:'MERGER',yr:'2024',nm:'Capital One / Discover',acq:'Capital One',v:'$35.3B',ret:'+8%',dur:'15 mo',
+   desc:'Bank merger creating third-largest US credit card issuer. Discover\'s payments network strategic asset. Cleared OCC, Fed, DOJ with CRA commitments. Closed May 2025.',
+   out:'All-stock at 1.0192 COF/DFS ratio. Spread compressed from 8% to 1% as gates cleared. Textbook bank merger arb — 6.8% annualized return for 15-month hold.',
+   lesson:'Modern bank mergers possible despite "too big to fail" rhetoric. Concrete CRA commitments unlock regulatory approval. Set precedent for future bank consolidation.'},
+  {cat:'ACTIVISM',yr:'2024',nm:'Elliott / Southwest',acq:'Elliott',v:'$17B cap',ret:'+28%',dur:'5 mo',
+   desc:'Elliott 10% stake, threatened proxy fight with 10-director slate. Demanded CEO Bob Jordan removal + operational transformation. Settlement October 2024.',
+   out:'CEO replaced. Six new Elliott-nominated directors added. Operating model overhaul: assigned seating, capacity rationalization, red-eye flights. Stock +28% over campaign.',
+   lesson:'Fastest mega-cap activism win in recent history (5 months). Operational concreteness of demands + strong proxy advisory backing = quick capitulation. Modern playbook reference.'},
+  {cat:'MERGER',yr:'2019',nm:'BMS / Celgene + CVR',acq:'Bristol-Myers Squibb',v:'$74B',ret:'+12%',dur:'14 mo',
+   desc:'Pharmaceutical mega-merger with embedded Contingent Value Right. CVR paid $9 contingent on FDA approval of three Celgene pipeline drugs (Ozanimod, Liso-cel, Bb2121) by milestones.',
+   out:'Two of three milestones met. CVR partially expired worthless. CVR traded from initial $3 to as low as $0.50 before partial recovery. Sophisticated capital structure arb opportunity.',
+   lesson:'CVRs create binary embedded options often mispriced by market. Specialists generated 30%+ IRR on CVR positions. Template for pharma capital structure arb.'},
+  {cat:'DISTRESSED',yr:'2020',nm:'Hertz Ch.11 + Equity Squeeze',acq:'Court / Stalking Horse',v:'$24B debt',ret:'Wild',dur:'12 mo',
+   desc:'COVID-19 collapsed travel. Hertz filed Ch.11 May 2020. Wild retail-driven equity rally July 2020 ($0.40 → $5+) on speculation of going-concern value. Even SEC intervened.',
+   out:'Hertz emerged June 2021 via "rights offering" structure. Old equity received warrants. Retail speculators broadly lost money. Distressed PMs who held bonds at 25 cents recovered 80+ cents.',
+   lesson:'Retail flow can temporarily disconnect bankruptcy securities from underlying value. Sophisticated distressed funds harvested both bond gains AND equity speculation. Modern meme distress.'},
+  {cat:'SPINOFF',yr:'2024',nm:'GE Trifecta',acq:'GE Separation',v:'$200B+',ret:'+60% (GEV)',dur:'24 mo',
+   desc:'GE separated into GE Aerospace, GE Vernova (energy), and GE Healthcare (already spun 2023). Apr 2024 GEV distribution. Wrong-hands selling created initial discount.',
+   out:'GEV +60% post-spin as grid demand confirmed. GE Aerospace cleaner pure-play multiple. Total shareholder value creation $150B+ vs combined GE.',
+   lesson:'Conglomerates can self-restructure successfully when management committed. GE proved 8-year separation strategy. Template for Honeywell, J&J, Bayer breakups.'},
+  {cat:'MERGER',yr:'2015',nm:'Pfizer / Allergan (Failed)',acq:'Pfizer',v:'$160B',ret:'-15%',dur:'5 mo',
+   desc:'Largest pharma deal ever — inversion structure (Allergan domiciled in Ireland). Treasury Department rule change April 2016 retroactively killed tax benefits. Deal terminated.',
+   out:'Termination announcement collapsed Allergan stock 20%. Pfizer paid $400M breakup fee. Treasury rule changes specifically targeting deal = unprecedented regulatory action.',
+   lesson:'Tax-driven inversions can be killed by regulatory action even post-signing. Political risk became a deal risk category. Pharma tax inversion era ended.'},
+  {cat:'ACTIVISM',yr:'2024',nm:'Elliott / Honeywell',acq:'Elliott',v:'$145B cap',ret:'Live',dur:'Ongoing',
+   desc:'Largest activist position by capital deployed ($5B). Three-way separation demand: Aerospace, Industrial Automation, Buildings. Engagement Nov 2024.',
+   out:'HON committed to Aerospace + Automation separation early 2025. Buildings TBD. Stock +18% from disclosure. Largest current activist campaign by deployed capital.',
+   lesson:'Mega-cap activism scaling to $5B+ stakes. Elliott\'s industrial conglomerate playbook (Arconic, Cognex, Ashland) reaching ultimate scale. Active situation to monitor.'},
+  {cat:'DISTRESSED',yr:'2023',nm:'WeWork Ch.11',acq:'Estate',v:'$8B pre-BK',ret:'Variable',dur:'7 mo',
+   desc:'$47B peak valuation → $0 equity in 4 years. Filed Ch.11 Nov 2023. $12B lease obligations eliminated. Emerged June 2024 with 400 locations (from 700) and reduced rent.',
+   out:'Equity zero. Senior secured: 65 cents recovery. 2L: 15 cents. SoftBank wrote off $15B investment. Iconic example of unprofitable growth company collapse.',
+   lesson:'Lease-heavy growth model fundamentally broken at scale. Even cleaner balance sheet emergence didn\'t restore viability. Cautionary tale for asset-heavy startups.'},
+  {cat:'SPINOFF',yr:'2023',nm:'Kenvue (J&J Consumer)',acq:'J&J Spin',v:'$38B cap',ret:'-22%',dur:'18 mo',
+   desc:'J&J spun consumer health (Tylenol, Listerine, Neutrogena) via IPO May 2023 + split-off August 2023. Removed Tylenol litigation overhang from J&J pharma.',
+   out:'Kenvue at IPO $22 → $17 currently. Consumer staples multiple compression + Tylenol litigation + sunscreen recall headwinds. Underperformed J&J post-separation.',
+   lesson:'Not all spin-offs unlock value. SpinCo into deteriorating sector environment = double whammy. Liability separation thesis can backfire if SpinCo standalone is weak.'},
+  {cat:'MERGER',yr:'2025',nm:'US Steel / Nippon (Blocked)',acq:'Nippon Steel',v:'$14.9B',ret:'-50% (current)',dur:'18 mo+',
+   desc:'$55/share all-cash tender by Japanese acquirer. Blocked by Presidential CFIUS prohibition Jan 2025. National security determination. Litigation ongoing in DC Circuit.',
+   out:'USS trading $32 vs $55 offer = 42% spread reflecting binary outcome. Litigation could take 12-18 months. Set precedent for ally-nation acquisitions of US "strategic" industries.',
+   lesson:'CFIUS now applies even to close allies (Japan). Political dimension of M&A reached new heights. Binary risk situations require small position sizing.'},
+];
+
