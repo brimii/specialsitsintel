@@ -129,21 +129,21 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 
 > Mets à jour cette section au fil du projet pour que les futures sessions sachent où on en est.
 
-- [ ] Phase 0 — Socle (migration vers Next.js + base)
+- [x] Phase 0 — Socle (migration vers Next.js + base) ✅
 - [ ] Phase 1 — Auth + Stripe + restriction par palier
 - [ ] Phase 2 — Gestion / admin
 - [ ] Phase 3 — Pipeline de données semi-automatique
 - [ ] Phase 4 — Automatisation étendue
 
-**Session actuelle / notes** (maj 2026-05-25) — *Phase 0 : front terminé, reste l'activation Supabase (par l'humain)* :
+**Session actuelle / notes** (maj 2026-05-25) — *Phase 0 TERMINÉE ✅ (front + Supabase activé). Prochaine : Phase 1.* :
 
 - **Stack** : Next.js 16 (App Router, TypeScript) sans Tailwind. Maquette de référence conservée dans `reference/specialsitsintel_premium_2.html`. Design system porté tel quel dans `app/globals.css` (tokens + polices DM Mono / Syne / Instrument Serif).
 - **Coque** : `Sidebar` (+ nav mobile hamburger/`mob-nav`), `KpiBar` (count/spread/proba **calculés** depuis les deals), `Ticker` dans `app/layout.tsx` (persistants sur toutes les pages).
 - **8 routes front faites** : `/` (Deal Universe complet : `DealTable` + `DealDetail` avec graphique SVG `PriceChart`, alert-strip « LIVE INTEL », vue « Upcoming Catalysts », cross-link Strategies), `/home`, `/portfolio` (tracker P&L/Kelly, localStorage), `/strategies`, `/market-regime`, `/historical` (graphiques SVG), `/regulators`, `/glossary`.
 - **Modales** : `ModalProvider` + `useModal` + `ModalButton` (Request Access, Contact Sales, Log in) — formulaires + validation + état succès ; reliées depuis Sidebar et Home. Auth réelle en Phase 1.
 - **Données** : `app/data/deals.ts` (213 deals + types/helpers) ; `app/data/content.ts` (STRATS/REGS/GLOS/CUR_REGIME/MACRO/REGIMES/HIST/ALERTS/CATALYSTS).
-- **Supabase (code prêt, PAS encore activé)** : `supabase/migrations/0001_init.sql` (6 tables + RLS + trigger profil) ; `lib/supabase/server.ts` (client `service_role`) ; `lib/deals.ts` (`getDeals()` lecture serveur + **fallback local** tant qu'aucun env) ; `scripts/seed-deals.ts` (`npm run seed`) ; `.env.example`. `page.tsx` (Universe) est un Server Component qui lit côté serveur.
-  - **À faire par l'humain pour activer** : créer le projet Supabase → coller le SQL → remplir `.env.local` (URL + anon + service_role) → `npm run seed`.
-- **Reste en Phase 0** : uniquement l'**activation Supabase** par l'humain (ci-dessus) pour boucler les objectifs 2-3-4. Front 100 % (8 pages + coque + modales + nav mobile + KPI calculés). Seul *nice-to-have* non porté : le chart plein écran (zoom).
-- **Validé en local** (Windows, Node 24) : `npm install` + `npm run dev` → `http://localhost:3000` OK sur le fallback local.
+- **Supabase ACTIVÉ** : `supabase/migrations/0001_init.sql` (6 tables + RLS + trigger profil + **GRANTs** de rôles) exécuté ; projet créé ; `.env.local` rempli (URL + anon + service_role) ; `scripts/seed-deals.ts` (`npm run seed`) → **213 deals chargés**. `lib/supabase/server.ts` (client `service_role`) + `lib/deals.ts` (`getDeals()` lit Supabase, fallback local si pas d'env). `page.tsx` (Universe) = Server Component qui lit côté serveur → **lit désormais la vraie base**.
+  - *Piège rencontré* : `42501 permission denied for table deals` → corrigé par les `GRANT` ajoutés à la migration (la RLS reste le garde-fou des lignes).
+- **Reste (hors Phase 0)** : seul *nice-to-have* non porté = chart plein écran (zoom). Pour la prod, prévoir `export const dynamic` sur `/` quand le filtrage par palier par utilisateur arrivera (Phase 1).
+- **Validé en local** (Windows, Node 24) : `npm install` + `npm run dev` → `http://localhost:3000`. Supabase activé côté humain.
 - **Branche de dev** : `claude/create-claude-md-memory-o4d1u`. Vérifs faites à chaque étape : `tsc --noEmit`, `npm run lint`, `npm run build`, rendu HTTP. ⚠️ Conteneur headless : aucun contrôle visuel pixel-près ni interaction réelle — à confirmer en local.
