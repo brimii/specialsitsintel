@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useModal } from "./modals/ModalProvider";
 
 // Navigation principale — reproduit les 8 entrées de la maquette
 const NAV = [
@@ -17,6 +18,7 @@ const NAV = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { open } = useModal();
 
   return (
     <nav>
@@ -65,11 +67,10 @@ export default function Sidebar() {
       </div>
 
       <div className="nav-footer">
-        {/* Les modales Request Access / Log in seront branchées en étape 4 */}
-        <button className="btn btn-primary btn-sm" style={{ width: "100%" }}>
+        <button className="btn btn-primary btn-sm" style={{ width: "100%" }} onClick={() => open("access")}>
           Request Access →
         </button>
-        <button className="btn btn-secondary btn-sm" style={{ width: "100%" }}>
+        <button className="btn btn-secondary btn-sm" style={{ width: "100%" }} onClick={() => open("login")}>
           Log in
         </button>
       </div>

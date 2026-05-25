@@ -3,6 +3,7 @@ import "./globals.css";
 import Sidebar from "./components/Sidebar";
 import KpiBar from "./components/KpiBar";
 import Ticker from "./components/Ticker";
+import { ModalProvider } from "./components/modals/ModalProvider";
 
 export const metadata: Metadata = {
   title: "SpecialSitsIntel — Institutional Event-Driven Intelligence",
@@ -18,10 +19,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Sidebar />
-        <KpiBar />
-        <Ticker />
-        {children}
+        <ModalProvider>
+          <Sidebar />
+          <KpiBar />
+          <Ticker />
+          {children}
+        </ModalProvider>
       </body>
     </html>
   );

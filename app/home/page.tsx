@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ModalButton from "@/app/components/ModalButton";
 
 // Page Home (marketing). Les boutons "Request Access / Contact Sales" et le
 // formulaire e-mail ouvriront des modales — branchés à l'étape modales.
@@ -23,7 +24,9 @@ export default function HomePage() {
               <Link href="/" className="btn btn-primary btn-lg">
                 View Live Situations →
               </Link>
-              <button className="btn btn-secondary btn-lg">Request Access</button>
+              <ModalButton modal="access" className="btn btn-secondary btn-lg">
+                Request Access
+              </ModalButton>
             </div>
             <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
               Currently onboarding event-driven funds · Institutional access only · as of May 23, 2026
@@ -170,7 +173,9 @@ export default function HomePage() {
                 <div className="plan-feat no">Portfolio tracker</div>
                 <div className="plan-feat no">Price charts</div>
               </div>
-              <button className="plan-cta btn-secondary">Get Started</button>
+              <ModalButton modal="access" className="plan-cta btn-secondary">
+                Get Started
+              </ModalButton>
             </div>
 
             <div className="plan featured">
@@ -191,7 +196,9 @@ export default function HomePage() {
                 <div className="plan-feat no">API access</div>
                 <div className="plan-feat no">Multi-seat</div>
               </div>
-              <button className="plan-cta btn btn-primary">Request Access →</button>
+              <ModalButton modal="access" className="plan-cta btn btn-primary">
+                Request Access →
+              </ModalButton>
             </div>
 
             <div className="plan">
@@ -209,7 +216,9 @@ export default function HomePage() {
                 <div className="plan-feat">Strategy backtesting engine</div>
                 <div className="plan-feat">Priority support + custom coverage</div>
               </div>
-              <button className="plan-cta btn-secondary">Contact Sales</button>
+              <ModalButton modal="contact" className="plan-cta btn-secondary">
+                Contact Sales
+              </ModalButton>
             </div>
 
             <div className="plan">
@@ -227,7 +236,9 @@ export default function HomePage() {
                 <div className="plan-feat">Custom OMS / PMS integrations</div>
                 <div className="plan-feat">Dedicated coverage team</div>
               </div>
-              <button className="plan-cta btn-secondary">Talk to Us</button>
+              <ModalButton modal="contact" className="plan-cta btn-secondary">
+                Talk to Us
+              </ModalButton>
             </div>
           </div>
 
@@ -240,7 +251,9 @@ export default function HomePage() {
             </div>
             <div style={{ display: "flex", gap: "var(--sp-3)", justifyContent: "center", flexWrap: "wrap" }}>
               <input type="email" placeholder="your@fund.com" className="form-input" style={{ width: 240 }} />
-              <button className="btn btn-primary">Request Institutional Access →</button>
+              <ModalButton modal="access" className="btn btn-primary">
+                Request Institutional Access →
+              </ModalButton>
             </div>
           </div>
         </div>
