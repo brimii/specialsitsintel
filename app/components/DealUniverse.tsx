@@ -4,6 +4,8 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { type Deal } from "../data/deals";
 import DealTable, { type SortField } from "./DealTable";
 import DealDetail from "./DealDetail";
+import AlertStrip from "./AlertStrip";
+import Catalysts from "./Catalysts";
 
 const CATS: { id: string; label: string; style?: CSSProperties }[] = [
   { id: "ALL", label: "All" },
@@ -83,6 +85,7 @@ export default function DealUniverse({ deals }: { deals: Deal[] }) {
     <div className="page active" id="page-u">
       <div className="universe-shell">
         <div className="universe-main">
+          <AlertStrip />
           <div className="filter-bar">
             <span className="filter-label">CATEGORY</span>
             {CATS.map((c) => (
@@ -143,9 +146,7 @@ export default function DealUniverse({ deals }: { deals: Deal[] }) {
                 onReset={onReset}
               />
             ) : (
-              <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-3)", fontSize: 12, lineHeight: 1.8 }}>
-                Vue « Upcoming Catalysts » à venir dans une prochaine étape.
-              </div>
+              <Catalysts />
             )}
           </div>
         </div>

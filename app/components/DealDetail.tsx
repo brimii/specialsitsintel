@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { type Deal, pcol, ecol, SC, SC_HEX } from "../data/deals";
+import { STRATS } from "../data/content";
+import PriceChart from "./PriceChart";
 
 // Panneau de détail d'un deal. Le graphique de prix (SVG procédural) et le
 // renvoi vers la page Strategies sont différés à une étape ultérieure.
@@ -27,6 +30,7 @@ export default function DealDetail({ deal }: { deal: Deal | null }) {
   const ec = ecol(deal);
   const sHex = SC_HEX[deal.sc] || "#6e7a96";
   const tlCol = SC[deal.sc] || "var(--navy)";
+  const strat = STRATS.find((s) => s.cat === deal.c) || STRATS[0];
   const meta =
     deal.c === "MERGER"
       ? `Acq: ${deal.acq} · ${deal.v}`
@@ -83,6 +87,8 @@ export default function DealDetail({ deal }: { deal: Deal | null }) {
         <div className="ai-block-label">⊞ AI Commentary</div>
         <div className="ai-block-text">{deal.ai}</div>
       </div>
+
+      <PriceChart deal={deal} />
 
       {deal.s > 0 && (
         <>
@@ -148,6 +154,24 @@ export default function DealDetail({ deal }: { deal: Deal | null }) {
           </div>
         </>
       )}
+
+      <div className="section-title">Strategy Type</div>
+      <div
+        style={{
+          fontSize: 10.5,
+          color: "var(--text-2)",
+          lineHeight: 1.6,
+          padding: "var(--sp-3)",
+          background: "var(--bg-2)",
+          borderRadius: "var(--r-md)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        {strat.desc.substring(0, 160)}…{" "}
+        <Link href="/strategies" style={{ color: "var(--navy)", fontWeight: 600 }}>
+          Learn more →
+        </Link>
+      </div>
     </div>
   );
 }

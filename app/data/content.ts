@@ -475,3 +475,87 @@ export const HIST: HistDeal[] = [
    lesson:'CFIUS now applies even to close allies (Japan). Political dimension of M&A reached new heights. Binary risk situations require small position sizing.'},
 ];
 
+
+export type Alert = { t: string; x: string; d: string; c: string };
+export type Catalyst = {
+  mo: string;
+  d: string;
+  m: string;
+  tag: string;
+  tagC: string;
+  deal: string;
+  evt: string;
+  desc: string;
+  imp: string;
+};
+
+export const ALERTS: Alert[] = [
+  {t:"SPREAD ALERT — URGENT",x:"US Steel/Nippon: DC Circuit oral args heard Apr 2026, panel skeptical of presidential override. Spread +3.2pts. Binary — size carefully.",d:"4 min ago",c:"R"},
+  {t:"AI SIGNAL — MISPRICING",x:"Seven&i: AI model 69% vs market 65%. +4pt alpha. FEFTA commitment framework reportedly near. Slippage model +2.1mo.",d:"12 min ago",c:"G"},
+  {t:"VERDICT PENDING",x:"Amedisys/UnitedHealth DOJ trial concluded. Verdict expected Q3 2026. Market at $85 vs $101 offer — binary.",d:"28 min ago",c:"R"},
+  {t:"ACTIVISM — CEO",x:"BP: Kate Thomson installed as CEO Feb 2026 replacing Auchincloss. $25B buyback plan announced. Elliott 5.2% partial win.",d:"44 min ago",c:"P"},
+  {t:"CLOSING — IMMINENT",x:"Hess/Chevron: ICC ruled ROFR does not apply. Close June 2026. Harvest at 1.9% spread. Redeploy capital.",d:"1h ago",c:"G"},
+  {t:"DISTRESSED — LIQUIDATION",x:"Spirit Airlines Chapter 7 filed May 2026. Frontier deal collapsed. A321neo fleet sold to Air Lease. Free Spirit loyalty to AA.",d:"2h ago",c:"R"},
+  {t:"SPINOFF — FORM 10",x:"Honeywell Aerospace Form 10 filed Q1 2026. Standalone EBITDA: $4.8B disclosed. $220B backlog. 2027 spin target.",d:"3h ago",c:"P"},
+  {t:"OOC — ADVANCING",x:"Altice USA RSA signed 80%+ creditors. Drahi dilutes to 18%. FCC change of control filed. Close Q4 2026.",d:"4h ago",c:"A"},
+  {t:"CLOSING — CONFIRMED",x:"Synopsys/Ansys closed April 2026. $390/share. All clearances DOJ, DG COMP, SAMR. Largest EDA deal.",d:"5h ago",c:"G"},
+  {t:"MACRO — AI POWER",x:"GE Vernova +180% since Apr 2024 spin. AI data center power demand drives gas turbine orders. Grid backlog $52B.",d:"6h ago",c:"B"},
+  {t:"ARBITRAGE — DC CIRCUIT",x:"Nippon/USS oral arguments April 2026. Ruling expected Q3 2026. Panel appeared skeptical of presidential override scope.",d:"7h ago",c:"A"},
+  {t:"DISTRESSED — MACRO",x:"Thames Water: Ofwat rejected second turnaround plan. Special administration imminent H2 2026. Senior secured 60-75 cents.",d:"9h ago",c:"A"},
+  {t:"MERGER — ANNOUNCED",x:"Informatica/Salesforce $37/share all-cash announced April 2026. HSR filed May 2026. DOJ vertical review.",d:"11h ago",c:"B"},
+  {t:"ACTIVISM — SETTLED",x:"Match Group: New CEO installed + 4 Elliott directors Q1 2026. Hinge IPO and Tinder separation under strategic review.",d:"14h ago",c:"P"},
+  {t:"REORG — EMERGING",x:"Enviva emerged March 2026. European contracts renegotiated. 1L noteholders: 82% equity. New Enviva 5 plants operational.",d:"18h ago",c:"G"},
+];
+
+export const CATALYSTS: Catalyst[] = [
+  {mo:"MAY 2026",d:"28",m:"May",tag:"CLOSING",tagC:"g",deal:"Hess / Chevron",evt:"Close — ICC cleared, FTC cleared",desc:"ICC ruled ROFR does not apply. 1.9% spread = pure settlement. Harvest.",imp:"M"},
+  {mo:"MAY 2026",d:"30",m:"May",tag:"CLOSE",tagC:"g",deal:"Mister Car Wash / LGP",evt:"PE take-private close",desc:"$8.25/share Leonard Green. H1 2026. HSR cleared.",imp:"L"},
+  {mo:"JUN 2026",d:"06",m:"Jun",tag:"CLOSE",tagC:"g",deal:"Enhabit / Kinderhook",evt:"Healthcare PE close",desc:"Q2 2026. HSR cleared.",imp:"L"},
+  {mo:"JUN 2026",d:"10",m:"Jun",tag:"CONSENT",tagC:"g",deal:"Juniper / HPE",evt:"FTC consent decree effective",desc:"$40/share settlement. 3.1% spread.",imp:"M"},
+  {mo:"JUN 2026",d:"15",m:"Jun",tag:"CLOSING",tagC:"g",deal:"SolarWinds / Turn/River",evt:"PE take-private close",desc:"$14.50/share. Q2 2026.",imp:"L"},
+  {mo:"JUN 2026",d:"18",m:"Jun",tag:"CLOSE",tagC:"g",deal:"Veris Residential / Affinius",evt:"NJ multifamily REIT close",desc:"$23.80/share all-cash. Q2 2026.",imp:"L"},
+  {mo:"JUN 2026",d:"20",m:"Jun",tag:"CLOSE",tagC:"g",deal:"G Mining / G2 Goldfields",evt:"Guyana gold merger close",desc:"All-stock. Competition Bureau Canada cleared.",imp:"L"},
+  {mo:"JUN 2026",d:"22",m:"Jun",tag:"RITE AID",tagC:"a",deal:"Rite Aid",evt:"Plan confirmation hearing",desc:"Opioid settlement $402M. 1,100-store entity. Secured 78-84 cents.",imp:"M"},
+  {mo:"JUN 2026",d:"25",m:"Jun",tag:"CLOSE",tagC:"g",deal:"Stellar Bancorp / Prosperity",evt:"Texas bank merger close",desc:"Fed + OCC approved. Q2 2026.",imp:"L"},
+  {mo:"JUN 2026",d:"28",m:"Jun",tag:"CLOSE",tagC:"g",deal:"Kennedy-Wilson / Fairfax",evt:"Real estate take-private close",desc:"Fairfax all-cash. Q2 2026.",imp:"L"},
+  {mo:"JUL 2026",d:"08",m:"Jul",tag:"CFIUS",tagC:"a",deal:"US Steel / Nippon",evt:"CFIUS / DC Circuit — case held in abeyance",desc:"DOJ motion held case in abeyance due to 'ongoing discussions'. Watch for negotiated CFIUS approval vs litigation outcome. Binary if litigated — Win $55, Break $28.",imp:"H"},
+  {mo:"JUL 2026",d:"14",m:"Jul",tag:"VERDICT",tagC:"r",deal:"Amedisys / UnitedHealth",evt:"DOJ antitrust trial verdict",desc:"Federal judge rules on home health concentration. 49% probability. Break $70, win $101.",imp:"H"},
+  {mo:"JUL 2026",d:"15",m:"Jul",tag:"CLOSE",tagC:"g",deal:"Soleno / Neurocrine",evt:"Rare disease acquisition close",desc:"$62.80/share. May-July 2026 window. No antitrust overlap.",imp:"M"},
+  {mo:"JUL 2026",d:"18",m:"Jul",tag:"FCC",tagC:"a",deal:"DISH / DirecTV",evt:"FCC spectrum transfer ruling",desc:"18M subscriber entity. Rural broadband rationale. 72% probability.",imp:"H"},
+  {mo:"JUL 2026",d:"25",m:"Jul",tag:"FEFTA",tagC:"r",deal:"Seven & i / Couche-Tard",evt:"FEFTA national security commitment",desc:"Japanese gov binding commitment framework. Determines deal viability at ¥2,700/share. 69%.",imp:"H"},
+  {mo:"JUL 2026",d:"28",m:"Jul",tag:"CLOSE",tagC:"g",deal:"Centessa / Eli Lilly",evt:"Gene therapy pipeline close",desc:"$24.80/share. Lilly pipeline. No antitrust overlap.",imp:"L"},
+  {mo:"AUG 2026",d:"04",m:"Aug",tag:"CLOSE",tagC:"g",deal:"Calavo / Mission Produce",evt:"Avocado producer merger close",desc:"By end August 2026. FTC cleared.",imp:"L"},
+  {mo:"AUG 2026",d:"05",m:"Aug",tag:"CLOSE",tagC:"g",deal:"Walgreens / Sycamore",evt:"PE take-private close",desc:"$11.45/share. FTC cleared. WBA delists.",imp:"M"},
+  {mo:"AUG 2026",d:"10",m:"Aug",tag:"CLOSE",tagC:"g",deal:"KalVista / Chiesi",evt:"Rare disease pharma close",desc:"Hereditary angioedema. Q3 2026. EU + HSR cleared.",imp:"L"},
+  {mo:"AUG 2026",d:"12",m:"Aug",tag:"FTC 2ND",tagC:"a",deal:"Smith & Nephew / Stryker",evt:"FTC Second Request substantial compliance",desc:"Orthopedic divestitures framework submitted. CMA parallel. Q1 2027 close.",imp:"H"},
+  {mo:"AUG 2026",d:"15",m:"Aug",tag:"CLOSE",tagC:"g",deal:"Catalyst Pharma / Angelini",evt:"Rare disease acquisition close",desc:"Firdapse / Lambert-Eaton. Q3 2026. No overlap.",imp:"L"},
+  {mo:"AUG 2026",d:"18",m:"Aug",tag:"CLOSE",tagC:"g",deal:"Esperion / ARCHIMED",evt:"PE pharma acquisition close",desc:"Bempedoic acid. Q3 2026.",imp:"L"},
+  {mo:"AUG 2026",d:"20",m:"Aug",tag:"CLOSE",tagC:"g",deal:"Cross Country / Knox Lane",evt:"Healthcare staffing PE close",desc:"Knox Lane take-private. Q3 2026.",imp:"L"},
+  {mo:"AUG 2026",d:"25",m:"Aug",tag:"OOC",tagC:"a",deal:"Altice USA",evt:"OOC exchange offer close",desc:"80%+ RSA. Drahi 18% equity. FCC concurrent. Q4 2026.",imp:"H"},
+  {mo:"SEP 2026",d:"08",m:"Sep",tag:"IPO",tagC:"p",deal:"Sanofi / Opella",evt:"Opella IPO on Euronext",desc:"€16B valuation. Sanofi retains 70%. Parent re-rates as pure-play pharma.",imp:"M"},
+  {mo:"SEP 2026",d:"10",m:"Sep",tag:"CLOSE",tagC:"g",deal:"Orla Mining / Equinox",evt:"Canadian gold merger close",desc:"Camino Rojo Mexico. Q3 2026.",imp:"L"},
+  {mo:"SEP 2026",d:"15",m:"Sep",tag:"DOJ",tagC:"a",deal:"Informatica / Salesforce",evt:"DOJ clearance decision",desc:"Vertical data management review. Behavioral remedy expected. Q3 2026.",imp:"M"},
+  {mo:"SEP 2026",d:"18",m:"Sep",tag:"CLOSE",tagC:"g",deal:"Whitestone REIT / Ares",evt:"Sun Belt retail REIT close",desc:"Ares Management all-cash. Q3 2026.",imp:"L"},
+  {mo:"SEP 2026",d:"22",m:"Sep",tag:"SPINOFF",tagC:"b",deal:"DuPont Electronics",evt:"E&I distribution to holders",desc:"Semiconductor materials = AI infrastructure pure-play.",imp:"M"},
+  {mo:"SEP 2026",d:"25",m:"Sep",tag:"CLOSE",tagC:"g",deal:"Aurion Resources / Agnico",evt:"Finnish gold district close",desc:"Competition Bureau Canada. Early Q3 2026.",imp:"L"},
+  {mo:"SEP 2026",d:"28",m:"Sep",tag:"CLOSE",tagC:"g",deal:"Emerald Holding / Apollo",evt:"B2B trade shows PE close",desc:"Apollo all-cash. H2 2026.",imp:"L"},
+  {mo:"OCT 2026",d:"05",m:"Oct",tag:"CLOSE",tagC:"g",deal:"Boralex / Brookfield+CDPQ",evt:"Canadian renewables close",desc:"Brookfield + CDPQ. Q4 2026.",imp:"M"},
+  {mo:"OCT 2026",d:"06",m:"Oct",tag:"CMA",tagC:"a",deal:"Anglo American / BHP",evt:"CMA Phase 2 launch",desc:"Copper concentration. 12-month Phase 2. Q4 2026 + CMA timing.",imp:"H"},
+  {mo:"OCT 2026",d:"10",m:"Oct",tag:"CLOSE",tagC:"g",deal:"National Storage / Public Storage",evt:"Self-storage REIT merger close",desc:"FTC geographic divestitures. Q3 2026.",imp:"M"},
+  {mo:"OCT 2026",d:"14",m:"Oct",tag:"CLOSE",tagC:"g",deal:"TDS / Verizon",evt:"Rural wireless consolidation close",desc:"$24.80/share. FCC + DOJ cleared. Q4 2026.",imp:"M"},
+  {mo:"OCT 2026",d:"18",m:"Oct",tag:"CLOSE",tagC:"g",deal:"ARC Resources / Shell",evt:"Canadian Montney gas close",desc:"Competition Bureau + CRTC. H2 2026.",imp:"M"},
+  {mo:"OCT 2026",d:"20",m:"Oct",tag:"ACTIVISM",tagC:"p",deal:"Honeywell Buildings",evt:"Buildings separation decision",desc:"Third HON leg. Aerospace + Automation committed. 2027 target.",imp:"M"},
+  {mo:"OCT 2026",d:"25",m:"Oct",tag:"CLOSE",tagC:"g",deal:"UniFirst / Cintas",evt:"Uniform services merger close",desc:"DOJ geographic remedy agreed. H2 2026.",imp:"M"},
+  {mo:"NOV 2026",d:"04",m:"Nov",tag:"CLOSE",tagC:"g",deal:"Globalstar / Amazon",evt:"LEO satellite close",desc:"FCC spectrum transfer. Amazon Kuiper integration.",imp:"M"},
+  {mo:"NOV 2026",d:"10",m:"Nov",tag:"EC",tagC:"a",deal:"ZIM / Hapag-Lloyd",evt:"EC Phase 1 decision",desc:"DG COMP container shipping. Asia-Europe route concentration. Behavioral remedies expected.",imp:"H"},
+  {mo:"NOV 2026",d:"15",m:"Nov",tag:"CLOSE",tagC:"g",deal:"Olaplex / Henkel",evt:"Luxury haircare close",desc:"EC + HSR cleared. H2 2026.",imp:"L"},
+  {mo:"NOV 2026",d:"18",m:"Nov",tag:"FINMA",tagC:"a",deal:"Julius Baer / EFG",evt:"FINMA Swiss banking decision",desc:"#3 Swiss private bank. ECB concurrent. H1 2027.",imp:"M"},
+  {mo:"NOV 2026",d:"22",m:"Nov",tag:"FERC",tagC:"a",deal:"AES / BlackRock GIP+EQT",evt:"FERC initial decision",desc:"Utility assets acquisition. Multi-state commissions. Late 2026-Early 2027.",imp:"H"},
+  {mo:"NOV 2026",d:"28",m:"Nov",tag:"CLOSE",tagC:"g",deal:"Equitable / Corebridge",evt:"Life insurance merger close",desc:"50-state insurance commissioners + DOL. Year-end 2026.",imp:"M"},
+  {mo:"DEC 2026",d:"05",m:"Dec",tag:"CLOSE",tagC:"g",deal:"LiveRamp / Publicis",evt:"Data platform acquisition close",desc:"$38.50/share. CFIUS behavioral commitment. Year-end 2026.",imp:"M"},
+  {mo:"DEC 2026",d:"10",m:"Dec",tag:"CLOSE",tagC:"g",deal:"Anglo American / BHP",evt:"CMA + SAMR clearance (Phase 1 scenario)",desc:"If CMA clears Phase 1. Copper divestitures as remedy. $49B.",imp:"H"},
+  {mo:"DEC 2026",d:"15",m:"Dec",tag:"FERC",tagC:"r",deal:"Dominion / NextEra",evt:"FERC utility mega-merger filing",desc:"World's largest utility merger. 5 regulators. FERC review begins. 12-18 months.",imp:"H"},
+  {mo:"DEC 2026",d:"20",m:"Dec",tag:"DOJ",tagC:"a",deal:"Valaris / Transocean",evt:"HSR Second Request compliance",desc:"Offshore drillship divestitures. DOJ + CMA + NKOM concurrent.",imp:"H"},
+  {mo:"DEC 2026",d:"22",m:"Dec",tag:"CLOSE",tagC:"g",deal:"RE/MAX / Real Brokerage",evt:"Real estate franchise merger close",desc:"DOJ real estate cleared. H2 2026.",imp:"L"},
+];
+
