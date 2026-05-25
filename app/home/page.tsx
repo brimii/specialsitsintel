@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ModalButton from "@/app/components/ModalButton";
+import CheckoutButton from "@/app/components/CheckoutButton";
 
 // Page Home (marketing). Les boutons "Request Access / Contact Sales" et le
 // formulaire e-mail ouvriront des modales — branchés à l'étape modales.
@@ -196,9 +197,9 @@ export default function HomePage() {
                 <div className="plan-feat no">API access</div>
                 <div className="plan-feat no">Multi-seat</div>
               </div>
-              <ModalButton modal="access" className="plan-cta btn btn-primary">
-                Request Access →
-              </ModalButton>
+              <CheckoutButton tier="analyst" className="plan-cta btn btn-primary">
+                S&apos;abonner →
+              </CheckoutButton>
             </div>
 
             <div className="plan">

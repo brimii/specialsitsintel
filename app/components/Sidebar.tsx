@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useModal } from "./modals/ModalProvider";
 import { createClient } from "@/lib/supabase/client";
+import PortalButton from "./PortalButton";
 
 // Navigation principale — reproduit les 8 entrées de la maquette
 const NAV = [
@@ -106,6 +107,9 @@ export default function Sidebar() {
             >
               {email}
             </div>
+            <PortalButton className="btn btn-secondary btn-sm" style={{ width: "100%" }}>
+              Gérer l&apos;abonnement
+            </PortalButton>
             <button className="btn btn-secondary btn-sm" style={{ width: "100%" }} onClick={onLogout}>
               Se déconnecter
             </button>
