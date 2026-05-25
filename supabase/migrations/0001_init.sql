@@ -104,6 +104,15 @@ alter table public.deal_updates  enable row level security;
 alter table public.sources       enable row level security;
 alter table public.review_queue  enable row level security;
 
+-- ── Privilèges de rôles (la RLS ci-dessus reste le vrai garde-fou) ──
+-- Supabase applique normalement ces grants automatiquement ; on les rend
+-- explicites pour garantir que service_role (serveur) et les rôles client
+-- aient les privilèges attendus. L'accès aux LIGNES est contrôlé par la RLS.
+grant usage on schema public to anon, authenticated, service_role;
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+grant all on all routines in schema public to anon, authenticated, service_role;
+
 -- profiles : chaque user lit/édite SA ligne
 create policy "profiles_select_own" on public.profiles
   for select using (auth.uid() = id);
