@@ -1,6 +1,19 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+
+const linkBtnStyle = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  color: "var(--navy)",
+  fontFamily: "var(--font-mono)",
+  fontSize: 11,
+  cursor: "pointer",
+  textDecoration: "underline",
+} as const;
 
 type ModalName = "access" | "contact" | "login";
 type Ctx = { open: (m: ModalName) => void; close: () => void };
@@ -225,35 +238,151 @@ function ContactModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+type LoginMode = "login" | "signup" | "forgot";
+
 function LoginModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const [mode, setMode] = useState<LoginMode>("login");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // L'authentification réelle (Supabase Auth) arrive en Phase 1.
+  const switchMode = (m: LoginMode) => {
+    setMode(m);
+    setError(null);
+    setInfo(null);
+  };
+
+  const submit = async () => {
+    setError(null);
+    setInfo(null);
+    const supabase = createClient();
+    if (!supabase) {
+      setError("Authentification non configurée (env Supabase manquant).");
+      return;
+    }
+    if (!isEmail(email)) {
+      setError("Entre un email valide.");
+      return;
+    }
+    setLoading(true);
+    try {
+      if (mode === "login") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+        if (error) return setError(error.message);
+        onClose();
+        router.refresh();
+      } else if (mode === "signup") {
+        if (pass.length < 8) return setError("Mot de passe : 8 caractères minimum.");
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password: pass,
+          options: { emailRedirectTo: `${window.location.origin}/auth/confirm` },
+        });
+        if (error) return setError(error.message);
+        if (data.session) {
+          onClose();
+          router.refresh();
+        } else {
+          setInfo("Compte créé ! Vérifie ton email pour confirmer ton adresse.");
+        }
+      } else {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth/confirm`,
+        });
+        if (error) return setError(error.message);
+        setInfo("Email de réinitialisation envoyé. Vérifie ta boîte de réception.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const titles: Record<LoginMode, string> = {
+    login: "Log in",
+    signup: "Créer un compte",
+    forgot: "Mot de passe oublié",
+  };
+  const subtitles: Record<LoginMode, string> = {
+    login: "Access your SpecialSitsIntel dashboard.",
+    signup: "Crée ton accès SpecialSitsIntel.",
+    forgot: "On t'envoie un lien de réinitialisation.",
+  };
+  const ctaLabel = loading
+    ? "…"
+    : mode === "login"
+      ? "Log in →"
+      : mode === "signup"
+        ? "Créer →"
+        : "Envoyer le lien →";
+
   return (
     <Overlay onClose={onClose}>
-      <Header title="Log in" subtitle="Access your SpecialSitsIntel dashboard." onClose={onClose} />
+      <Header title={titles[mode]} subtitle={subtitles[mode]} onClose={onClose} />
       <div className="modal-body">
         <div className="form-group">
           <label className="form-label">Email</label>
-          <input className="form-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@fund.com" />
+          <input
+            className="form-input"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@fund.com"
+          />
         </div>
-        <div className="form-group">
-          <label className="form-label">Password</label>
-          <input className="form-input" type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••" />
-        </div>
-        <div style={{ textAlign: "right", marginBottom: "var(--sp-4)" }}>
-          <a href="#" style={{ fontSize: 11, color: "var(--navy)", fontFamily: "var(--font-mono)" }}>
-            Forgot password?
-          </a>
+        {mode !== "forgot" && (
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <input
+              className="form-input"
+              type="password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+        )}
+        {mode === "login" && (
+          <div style={{ textAlign: "right", marginBottom: "var(--sp-2)" }}>
+            <button type="button" onClick={() => switchMode("forgot")} style={linkBtnStyle}>
+              Forgot password?
+            </button>
+          </div>
+        )}
+        {error && <div className="form-error visible">{error}</div>}
+        {info && <div style={{ fontSize: 11, color: "var(--navy)", lineHeight: 1.6, marginTop: 6 }}>{info}</div>}
+        <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: "var(--sp-3)" }}>
+          {mode === "login" && (
+            <>
+              Pas de compte ?{" "}
+              <button type="button" onClick={() => switchMode("signup")} style={linkBtnStyle}>
+                Créer un compte
+              </button>
+            </>
+          )}
+          {mode === "signup" && (
+            <>
+              Déjà un compte ?{" "}
+              <button type="button" onClick={() => switchMode("login")} style={linkBtnStyle}>
+                Se connecter
+              </button>
+            </>
+          )}
+          {mode === "forgot" && (
+            <button type="button" onClick={() => switchMode("login")} style={linkBtnStyle}>
+              ← Retour à la connexion
+            </button>
+          )}
         </div>
       </div>
       <div className="modal-footer">
         <button className="btn btn-secondary" onClick={onClose}>
           Cancel
         </button>
-        <button className="btn btn-primary" onClick={onClose}>
-          Log in →
+        <button className="btn btn-primary" onClick={submit} disabled={loading}>
+          {ctaLabel}
         </button>
       </div>
     </Overlay>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useModal } from "./modals/ModalProvider";
+import { createClient } from "@/lib/supabase/client";
 
 // Navigation principale — reproduit les 8 entrées de la maquette
 const NAV = [
@@ -19,8 +20,28 @@ const NAV = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { open } = useModal();
   const [mobOpen, setMobOpen] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setEmail(session?.user?.email ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const onLogout = async () => {
+    const supabase = createClient();
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setEmail(null);
+    router.refresh();
+  };
 
   return (
     <>
@@ -70,12 +91,35 @@ export default function Sidebar() {
       </div>
 
       <div className="nav-footer">
-        <button className="btn btn-primary btn-sm" style={{ width: "100%" }} onClick={() => open("access")}>
-          Request Access →
-        </button>
-        <button className="btn btn-secondary btn-sm" style={{ width: "100%" }} onClick={() => open("login")}>
-          Log in
-        </button>
+        {email ? (
+          <>
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 9,
+                color: "var(--text-3)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={email}
+            >
+              {email}
+            </div>
+            <button className="btn btn-secondary btn-sm" style={{ width: "100%" }} onClick={onLogout}>
+              Se déconnecter
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-primary btn-sm" style={{ width: "100%" }} onClick={() => open("access")}>
+              Request Access →
+            </button>
+            <button className="btn btn-secondary btn-sm" style={{ width: "100%" }} onClick={() => open("login")}>
+              Log in
+            </button>
+          </>
+        )}
       </div>
 
       <button
