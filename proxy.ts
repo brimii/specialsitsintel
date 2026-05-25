@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Rafraîchit la session Supabase à chaque requête (cookies) pour que les
 // Server Components voient l'utilisateur connecté. No-op si l'env est absent.
-export async function middleware(request: NextRequest) {
+// (Convention Next 16 : "proxy", anciennement "middleware".)
+export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) return NextResponse.next();
