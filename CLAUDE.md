@@ -130,16 +130,17 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 > Mets à jour cette section au fil du projet pour que les futures sessions sachent où on en est.
 
 - [x] Phase 0 — Socle (migration vers Next.js + base) ✅
-- [ ] Phase 1 — Auth + Stripe + restriction par palier
+- [x] Phase 1 — Auth + Stripe + restriction par palier ✅
 - [ ] Phase 2 — Gestion / admin
 - [ ] Phase 3 — Pipeline de données semi-automatique
 - [ ] Phase 4 — Automatisation étendue
 
-**Session actuelle / notes** (maj 2026-05-25) — *Phase 0 ✅. Phase 1 en cours : Auth ✅ + Stripe ✅, reste la restriction par palier.* :
+**Session actuelle / notes** (maj 2026-05-25) — *Phases 0 ✅ et 1 ✅ terminées. Prochaine : Phase 2 (gestion / admin).* :
 
 - **Phase 1 — Auth (fait)** : email + mot de passe via `@supabase/ssr`. `lib/supabase/client.ts` (navigateur, cookies) + `lib/supabase/server.ts` (`createClient` session + `createAdminClient`) + `proxy.ts` (ex-middleware, rafraîchit la session). Route `app/auth/confirm/route.ts` (confirmation + récupération) + page `app/auth/reset-password`. Modale Login = connexion / inscription / mot de passe oublié. Sidebar = email + déconnexion quand connecté.
 - **Phase 1 — Stripe (fait)** : `lib/stripe.ts` (client paresseux + mapping tier↔price) ; `scripts/stripe-setup.ts` (`npm run stripe:setup`) ; migration `0002_stripe.sql` (`profiles.stripe_customer_id` + index unique abo). Routes `app/api/stripe/{checkout,webhook,portal}` : checkout auth serveur ; webhook **signé + idempotent** → met à jour `subscriptions` + `profiles.tier` ; portal. Boutons `CheckoutButton` (Analyst sur Home) + `PortalButton` (sidebar). **Testé** : paiement test → `tier` passe à `analyst`. `.env.local` contient aussi `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*`.
-- **Phase 1 — RESTE** : restriction par palier (RLS `tier ≥ min_tier` + filtrage API : free = 5 deals max, sans `ai_commentary` ni scoring FTC ; `/` à passer en dynamique pour lire le tier de l'utilisateur).
+- **Phase 1 — Restriction par palier (fait)** : `lib/deals.ts` → `getDealsForTier(tier)` filtre CÔTÉ SERVEUR (free = 5 deals max, `ai`/`desc`/`pr` retirés avant envoi ; payant = tous selon `min_tier`). `page.tsx` est dynamique (`force-dynamic`) et lit le `tier` du profil via la session. `DealUniverse` affiche un bandeau d'aperçu, `DealDetail` masque IA/scoring/graphique en free. `KpiBar` utilise `getAllDeals()` (stats agrégées publiques). Migration `0003_tier_policy.sql` = policy RLS `tier ≥ min_tier` (défense en profondeur, **à exécuter dans le SQL Editor**).
+- **À noter** : `min_tier` de tous les deals = `analyst` par défaut → un abonné Analyst+ voit les 213 ; le free voit un aperçu de 5. Pour exposer certains deals au palier free, mettre leur `min_tier = 'free'`.
 
 - **Stack** : Next.js 16 (App Router, TypeScript) sans Tailwind. Maquette de référence conservée dans `reference/specialsitsintel_premium_2.html`. Design system porté tel quel dans `app/globals.css` (tokens + polices DM Mono / Syne / Instrument Serif).
 - **Coque** : `Sidebar` (+ nav mobile hamburger/`mob-nav`), `KpiBar` (count/spread/proba **calculés** depuis les deals), `Ticker` dans `app/layout.tsx` (persistants sur toutes les pages).
