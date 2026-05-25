@@ -23,6 +23,7 @@ export type Deal = {
   desc: string;
   ai: string;
   tl: TimelineEntry[];
+  min_tier?: string; // palier minimum requis (défaut: analyst)
 };
 
 export const BADGE_CL: Record<string, string> = {

@@ -3,9 +3,9 @@ import { type Deal, pcol, ecol, SC, SC_HEX } from "../data/deals";
 import { STRATS } from "../data/content";
 import PriceChart from "./PriceChart";
 
-// Panneau de détail d'un deal. Le graphique de prix (SVG procédural) et le
-// renvoi vers la page Strategies sont différés à une étape ultérieure.
-export default function DealDetail({ deal }: { deal: Deal | null }) {
+// Panneau de détail d'un deal. `locked` (palier free) masque les éléments
+// premium : commentaire IA, scoring FTC, graphique de prix.
+export default function DealDetail({ deal, locked = false }: { deal: Deal | null; locked?: boolean }) {
   if (!deal) {
     return (
       <div
@@ -79,10 +79,22 @@ export default function DealDetail({ deal }: { deal: Deal | null }) {
         </div>
       </div>
 
-      <div className="ai-block navy">
-        <div className="ai-block-label">✦ AI Intelligence</div>
-        <div className="ai-block-text">{deal.desc}</div>
-      </div>
+      {locked ? (
+        <div className="ai-block navy">
+          <div className="ai-block-label">🔒 Intelligence réservée</div>
+          <div className="ai-block-text">
+            Commentaire IA, scoring FTC et graphique de prix sont réservés aux abonnés Analyst+.{" "}
+            <Link href="/home" style={{ color: "var(--navy)", fontWeight: 600 }}>
+              Voir les offres →
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="ai-block navy">
+            <div className="ai-block-label">✦ AI Intelligence</div>
+            <div className="ai-block-text">{deal.desc}</div>
+          </div>
       <div className="ai-block cobalt">
         <div className="ai-block-label">⊞ AI Commentary</div>
         <div className="ai-block-text">{deal.ai}</div>
@@ -120,6 +132,8 @@ export default function DealDetail({ deal }: { deal: Deal | null }) {
               underpricing closing odds.
             </div>
           </div>
+        </>
+      )}
         </>
       )}
 

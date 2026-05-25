@@ -1,10 +1,9 @@
-import { getDeals } from "@/lib/deals";
+import { getAllDeals } from "@/lib/deals";
 
-// Barre KPI — calculée côté serveur à partir des deals (count, spread moyen
-// des deals à spread positif, proba de close moyenne). Les autres cellules
-// reprennent les valeurs décoratives de la maquette.
+// Barre KPI — stats agrégées (publiques) sur l'ensemble des situations :
+// nombre, spread moyen (deals à spread positif), proba de close moyenne.
 export default async function KpiBar() {
-  const deals = await getDeals();
+  const deals = await getAllDeals();
   const arb = deals.filter((d) => d.s > 0);
   const avgSpread = arb.length ? (arb.reduce((s, d) => s + d.s, 0) / arb.length).toFixed(1) + "%" : "—";
   const avgProb = deals.length ? (deals.reduce((s, d) => s + d.p, 0) / deals.length).toFixed(0) + "%" : "—";

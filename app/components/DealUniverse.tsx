@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties } from "react";
+import Link from "next/link";
 import { type Deal } from "../data/deals";
 import DealTable, { type SortField } from "./DealTable";
 import DealDetail from "./DealDetail";
@@ -38,7 +39,8 @@ function parseDate(s?: string): number {
   return 0;
 }
 
-export default function DealUniverse({ deals }: { deals: Deal[] }) {
+export default function DealUniverse({ deals, tier }: { deals: Deal[]; tier: string }) {
+  const locked = tier === "free";
   const [cat, setCat] = useState("ALL");
   const [reg, setReg] = useState("ALL");
   const [q, setQ] = useState("");
@@ -86,6 +88,30 @@ export default function DealUniverse({ deals }: { deals: Deal[] }) {
       <div className="universe-shell">
         <div className="universe-main">
           <AlertStrip />
+          {locked && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "var(--sp-3)",
+                flexWrap: "wrap",
+                padding: "var(--sp-3) var(--sp-5)",
+                background: "var(--navy-bg)",
+                borderBottom: "1px solid var(--navy-bd)",
+                fontSize: 11,
+                color: "var(--navy)",
+              }}
+            >
+              <span>
+                🔒 Aperçu gratuit — 5 situations. Commentaire IA, scoring FTC et graphiques
+                réservés aux abonnés Analyst+.
+              </span>
+              <Link href="/home" style={{ fontWeight: 700, whiteSpace: "nowrap" }}>
+                Passer à Analyst →
+              </Link>
+            </div>
+          )}
           <div className="filter-bar">
             <span className="filter-label">CATEGORY</span>
             {CATS.map((c) => (
@@ -159,7 +185,7 @@ export default function DealUniverse({ deals }: { deals: Deal[] }) {
             </span>
           </div>
           <div id="side">
-            <DealDetail deal={selDeal} />
+            <DealDetail deal={selDeal} locked={locked} />
           </div>
         </div>
       </div>
