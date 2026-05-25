@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties } from "react";
-import { DEALS } from "../data/deals";
+import { type Deal } from "../data/deals";
 import DealTable, { type SortField } from "./DealTable";
 import DealDetail from "./DealDetail";
 
@@ -36,7 +36,7 @@ function parseDate(s?: string): number {
   return 0;
 }
 
-export default function DealUniverse() {
+export default function DealUniverse({ deals }: { deals: Deal[] }) {
   const [cat, setCat] = useState("ALL");
   const [reg, setReg] = useState("ALL");
   const [q, setQ] = useState("");
@@ -47,7 +47,7 @@ export default function DealUniverse() {
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
-    const d = DEALS.filter((x) => {
+    const d = deals.filter((x) => {
       if (cat !== "ALL" && x.c !== cat) return false;
       if (reg !== "ALL" && x.reg !== reg) return false;
       if (ql && !(x.nm + x.acq + x.c + x.r).toLowerCase().includes(ql)) return false;
@@ -62,9 +62,9 @@ export default function DealUniverse() {
       return 0;
     });
     return d;
-  }, [cat, reg, q, sortF, sortD]);
+  }, [deals, cat, reg, q, sortF, sortD]);
 
-  const selDeal = selId == null ? null : DEALS.find((d) => d.id === selId) ?? null;
+  const selDeal = selId == null ? null : deals.find((d) => d.id === selId) ?? null;
 
   const onSort = (f: SortField) => {
     if (sortF === f) setSortD((v) => v * -1);

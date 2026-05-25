@@ -1,7 +1,9 @@
 import DealUniverse from "./components/DealUniverse";
+import { getDeals } from "@/lib/deals";
 
-// Page Deal Universe (route par défaut) : tableau des deals + panneau de détail,
-// alimentés par les données de la maquette en attendant Supabase.
-export default function Home() {
-  return <DealUniverse />;
+// Server Component : lit les deals CÔTÉ SERVEUR (Supabase si configuré, sinon
+// fallback local) et ne transmet au navigateur que les données autorisées.
+export default async function Home() {
+  const deals = await getDeals();
+  return <DealUniverse deals={deals} />;
 }
