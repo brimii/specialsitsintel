@@ -131,11 +131,13 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 
 - [x] Phase 0 — Socle (migration vers Next.js + base) ✅
 - [x] Phase 1 — Auth + Stripe + restriction par palier ✅
-- [ ] Phase 2 — Gestion / admin
+- [x] Phase 2 — Gestion / admin ✅
 - [ ] Phase 3 — Pipeline de données semi-automatique
 - [ ] Phase 4 — Automatisation étendue
 
-**Session actuelle / notes** (maj 2026-05-25) — *Phases 0 ✅ et 1 ✅ terminées. Prochaine : Phase 2 (gestion / admin).* :
+**Session actuelle / notes** (maj 2026-05-25) — *Phases 0, 1, 2 terminées ✅. Prochaine : Phase 3 (pipeline de données).* :
+
+- **Phase 2 — Admin (fait)** : `lib/admin.ts` → `requireAdmin()` (404 si rôle ≠ admin). Dossier `app/admin/` : layout avec nav (Vue d'ensemble / Utilisateurs / Deals), page Overview (KPIs users par tier, abos actifs, MRR estimé, deals en base), page Users (changer tier + role via server actions), page Deals (changer `min_tier`). Toutes les mutations re-vérifient le rôle admin et utilisent `service_role` côté serveur. Pour passer admin : `update public.profiles set role='admin' where email='…'` dans le SQL Editor.
 
 - **Phase 1 — Auth (fait)** : email + mot de passe via `@supabase/ssr`. `lib/supabase/client.ts` (navigateur, cookies) + `lib/supabase/server.ts` (`createClient` session + `createAdminClient`) + `proxy.ts` (ex-middleware, rafraîchit la session). Route `app/auth/confirm/route.ts` (confirmation + récupération) + page `app/auth/reset-password`. Modale Login = connexion / inscription / mot de passe oublié. Sidebar = email + déconnexion quand connecté.
 - **Phase 1 — Stripe (fait)** : `lib/stripe.ts` (client paresseux + mapping tier↔price) ; `scripts/stripe-setup.ts` (`npm run stripe:setup`) ; migration `0002_stripe.sql` (`profiles.stripe_customer_id` + index unique abo). Routes `app/api/stripe/{checkout,webhook,portal}` : checkout auth serveur ; webhook **signé + idempotent** → met à jour `subscriptions` + `profiles.tier` ; portal. Boutons `CheckoutButton` (Analyst sur Home) + `PortalButton` (sidebar). **Testé** : paiement test → `tier` passe à `analyst`. `.env.local` contient aussi `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*`.
