@@ -8,16 +8,9 @@ export async function requireAdmin() {
   const supabase = await createClient();
   const {
     data: { user },
-    error: userError,
   } = await supabase.auth.getUser();
-  console.log("[requireAdmin] user.id:", user?.id, "email:", user?.email, "userErr:", userError?.message);
   if (!user) notFound();
-  const { data, error: profileError } = await supabase
-    .from("profiles")
-    .select("role, email")
-    .eq("id", user.id)
-    .single();
-  console.log("[requireAdmin] profile:", data, "profileErr:", profileError?.message);
+  const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (data?.role !== "admin") notFound();
   return { user, supabase };
 }
