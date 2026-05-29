@@ -8,7 +8,26 @@ export const tierRank = (t: string) => RANK[t] ?? 0;
 
 const FREE_PREVIEW_COUNT = 5;
 
-// Tant que Supabase n'est pas configuré (pas d'env), fallback sur les données locales.
+// Terminal statuses — a deal in any of these is considered archived (historical).
+const TERMINAL_STATUSES = new Set([
+  "Closed",
+  "Dead",
+  "Liquidated",
+  "Settled",
+  "Terminated",
+  "Withdrawn",
+  "Won",
+  "Closed Won",
+  "Cancelled",
+  "Canceled",
+  "Failed",
+]);
+
+export function isActiveStatus(s: string | null | undefined): boolean {
+  if (!s) return true;
+  return !TERMINAL_STATUSES.has(s);
+}
+
 const hasSupabase = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
@@ -59,7 +78,7 @@ function rowToDeal(r: DealRow): Deal {
   };
 }
 
-async function fetchAllDeals(): Promise<Deal[]> {
+async function fetchAllRawDeals(): Promise<Deal[]> {
   if (!hasSupabase) return DEALS;
   const { createAdminClient } = await import("./supabase/server");
   const supabase = createAdminClient();
@@ -68,29 +87,43 @@ async function fetchAllDeals(): Promise<Deal[]> {
     .select("*")
     .order("spread", { ascending: false });
   if (error) {
-    console.error("[deals] Lecture Supabase échouée, fallback local :", error.message);
+    console.error("[deals] Supabase read failed, falling back to local:", error.message);
     return DEALS;
   }
   return (data as DealRow[]).map(rowToDeal);
 }
 
-// Statistiques agrégées (public marketing : nombre, spread moyen). Non restreint.
+// All ACTIVE deals (aggregated stats — used by the KPI bar).
 export async function getAllDeals(): Promise<Deal[]> {
-  return fetchAllDeals();
+  const all = await fetchAllRawDeals();
+  return all.filter((d) => isActiveStatus(d.st));
 }
 
-// Retire les champs premium AVANT envoi au navigateur (règle d'or).
+// All deals regardless of status (used by admin views).
+export async function getAllDealsIncludingArchived(): Promise<Deal[]> {
+  return fetchAllRawDeals();
+}
+
 function stripForFree(d: Deal): Deal {
   return { ...d, ai: "", desc: "", pr: { ...d.pr, u: 0, c: 0, o: 0 } };
 }
 
-// Deals visibles selon le palier de l'utilisateur, filtrés CÔTÉ SERVEUR.
+// Active deals filtered by tier — for the public Universe (/).
 export async function getDealsForTier(tier: Tier): Promise<Deal[]> {
-  const all = await fetchAllDeals();
+  const all = await fetchAllRawDeals();
+  const active = all.filter((d) => isActiveStatus(d.st));
   if (tier === "free") {
-    // Aperçu gratuit : 5 deals, sans commentaire IA / scoring / graphique.
-    return all.slice(0, FREE_PREVIEW_COUNT).map(stripForFree);
+    return active.slice(0, FREE_PREVIEW_COUNT).map(stripForFree);
   }
-  // Payant : tous les deals dont min_tier <= palier de l'utilisateur.
-  return all.filter((d) => tierRank(tier) >= tierRank(d.min_tier ?? "analyst"));
+  return active.filter((d) => tierRank(tier) >= tierRank(d.min_tier ?? "analyst"));
+}
+
+// Archived deals filtered by tier — for the public Archive (/archive).
+export async function getArchivedDealsForTier(tier: Tier): Promise<Deal[]> {
+  const all = await fetchAllRawDeals();
+  const archived = all.filter((d) => !isActiveStatus(d.st));
+  if (tier === "free") {
+    return archived.slice(0, FREE_PREVIEW_COUNT).map(stripForFree);
+  }
+  return archived.filter((d) => tierRank(tier) >= tierRank(d.min_tier ?? "analyst"));
 }

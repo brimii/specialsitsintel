@@ -198,7 +198,7 @@ export default function HomePage() {
                 <div className="plan-feat no">Multi-seat</div>
               </div>
               <CheckoutButton tier="analyst" className="plan-cta btn btn-primary">
-                S&apos;abonner →
+                Subscribe →
               </CheckoutButton>
             </div>
 

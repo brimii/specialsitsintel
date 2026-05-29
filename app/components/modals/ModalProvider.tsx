@@ -260,11 +260,11 @@ function LoginModal({ onClose }: { onClose: () => void }) {
     setInfo(null);
     const supabase = createClient();
     if (!supabase) {
-      setError("Authentification non configurée (env Supabase manquant).");
+      setError("Authentication not configured (Supabase env missing).");
       return;
     }
     if (!isEmail(email)) {
-      setError("Entre un email valide.");
+      setError("Enter a valid email.");
       return;
     }
     setLoading(true);
@@ -275,7 +275,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
         onClose();
         router.refresh();
       } else if (mode === "signup") {
-        if (pass.length < 8) return setError("Mot de passe : 8 caractères minimum.");
+        if (pass.length < 8) return setError("Password: 8 characters minimum.");
         const { data, error } = await supabase.auth.signUp({
           email,
           password: pass,
@@ -286,14 +286,14 @@ function LoginModal({ onClose }: { onClose: () => void }) {
           onClose();
           router.refresh();
         } else {
-          setInfo("Compte créé ! Vérifie ton email pour confirmer ton adresse.");
+          setInfo("Account created! Check your email to confirm your address.");
         }
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/auth/confirm`,
         });
         if (error) return setError(error.message);
-        setInfo("Email de réinitialisation envoyé. Vérifie ta boîte de réception.");
+        setInfo("Reset email sent. Check your inbox.");
       }
     } finally {
       setLoading(false);
@@ -302,21 +302,21 @@ function LoginModal({ onClose }: { onClose: () => void }) {
 
   const titles: Record<LoginMode, string> = {
     login: "Log in",
-    signup: "Créer un compte",
-    forgot: "Mot de passe oublié",
+    signup: "Sign up",
+    forgot: "Forgot password",
   };
   const subtitles: Record<LoginMode, string> = {
     login: "Access your SpecialSitsIntel dashboard.",
-    signup: "Crée ton accès SpecialSitsIntel.",
-    forgot: "On t'envoie un lien de réinitialisation.",
+    signup: "Create your SpecialSitsIntel account.",
+    forgot: "We'll send you a reset link.",
   };
   const ctaLabel = loading
     ? "…"
     : mode === "login"
       ? "Log in →"
       : mode === "signup"
-        ? "Créer →"
-        : "Envoyer le lien →";
+        ? "Sign up →"
+        : "Send link →";
 
   return (
     <Overlay onClose={onClose}>
@@ -356,23 +356,23 @@ function LoginModal({ onClose }: { onClose: () => void }) {
         <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: "var(--sp-3)" }}>
           {mode === "login" && (
             <>
-              Pas de compte ?{" "}
+              No account?{" "}
               <button type="button" onClick={() => switchMode("signup")} style={linkBtnStyle}>
-                Créer un compte
+                Sign up
               </button>
             </>
           )}
           {mode === "signup" && (
             <>
-              Déjà un compte ?{" "}
+              Already have an account?{" "}
               <button type="button" onClick={() => switchMode("login")} style={linkBtnStyle}>
-                Se connecter
+                Sign in
               </button>
             </>
           )}
           {mode === "forgot" && (
             <button type="button" onClick={() => switchMode("login")} style={linkBtnStyle}>
-              ← Retour à la connexion
+              ← Back to sign in
             </button>
           )}
         </div>

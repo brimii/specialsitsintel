@@ -74,7 +74,7 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 
 ## 6. Conventions de code
 
-- **Langue** : code et noms techniques en anglais ; commentaires et UI en français.
+- **Langue** : tout en anglais (code, commentaires, UI). Produit destiné à un public institutionnel international. Les anciens commentaires en français peuvent rester ; le nouveau code utilise l'anglais.
 - **TypeScript** partout, typage explicite des données venant de la base.
 - **Composants React** clairs et découpés : `Sidebar`, `KpiBar`, `Ticker`, `DealTable`, `DealDetail`, pages, modales.
 - **Données** lues via des **API routes côté serveur**, jamais en exposant la base directement au navigateur pour le contenu restreint.

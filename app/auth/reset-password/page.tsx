@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// Page de définition d'un nouveau mot de passe (après clic sur le lien de
-// récupération reçu par email — l'utilisateur a alors une session active).
+// Set a new password after clicking the recovery email link (the verify
+// callback gives the user an active session, so updateUser({ password }) works).
 export default function ResetPasswordPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -16,12 +16,12 @@ export default function ResetPasswordPage() {
   const submit = async () => {
     setError(null);
     if (password.length < 8) {
-      setError("Le mot de passe doit faire au moins 8 caractères.");
+      setError("Password must be at least 8 characters.");
       return;
     }
     const supabase = createClient();
     if (!supabase) {
-      setError("Authentification non configurée.");
+      setError("Authentication not configured.");
       return;
     }
     setLoading(true);
@@ -38,18 +38,18 @@ export default function ResetPasswordPage() {
   return (
     <div className="page active">
       <div style={{ maxWidth: 420, margin: "0 auto", padding: "60px clamp(20px,3vw,32px)" }}>
-        <div className="hero-eyebrow">Sécurité du compte</div>
+        <div className="hero-eyebrow">Account security</div>
         <h1 style={{ fontFamily: "var(--font-serif)", fontSize: "clamp(24px,3vw,34px)", margin: "8px 0 20px" }}>
-          Nouveau mot de passe
+          New password
         </h1>
         {done ? (
           <div className="ai-block navy">
-            <div className="ai-block-label">✓ Mot de passe mis à jour</div>
-            <div className="ai-block-text">Redirection en cours…</div>
+            <div className="ai-block-label">✓ Password updated</div>
+            <div className="ai-block-text">Redirecting…</div>
           </div>
         ) : (
           <div className="form-group">
-            <label className="form-label">Nouveau mot de passe</label>
+            <label className="form-label">New password</label>
             <input
               className="form-input"
               type="password"
@@ -64,7 +64,7 @@ export default function ResetPasswordPage() {
               onClick={submit}
               disabled={loading}
             >
-              {loading ? "…" : "Mettre à jour →"}
+              {loading ? "…" : "Update →"}
             </button>
           </div>
         )}

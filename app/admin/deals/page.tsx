@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { changeDealMinTier } from "./actions";
+import { PendingBar } from "../PendingBar";
 
 const TIERS = ["free", "analyst", "institutional", "enterprise"] as const;
 
@@ -40,15 +41,15 @@ export default async function AdminDeals() {
         }}
       >
         <span>ID</span>
-        <span>Nom</span>
-        <span>Catégorie</span>
-        <span>Statut</span>
+        <span>Name</span>
+        <span>Category</span>
+        <span>Status</span>
         <span>Spread</span>
         <span>Min tier</span>
       </div>
       {deals.length === 0 ? (
         <div style={{ padding: 40, textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>
-          Aucun deal — fais `npm run seed`.
+          No deals — run `npm run seed`.
         </div>
       ) : (
         deals.map((d) => (
@@ -73,14 +74,17 @@ export default async function AdminDeals() {
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--navy)" }}>
               {d.spread != null ? `${d.spread.toFixed(1)}%` : "—"}
             </span>
-            <form action={changeDealMinTier} style={{ display: "flex", gap: 6 }}>
-              <input type="hidden" name="deal_id" value={d.id} />
-              <select className="form-input" name="min_tier" defaultValue={d.min_tier ?? "analyst"} style={{ fontSize: 10 }}>
-                {TIERS.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-              <button className="btn btn-secondary btn-sm" type="submit">OK</button>
+            <form action={changeDealMinTier} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input type="hidden" name="deal_id" value={d.id} />
+                <select className="form-input" name="min_tier" defaultValue={d.min_tier ?? "analyst"} style={{ fontSize: 10 }}>
+                  {TIERS.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                <button className="btn btn-secondary btn-sm" type="submit">OK</button>
+              </div>
+              <PendingBar />
             </form>
           </div>
         ))

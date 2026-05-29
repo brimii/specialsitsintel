@@ -234,6 +234,20 @@ export async function runPipeline(
   }
   const deals = (dealsData as DealRecord[]) ?? [];
 
+  // Filing dedup: skip any SEC URL already processed (review_queue or applied).
+  const seenSources = new Set<string>();
+  const { data: queueRows } = await admin.from("review_queue").select("source_url");
+  for (const r of (queueRows ?? []) as Array<{ source_url: string | null }>) {
+    if (r.source_url) seenSources.add(r.source_url);
+  }
+  const { data: appliedRows } = await admin
+    .from("deal_updates")
+    .select("source_url")
+    .not("source_url", "is", null);
+  for (const r of (appliedRows ?? []) as Array<{ source_url: string | null }>) {
+    if (r.source_url) seenSources.add(r.source_url);
+  }
+
   let filingsScanned = 0;
   let proposalsExtracted = 0;
   let autoApplied = 0;
@@ -253,6 +267,7 @@ export async function runPipeline(
     for (const f of filings) {
       if (seen.has(f.accessionNo)) continue;
       seen.add(f.accessionNo);
+      if (seenSources.has(f.url)) continue; // already processed in a past run
       const text = await fetchFilingText(f.url).catch(() => "");
       const proposals = await extractUpdates(deal, f, text).catch((e) => {
         errors.push(`extract ${deal.nom}/${f.accessionNo}: ${(e as Error).message}`);

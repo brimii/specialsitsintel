@@ -108,10 +108,10 @@ export default function Sidebar() {
               {email}
             </div>
             <PortalButton className="btn btn-secondary btn-sm" style={{ width: "100%" }}>
-              Gérer l&apos;abonnement
+              Manage subscription
             </PortalButton>
             <button className="btn btn-secondary btn-sm" style={{ width: "100%" }} onClick={onLogout}>
-              Se déconnecter
+              Sign out
             </button>
           </>
         ) : (

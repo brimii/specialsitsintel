@@ -39,7 +39,15 @@ function parseDate(s?: string): number {
   return 0;
 }
 
-export default function DealUniverse({ deals, tier }: { deals: Deal[]; tier: string }) {
+export default function DealUniverse({
+  deals,
+  tier,
+  archiveMode = false,
+}: {
+  deals: Deal[];
+  tier: string;
+  archiveMode?: boolean;
+}) {
   const locked = tier === "free";
   const [cat, setCat] = useState("ALL");
   const [reg, setReg] = useState("ALL");
@@ -88,6 +96,44 @@ export default function DealUniverse({ deals, tier }: { deals: Deal[]; tier: str
       <div className="universe-shell">
         <div className="universe-main">
           <AlertStrip />
+          {archiveMode && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "var(--sp-3)",
+                flexWrap: "wrap",
+                padding: "var(--sp-3) var(--sp-5)",
+                background: "var(--bg-2)",
+                borderBottom: "1px solid var(--border)",
+                fontSize: 11,
+                color: "var(--text-2)",
+              }}
+            >
+              <span>📁 Historical archive — closed, settled or terminated deals.</span>
+              <Link href="/" style={{ fontWeight: 700, whiteSpace: "nowrap", color: "var(--navy)" }}>
+                ← Back to active deals
+              </Link>
+            </div>
+          )}
+          {!archiveMode && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                padding: "6px var(--sp-5)",
+                background: "var(--bg-1)",
+                borderBottom: "1px solid var(--border)",
+                fontSize: 10,
+              }}
+            >
+              <Link href="/archive" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
+                📁 View historical archive →
+              </Link>
+            </div>
+          )}
           {locked && (
             <div
               style={{
@@ -104,11 +150,11 @@ export default function DealUniverse({ deals, tier }: { deals: Deal[]; tier: str
               }}
             >
               <span>
-                🔒 Aperçu gratuit — 5 situations. Commentaire IA, scoring FTC et graphiques
-                réservés aux abonnés Analyst+.
+                🔒 Free preview — 5 situations. AI commentary, FTC scoring and price charts are
+                reserved for Analyst+ subscribers.
               </span>
               <Link href="/home" style={{ fontWeight: 700, whiteSpace: "nowrap" }}>
-                Passer à Analyst →
+                Upgrade to Analyst →
               </Link>
             </div>
           )}
@@ -174,6 +220,7 @@ export default function DealUniverse({ deals, tier }: { deals: Deal[]; tier: str
             ) : (
               <Catalysts />
             )}
+            {archiveMode === false ? null : null}
           </div>
         </div>
 

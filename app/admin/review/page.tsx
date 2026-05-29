@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow } from "./actions";
 import { SubmitButton } from "./SubmitButton";
+import { PendingBar } from "../PendingBar";
 
 type UpdateProposition = {
   kind?: undefined | "update";
@@ -56,36 +57,40 @@ export default async function AdminReview() {
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
         <div style={{ fontSize: 13, color: "var(--text-2)" }}>
-          <b>{items.length}</b> proposition(s) en attente. Source : SEC EDGAR + extraction Claude.
+          <b>{items.length}</b> pending proposal(s). Source: SEC EDGAR + Claude extraction.
         </div>
         <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
           <form action={runPipelineNow}>
-            <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Scan en cours… (~30 s)">
-              ▶ Mise à jour rapide (10 deals)
+            <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Scanning… (~30s)">
+              ▶ Quick update (10 deals)
             </SubmitButton>
+            <PendingBar />
           </form>
           <form action={runFullScan}>
-            <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Scan complet… (10-20 min)">
-              ▶▶ Mise à jour complète (213 deals, 2 ans)
+            <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Full scan… (10-20 min)">
+              ▶▶ Full update (all deals, 2 yrs)
             </SubmitButton>
+            <PendingBar />
           </form>
           <form action={runDiscoveryNow}>
-            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="Découverte en cours… (~1-2 min)">
-              🔍 Découvrir de nouveaux deals
+            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="Discovery in progress… (~3-5 min)">
+              🔍 Discover new deals
             </SubmitButton>
+            <PendingBar />
           </form>
         </div>
       </div>
       <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: "var(--sp-4)", lineHeight: 1.6 }}>
-        <b>Mise à jour</b> = scanne les deals existants pour des modifs (statut, proba…).
-        <b> Découverte</b> = scanne les S-4 / DEFM14A / SC TO-T / SC 13D récents pour repérer de
-        nouveaux deals event-driven, puis les met en file de validation. Logs dans le terminal
-        <code> npm run dev </code> (lignes <code>[runDiscoveryNow]</code>).
+        <b>Update</b> = scan existing deals for changes (status, probability…).
+        <b> Discovery</b> = scan recent S-4 / DEFM14A / SC TO-T / SC 13D / 8-K filings to surface
+        new event-driven deals (up to 100 filings, 30 days back). Already-processed filings are
+        skipped automatically. Live logs in the <code>npm run dev</code> terminal (look for
+        <code>[runDiscoveryNow]</code>).
       </div>
 
       {items.length === 0 ? (
         <div style={{ padding: 40, textAlign: "center", color: "var(--text-3)", fontSize: 12, background: "var(--bg-1)", border: "1px solid var(--border)", borderRadius: "var(--r-md)" }}>
-          File vide. Lance un scan ou une découverte ci-dessus.
+          Queue empty. Run a scan or discovery above.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
@@ -113,8 +118,8 @@ function UpdateCard({ item, prop }: { item: ReviewRow; prop: UpdateProposition }
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-2)" }}>
         <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
-          MISE À JOUR · Deal #{prop.deal_id} · champ <b style={{ color: "var(--text)" }}>{prop.champ_modifie}</b>
-          {" · "}confiance <b style={{ color: (item.confiance ?? 0) >= 85 ? "var(--navy)" : "var(--amber)" }}>{item.confiance ?? "—"}</b>
+          UPDATE · Deal #{prop.deal_id} · field <b style={{ color: "var(--text)" }}>{prop.champ_modifie}</b>
+          {" · "}confidence <b style={{ color: (item.confiance ?? 0) >= 85 ? "var(--navy)" : "var(--amber)" }}>{item.confiance ?? "—"}</b>
         </div>
         <span
           style={{
@@ -125,17 +130,17 @@ function UpdateCard({ item, prop }: { item: ReviewRow; prop: UpdateProposition }
             border: `1px solid ${isMajor ? "var(--crimson-bd)" : "var(--navy-bd)"}`,
           }}
         >
-          {prop.type_changement ?? "MINEUR"}
+          {prop.type_changement === "MAJEUR" ? "MAJOR" : "MINOR"}
         </span>
       </div>
       <div style={{ display: "flex", gap: "var(--sp-3)", fontSize: 12, marginBottom: "var(--sp-2)", flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".08em" }}>Avant</div>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".08em" }}>Before</div>
           <div style={{ color: "var(--text-2)" }}>{prop.ancienne_valeur ?? "—"}</div>
         </div>
         <div style={{ alignSelf: "center", color: "var(--text-3)" }}>→</div>
         <div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".08em" }}>Après</div>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".08em" }}>After</div>
           <div style={{ fontWeight: 600 }}>{prop.nouvelle_valeur}</div>
         </div>
       </div>
@@ -161,7 +166,7 @@ function NewDealCard({ item, prop }: { item: ReviewRow; prop: NewDealProposition
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-2)" }}>
         <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
-          NOUVEAU DEAL · confiance <b style={{ color: "var(--cobalt)" }}>{item.confiance ?? "—"}</b>
+          NEW DEAL · confidence <b style={{ color: "var(--cobalt)" }}>{item.confiance ?? "—"}</b>
         </div>
         <span
           style={{
@@ -171,7 +176,7 @@ function NewDealCard({ item, prop }: { item: ReviewRow; prop: NewDealProposition
             border: "1px solid var(--cobalt-bd)",
           }}
         >
-          🔍 DÉCOUVERTE
+          🔍 DISCOVERY
         </span>
       </div>
       <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>
@@ -181,13 +186,13 @@ function NewDealCard({ item, prop }: { item: ReviewRow; prop: NewDealProposition
         {d.c} · acq. {d.acq} · {d.v} · {d.r} · close {d.cl} · {d.reg}
       </div>
       <div style={{ fontSize: 11, color: "var(--text-2)", marginBottom: "var(--sp-2)", lineHeight: 1.6 }}>
-        <b>Description : </b>{d.desc}
+        <b>Description: </b>{d.desc}
       </div>
       <div style={{ fontSize: 11, color: "var(--text-2)", marginBottom: "var(--sp-3)", lineHeight: 1.6 }}>
-        <b>AI : </b>{d.ai}
+        <b>AI: </b>{d.ai}
       </div>
       <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)", marginBottom: "var(--sp-2)" }}>
-        Prix offre : {d.pr.cur}{d.pr.o || "?"} · {d.pr.sym || "—"} · annoncé {d.pr.ad}
+        Offer: {d.pr.cur}{d.pr.o || "?"} · {d.pr.sym || "—"} · announced {d.pr.ad}
       </div>
       <SourceAndActions item={item} />
     </div>
@@ -206,14 +211,16 @@ function SourceAndActions({ item }: { item: ReviewRow }) {
         <form action={approveItem}>
           <input type="hidden" name="id" value={item.id} />
           <SubmitButton className="btn btn-primary btn-sm" pendingLabel="…">
-            ✓ Approuver
+            ✓ Approve
           </SubmitButton>
+          <PendingBar />
         </form>
         <form action={rejectItem}>
           <input type="hidden" name="id" value={item.id} />
           <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="…">
-            ✕ Rejeter
+            ✕ Reject
           </SubmitButton>
+          <PendingBar />
         </form>
       </div>
     </>

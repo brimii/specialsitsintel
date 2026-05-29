@@ -81,11 +81,11 @@ export default function DealDetail({ deal, locked = false }: { deal: Deal | null
 
       {locked ? (
         <div className="ai-block navy">
-          <div className="ai-block-label">🔒 Intelligence réservée</div>
+          <div className="ai-block-label">🔒 Premium intelligence locked</div>
           <div className="ai-block-text">
-            Commentaire IA, scoring FTC et graphique de prix sont réservés aux abonnés Analyst+.{" "}
+            AI commentary, FTC scoring and the price chart are reserved for Analyst+ subscribers.{" "}
             <Link href="/home" style={{ color: "var(--navy)", fontWeight: 600 }}>
-              Voir les offres →
+              See plans →
             </Link>
           </div>
         </div>

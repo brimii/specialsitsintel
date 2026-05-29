@@ -3,8 +3,7 @@
 import { useFormStatus } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 
-// Bouton de soumission qui affiche l'état "en cours" du server action.
-// À placer DANS un <form action={...}>.
+// Submit button that shows pending state. Wraps a server action <form>.
 export function SubmitButton({
   children,
   pendingLabel,
@@ -19,7 +18,7 @@ export function SubmitButton({
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={pending} className={className} style={style}>
-      {pending ? (pendingLabel ?? "Traitement…") : children}
+      {pending ? (pendingLabel ?? "Processing…") : children}
     </button>
   );
 }

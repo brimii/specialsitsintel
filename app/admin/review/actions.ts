@@ -14,20 +14,20 @@ type UpdateProposition = {
 };
 
 type DiscoveredDeal = {
-  nm: string;
-  acq: string;
-  v: string;
-  c: string;
-  r: string;
-  st: string;
-  sc: string;
-  reg: string;
-  cl: string;
-  desc: string;
-  ai: string;
-  f: string;
-  pr: { u: number; c: number; o: number; sym: string; cur: string; ad: string };
-  tl: Array<{ d: string; t: string; x: string }>;
+  nm?: string;
+  acq?: string;
+  v?: string;
+  c?: string;
+  r?: string;
+  st?: string;
+  sc?: string;
+  reg?: string;
+  cl?: string;
+  desc?: string;
+  ai?: string;
+  f?: string;
+  pr?: { u?: number; c?: number; o?: number; sym?: string; cur?: string; ad?: string };
+  tl?: Array<{ d: string; t: string; x: string }>;
 };
 
 type NewDealProposition = {
@@ -44,67 +44,84 @@ function parseValue(field: string, v: string): string | number {
 }
 
 export async function approveItem(formData: FormData) {
+  console.log("[approveItem] called");
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
+  console.log("[approveItem] id:", id);
   if (!id) return;
   const admin = createAdminClient();
-  const { data: item } = await admin
+  const { data: item, error: fetchErr } = await admin
     .from("review_queue")
     .select("proposition, source_url, confiance, statut")
     .eq("id", id)
     .single();
-  if (!item || item.statut !== "en_attente") return;
+  if (fetchErr) {
+    console.error("[approveItem] fetch failed:", fetchErr.message);
+    return;
+  }
+  if (!item || item.statut !== "en_attente") {
+    console.log("[approveItem] skip: no item or wrong status", item?.statut);
+    return;
+  }
   const p = item.proposition as Proposition;
 
   if (p.kind === "new_deal") {
-    // Insertion d'un NOUVEAU deal (mode Découverte)
-    const d = p.deal;
+    const d = p.deal ?? {};
+    console.log("[approveItem] new_deal:", d.nm);
+    // Defensive: fall back on safe defaults so a missing field never crashes the insert.
+    const payload = {
+      nom: d.nm ?? "Unknown target",
+      acquereur: d.acq ?? null,
+      valeur: d.v ?? null,
+      regulateur: d.r ?? null,
+      categorie: d.c ?? null,
+      statut: d.st ?? "Review",
+      region: d.reg ?? "US",
+      description: d.desc ?? null,
+      ai_commentary: d.ai ?? null,
+      min_tier: "analyst",
+      flag: d.f ?? null,
+      score: d.sc ?? "G",
+      close_estimate: d.cl ?? null,
+      price: d.pr ?? { u: 0, c: 0, o: 0, sym: "", cur: "$", ad: "" },
+      timeline: d.tl ?? [],
+    };
     const { data: inserted, error: insErr } = await admin
       .from("deals")
-      .insert({
-        nom: d.nm,
-        acquereur: d.acq,
-        valeur: d.v,
-        regulateur: d.r,
-        categorie: d.c,
-        statut: d.st,
-        region: d.reg,
-        description: d.desc,
-        ai_commentary: d.ai,
-        min_tier: "analyst",
-        flag: d.f,
-        score: d.sc,
-        close_estimate: d.cl,
-        price: d.pr,
-        timeline: d.tl,
-      })
+      .insert(payload)
       .select("id")
       .single();
     if (insErr) {
-      console.error("[approve new_deal] insert failed:", insErr.message);
+      console.error("[approveItem] insert deal failed:", JSON.stringify(insErr));
       return;
     }
+    console.log("[approveItem] inserted deal id:", inserted?.id);
     if (inserted?.id) {
-      await admin.from("deal_updates").insert({
+      const { error: traceErr } = await admin.from("deal_updates").insert({
         deal_id: inserted.id,
         champ_modifie: "_creation",
         ancienne_valeur: null,
-        nouvelle_valeur: `Nouveau deal créé via Découverte : ${d.nm} / ${d.acq}`,
+        nouvelle_valeur: `New deal created via Discovery: ${payload.nom} / ${payload.acquereur ?? "?"}`,
         source_url: item.source_url,
         confiance: item.confiance,
         auteur: "humain",
       });
+      if (traceErr) console.error("[approveItem] trace failed:", traceErr.message);
     }
   } else {
-    // Mise à jour d'un deal existant (mode classique)
-    await admin
+    console.log("[approveItem] update deal:", p.deal_id, "field:", p.champ_modifie);
+    const { error: upErr } = await admin
       .from("deals")
       .update({
         [p.champ_modifie]: parseValue(p.champ_modifie, p.nouvelle_valeur),
         updated_at: new Date().toISOString(),
       })
       .eq("id", p.deal_id);
-    await admin.from("deal_updates").insert({
+    if (upErr) {
+      console.error("[approveItem] update failed:", upErr.message);
+      return;
+    }
+    const { error: traceErr } = await admin.from("deal_updates").insert({
       deal_id: p.deal_id,
       champ_modifie: p.champ_modifie,
       ancienne_valeur: p.ancienne_valeur,
@@ -113,9 +130,15 @@ export async function approveItem(formData: FormData) {
       confiance: item.confiance,
       auteur: "humain",
     });
+    if (traceErr) console.error("[approveItem] trace failed:", traceErr.message);
   }
 
-  await admin.from("review_queue").update({ statut: "approuve" }).eq("id", id);
+  const { error: queueErr } = await admin
+    .from("review_queue")
+    .update({ statut: "approuve" })
+    .eq("id", id);
+  if (queueErr) console.error("[approveItem] queue update failed:", queueErr.message);
+  console.log("[approveItem] done, revalidating");
   revalidatePath("/admin/review");
   revalidatePath("/admin");
   revalidatePath("/");
@@ -126,7 +149,8 @@ export async function rejectItem(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   const admin = createAdminClient();
-  await admin.from("review_queue").update({ statut: "rejete" }).eq("id", id);
+  const { error } = await admin.from("review_queue").update({ statut: "rejete" }).eq("id", id);
+  if (error) console.error("[rejectItem] failed:", error.message);
   revalidatePath("/admin/review");
 }
 
@@ -148,11 +172,10 @@ export async function runFullScan(): Promise<void> {
   revalidatePath("/admin");
 }
 
-// Mode Découverte : trouve de NOUVEAUX deals event-driven via EDGAR.
 export async function runDiscoveryNow(): Promise<void> {
   await requireAdmin();
   const { discoverNewDeals } = await import("@/lib/discovery");
-  const result = await discoverNewDeals({ daysBack: 7, maxFilings: 25 });
+  const result = await discoverNewDeals({ daysBack: 30, maxFilings: 100 });
   console.log("[runDiscoveryNow]", JSON.stringify(result));
   revalidatePath("/admin/review");
   revalidatePath("/admin");

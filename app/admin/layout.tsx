@@ -13,10 +13,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           Administration
         </h1>
         <div className="filter-pills" style={{ marginBottom: "var(--sp-6)" }}>
-          <Link href="/admin" className="filter-pill">Vue d&apos;ensemble</Link>
-          <Link href="/admin/users" className="filter-pill">Utilisateurs</Link>
+          <Link href="/admin" className="filter-pill">Overview</Link>
+          <Link href="/admin/users" className="filter-pill">Users</Link>
           <Link href="/admin/deals" className="filter-pill">Deals</Link>
-          <Link href="/admin/review" className="filter-pill">Revue IA</Link>
+          <Link href="/admin/review" className="filter-pill">AI Review</Link>
         </div>
         {children}
       </div>

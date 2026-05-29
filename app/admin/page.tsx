@@ -22,10 +22,10 @@ export default async function AdminOverview() {
   const mrr = subs.reduce((sum, s) => sum + (PRICE[s.tier as string] ?? 0), 0);
 
   const cells = [
-    { l: "Utilisateurs", v: String(profiles.length), s: `free ${byTier.free ?? 0} · analyst ${byTier.analyst ?? 0} · inst ${byTier.institutional ?? 0} · ent ${byTier.enterprise ?? 0}` },
-    { l: "Abos actifs", v: String(subs.length), s: "status = active" },
-    { l: "MRR estimé", v: `€${mrr.toLocaleString("fr-FR")}`, s: "somme des paliers actifs" },
-    { l: "Deals en base", v: String(deals.length), s: "table publique deals" },
+    { l: "Users", v: String(profiles.length), s: `free ${byTier.free ?? 0} · analyst ${byTier.analyst ?? 0} · inst ${byTier.institutional ?? 0} · ent ${byTier.enterprise ?? 0}` },
+    { l: "Active subs", v: String(subs.length), s: "status = active" },
+    { l: "Estimated MRR", v: `€${mrr.toLocaleString("en-US")}`, s: "sum of active tier prices" },
+    { l: "Deals in DB", v: String(deals.length), s: "public deals table" },
   ];
 
   return (

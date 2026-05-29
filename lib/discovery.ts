@@ -159,12 +159,12 @@ export type DiscoveryResult = {
 };
 
 export async function discoverNewDeals(opts: { daysBack?: number; maxFilings?: number } = {}): Promise<DiscoveryResult> {
-  const daysBack = opts.daysBack ?? 7;
-  const maxFilings = opts.maxFilings ?? 25;
+  const daysBack = opts.daysBack ?? 30;
+  const maxFilings = opts.maxFilings ?? 100;
   const errors: string[] = [];
   const admin = createAdminClient();
 
-  // Index des deals existants pour dédup
+  // Dedup index: existing deal names + tickers (active or archived).
   const { data: existing } = await admin.from("deals").select("nom, price");
   const existingNames = new Set<string>();
   const existingSyms = new Set<string>();
@@ -172,6 +172,26 @@ export async function discoverNewDeals(opts: { daysBack?: number; maxFilings?: n
     existingNames.add(normalize(d.nom));
     const pr = d.price as { sym?: string } | null;
     if (pr?.sym) existingSyms.add(normalize(pr.sym));
+  }
+
+  // Filing dedup: every SEC URL we've already processed (any status in the
+  // review queue AND any applied update). Prevents re-proposing the same filing.
+  const seenSources = new Set<string>();
+  const { data: queueRows } = await admin
+    .from("review_queue")
+    .select("source_url, proposition");
+  for (const r of (queueRows ?? []) as Array<{ source_url: string | null; proposition: unknown }>) {
+    if (r.source_url) seenSources.add(r.source_url);
+    const p = r.proposition as { kind?: string; deal?: { nm?: string; pr?: { sym?: string } } };
+    if (p?.kind === "new_deal" && p.deal?.nm) existingNames.add(normalize(p.deal.nm));
+    if (p?.kind === "new_deal" && p.deal?.pr?.sym) existingSyms.add(normalize(p.deal.pr.sym));
+  }
+  const { data: updateRows } = await admin
+    .from("deal_updates")
+    .select("source_url")
+    .not("source_url", "is", null);
+  for (const r of (updateRows ?? []) as Array<{ source_url: string | null }>) {
+    if (r.source_url) seenSources.add(r.source_url);
   }
 
   let filings: SecFiling[] = [];
@@ -187,7 +207,12 @@ export async function discoverNewDeals(opts: { daysBack?: number; maxFilings?: n
   let duplicates = 0;
 
   for (const f of filings) {
-    // Dédup rapide par filer (avant de lire le texte)
+    // Skip if we've already processed this exact filing (any past run).
+    if (seenSources.has(f.url)) {
+      duplicates++;
+      continue;
+    }
+    // Fast dedup by filer name (avoids spending Claude credits on known companies).
     if (existingNames.has(normalize(f.company))) {
       duplicates++;
       continue;
