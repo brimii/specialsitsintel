@@ -69,8 +69,22 @@ export async function approveItem(formData: FormData) {
   if (p.kind === "new_deal") {
     const d = p.deal ?? {};
     console.log("[approveItem] new_deal:", d.nm);
+
+    // The deals table was seeded with explicit ids (1-213) which bypasses the
+    // identity sequence. We compute MAX(id)+1 manually to avoid colliding with
+    // already-used ids (sequence is stuck behind).
+    const { data: maxRow } = await admin
+      .from("deals")
+      .select("id")
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const nextId = ((maxRow?.id as number | undefined) ?? 0) + 1;
+    console.log("[approveItem] computed nextId:", nextId);
+
     // Defensive: fall back on safe defaults so a missing field never crashes the insert.
     const payload = {
+      id: nextId,
       nom: d.nm ?? "Unknown target",
       acquereur: d.acq ?? null,
       valeur: d.v ?? null,
