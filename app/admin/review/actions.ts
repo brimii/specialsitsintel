@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -138,20 +139,26 @@ export async function approveItem(formData: FormData) {
     .update({ statut: "approuve" })
     .eq("id", id);
   if (queueErr) console.error("[approveItem] queue update failed:", queueErr.message);
-  console.log("[approveItem] done, revalidating");
+  console.log("[approveItem] === SUCCESS, redirecting ===");
   revalidatePath("/admin/review");
   revalidatePath("/admin");
   revalidatePath("/");
+  revalidatePath("/archive");
+  redirect("/admin/review");
 }
 
 export async function rejectItem(formData: FormData) {
+  console.log("[rejectItem] === called ===");
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
+  console.log("[rejectItem] id:", id);
   if (!id) return;
   const admin = createAdminClient();
   const { error } = await admin.from("review_queue").update({ statut: "rejete" }).eq("id", id);
   if (error) console.error("[rejectItem] failed:", error.message);
+  else console.log("[rejectItem] === SUCCESS, redirecting ===");
   revalidatePath("/admin/review");
+  redirect("/admin/review");
 }
 
 export async function runPipelineNow(): Promise<void> {
