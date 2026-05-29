@@ -135,7 +135,9 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - [ ] Phase 3 — Pipeline de données semi-automatique
 - [ ] Phase 4 — Automatisation étendue
 
-**Session actuelle / notes** (maj 2026-05-25) — *Phases 0, 1, 2 terminées ✅. Prochaine : Phase 3 (pipeline de données).* :
+**Session actuelle / notes** (maj 2026-05-25) — *Phases 0, 1, 2 terminées ✅. Phase 3 : fondation en place, à activer côté humain.* :
+
+- **Phase 3 — Pipeline (fondation faite, attente activation)** : `@anthropic-ai/sdk` ; `lib/anthropic.ts` (client paresseux, model `claude-sonnet-4-6`) ; `lib/sources/sec-edgar.ts` (full-text search + fetch texte) ; `lib/pipeline.ts` (orchestrateur : SEC → extraction Claude JSON via system prompt cacheable → garde-fous **MAJEUR/confiance<85/source unique = review_queue**, sinon = `deals` + `deal_updates`) ; `/api/cron/run` (Bearer `CRON_SECRET`) + `vercel.json` (06:00 UTC) ; `/admin/review` (Approuver / Rejeter + « Lancer maintenant » via server actions). **À activer** : ajouter `ANTHROPIC_API_KEY` et `CRON_SECRET` dans `.env.local`, puis tester via le bouton « Lancer maintenant » dans `/admin/review`. Déploiement Vercel requis pour le Cron quotidien.
 
 - **Phase 2 — Admin (fait)** : `lib/admin.ts` → `requireAdmin()` (404 si rôle ≠ admin). Dossier `app/admin/` : layout avec nav (Vue d'ensemble / Utilisateurs / Deals), page Overview (KPIs users par tier, abos actifs, MRR estimé, deals en base), page Users (changer tier + role via server actions), page Deals (changer `min_tier`). Toutes les mutations re-vérifient le rôle admin et utilisent `service_role` côté serveur. Pour passer admin : `update public.profiles set role='admin' where email='…'` dans le SQL Editor.
 
