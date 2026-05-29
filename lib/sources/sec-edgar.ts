@@ -80,3 +80,48 @@ export async function fetchFilingText(filingIndexUrl: string, maxChars = 40000):
   const text = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   return text.slice(0, maxChars);
 }
+
+// Liste les dépôts récents par TYPE (non liés à une société précise) —
+// utilisé par le Mode Découverte pour trouver de nouveaux deals.
+export async function listMaterialFilings(opts: {
+  forms?: string[];
+  query?: string;
+  daysBack?: number;
+  limit?: number;
+} = {}): Promise<SecFiling[]> {
+  const forms = opts.forms ?? ["S-4", "DEFM14A", "SC TO-T", "SC 13D"];
+  const query = opts.query ?? "merger";
+  const daysBack = opts.daysBack ?? 7;
+  const limit = opts.limit ?? 30;
+  const end = new Date();
+  const start = new Date(end.getTime() - daysBack * 24 * 3600 * 1000);
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+  const url = new URL("https://efts.sec.gov/LATEST/search-index");
+  url.searchParams.set("q", query);
+  url.searchParams.set("forms", forms.join(","));
+  url.searchParams.set("dateRange", "custom");
+  url.searchParams.set("startdt", fmt(start));
+  url.searchParams.set("enddt", fmt(end));
+
+  const res = await fetch(url.toString(), {
+    headers: { "User-Agent": UA, Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`EDGAR listMaterial ${res.status}`);
+  const data = (await res.json()) as { hits?: { hits?: Array<{ _source: EdgarHitSource }> } };
+  const hits = data.hits?.hits ?? [];
+  return hits.slice(0, limit).map((h) => {
+    const s = h._source;
+    const cik = (s.ciks?.[0] ?? "").padStart(10, "0");
+    const acc = s.adsh;
+    return {
+      cik,
+      company: s.display_names?.[0] ?? "",
+      form: s.form ?? "",
+      filed: s.file_date ?? "",
+      accessionNo: acc,
+      url: `https://www.sec.gov/Archives/edgar/data/${parseInt(cik) || 0}/${acc.replace(/-/g, "")}/${acc}-index.htm`,
+    };
+  });
+}
