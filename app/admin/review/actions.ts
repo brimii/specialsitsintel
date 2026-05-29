@@ -63,7 +63,20 @@ export async function rejectItem(formData: FormData) {
 export async function runPipelineNow(): Promise<void> {
   await requireAdmin();
   const { runPipeline } = await import("@/lib/pipeline");
-  await runPipeline({ maxDeals: 10, maxFilingsPerDeal: 2 });
+  const result = await runPipeline({ maxDeals: 10, maxFilingsPerDeal: 2 });
+  console.log("[runPipelineNow]", JSON.stringify(result));
+  revalidatePath("/admin/review");
+  revalidatePath("/admin");
+}
+
+// Scan complet : tous les deals actifs sur 2 ans. Peut prendre 10-20 min
+// localement (~3-5 s/deal). À utiliser ponctuellement pour rattraper un retard ;
+// en production, le Cron quotidien (06:00 UTC) prend le relais.
+export async function runFullScan(): Promise<void> {
+  await requireAdmin();
+  const { runPipeline } = await import("@/lib/pipeline");
+  const result = await runPipeline({ maxDeals: 250, maxFilingsPerDeal: 1, daysBack: 730 });
+  console.log("[runFullScan]", JSON.stringify(result));
   revalidatePath("/admin/review");
   revalidatePath("/admin");
 }

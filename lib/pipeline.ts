@@ -215,9 +215,12 @@ export type PipelineResult = {
   errors: string[];
 };
 
-export async function runPipeline(opts: { maxDeals?: number; maxFilingsPerDeal?: number } = {}): Promise<PipelineResult> {
+export async function runPipeline(
+  opts: { maxDeals?: number; maxFilingsPerDeal?: number; daysBack?: number } = {},
+): Promise<PipelineResult> {
   const maxDeals = opts.maxDeals ?? 20;
   const maxFilingsPerDeal = opts.maxFilingsPerDeal ?? 3;
+  const daysBack = opts.daysBack ?? 14;
   const errors: string[] = [];
   const admin = createAdminClient();
 
@@ -239,7 +242,7 @@ export async function runPipeline(opts: { maxDeals?: number; maxFilingsPerDeal?:
   for (const deal of deals.slice(0, maxDeals)) {
     let filings: SecFiling[] = [];
     try {
-      filings = await searchSecFilings(deal.nom, { daysBack: 14, limit: maxFilingsPerDeal });
+      filings = await searchSecFilings(deal.nom, { daysBack, limit: maxFilingsPerDeal });
     } catch (e) {
       errors.push(`EDGAR ${deal.nom}: ${(e as Error).message}`);
       continue;

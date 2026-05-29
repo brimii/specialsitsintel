@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { approveItem, rejectItem, runPipelineNow } from "./actions";
+import { approveItem, rejectItem, runPipelineNow, runFullScan } from "./actions";
+import { SubmitButton } from "./SubmitButton";
 
 type Proposition = {
   deal_id: number;
@@ -30,15 +31,33 @@ export default async function AdminReview() {
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--sp-4)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
         <div style={{ fontSize: 13, color: "var(--text-2)" }}>
           <b>{items.length}</b> proposition(s) en attente. Source : SEC EDGAR + extraction Claude.
         </div>
-        <form action={runPipelineNow}>
-          <button type="submit" className="btn btn-secondary btn-sm">
-            ▶ Lancer le pipeline maintenant
-          </button>
-        </form>
+        <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+          <form action={runPipelineNow}>
+            <SubmitButton
+              className="btn btn-secondary btn-sm"
+              pendingLabel="Scan en cours… (~30 s)"
+            >
+              ▶ Scan rapide (10 deals, 14 j)
+            </SubmitButton>
+          </form>
+          <form action={runFullScan}>
+            <SubmitButton
+              className="btn btn-primary btn-sm"
+              pendingLabel="Scan complet en cours… (10-20 min)"
+            >
+              ▶▶ Scan complet (213 deals, 2 ans)
+            </SubmitButton>
+          </form>
+        </div>
+      </div>
+      <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: "var(--sp-4)", lineHeight: 1.6 }}>
+        Le <b>scan complet</b> balaye chacun des 213 deals existants pour chercher des dépôts SEC
+        des 2 dernières années. Coût indicatif : quelques dollars de crédits Claude. Tu peux suivre
+        la progression dans le terminal <code>npm run dev</code> (lignes <code>[runFullScan]</code>).
       </div>
 
       {items.length === 0 ? (
@@ -104,11 +123,15 @@ export default async function AdminReview() {
                 <div style={{ display: "flex", gap: "var(--sp-2)", marginTop: "var(--sp-3)" }}>
                   <form action={approveItem}>
                     <input type="hidden" name="id" value={it.id} />
-                    <button type="submit" className="btn btn-primary btn-sm">✓ Approuver</button>
+                    <SubmitButton className="btn btn-primary btn-sm" pendingLabel="…">
+                      ✓ Approuver
+                    </SubmitButton>
                   </form>
                   <form action={rejectItem}>
                     <input type="hidden" name="id" value={it.id} />
-                    <button type="submit" className="btn btn-secondary btn-sm">✕ Rejeter</button>
+                    <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="…">
+                      ✕ Rejeter
+                    </SubmitButton>
                   </form>
                 </div>
               </div>
