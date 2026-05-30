@@ -155,8 +155,8 @@ ${text}`;
     messages: [{ role: "user", content: userMsg }],
   });
   const block = res.content[0];
-  const text = block && block.type === "text" ? block.text : "";
-  const parsed = parseClaudeJson<{ updates?: unknown[] }>(text);
+  const responseText = block && block.type === "text" ? block.text : "";
+  const parsed = parseClaudeJson<{ updates?: unknown[] }>(responseText);
   if (!parsed) return [];
   const raw = Array.isArray(parsed.updates) ? parsed.updates : [];
   try {
@@ -175,7 +175,7 @@ ${text}`;
       }))
       .filter((u) => u.nouvelle_valeur !== "" && u.nouvelle_valeur !== u.ancienne_valeur);
   } catch (e) {
-    console.error("[pipeline] mapping failed:", (e as Error).message, text.slice(0, 200));
+    console.error("[pipeline] mapping failed:", (e as Error).message, responseText.slice(0, 200));
     return [];
   }
 }

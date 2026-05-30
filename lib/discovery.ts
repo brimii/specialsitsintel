@@ -146,8 +146,8 @@ ${text}`;
     messages: [{ role: "user", content: userMsg }],
   });
   const block = res.content[0];
-  const text = block && block.type === "text" ? block.text : "";
-  return parseClaudeJson<DiscoveryResponse>(text);
+  const responseText = block && block.type === "text" ? block.text : "";
+  return parseClaudeJson<DiscoveryResponse>(responseText);
 }
 
 export type DiscoveryResult = {
