@@ -45,37 +45,121 @@ async function fetchDatasetMetadata(): Promise<Record<string, unknown> | null> {
   return null;
 }
 
-// Walks a DCAT-AP-style metadata object and returns the first URL that looks
-// like a JSON distribution (downloadURL or accessURL on a distribution whose
-// format mentions JSON, or any URL ending in .json).
+// Walks a DCAT-AP metadata object and returns the first URL that looks
+// like a JSON distribution. data.europa.eu uses snake_case keys
+// (download_url / access_url) and a `format` shaped as an object with
+// a `resource` URI pointing to the file-type vocabulary.
 function pickJsonDistribution(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== "object") return null;
-  const found: string[] = [];
 
-  const visit = (node: unknown): void => {
-    if (!node) return;
-    if (Array.isArray(node)) {
-      for (const item of node) visit(item);
-      return;
-    }
-    if (typeof node !== "object") return;
-    const n = node as Record<string, unknown>;
-    const format = String(
-      (n.format as unknown) ?? (n.mediaType as unknown) ?? (n.encoding as unknown) ?? "",
-    ).toLowerCase();
-    const url = String(
-      (n.downloadURL as unknown) ?? (n.accessURL as unknown) ?? (n.url as unknown) ?? "",
-    );
-    if (url && (format.includes("json") || url.toLowerCase().endsWith(".json"))) {
-      found.push(url);
-    }
-    for (const value of Object.values(n)) visit(value);
-  };
-  visit(metadata);
+  // Walk into the common envelope: { result: {...} } at data.europa.eu
+  const root =
+    (metadata as Record<string, unknown>).result ??
+    (metadata as Record<string, unknown>).results ??
+    metadata;
 
-  if (found.length > 0) {
-    console.log(`[dg-comp] found ${found.length} JSON distribution(s); using ${found[0]}`);
-    return found[0];
+  const distributions = pickArray(root, ["distributions", "distribution"]);
+  if (distributions) {
+    console.log(`[dg-comp] ${distributions.length} distribution(s)`);
+    if (distributions.length > 0) {
+      console.log(`[dg-comp] distribution[0] keys: ${Object.keys(distributions[0] as Record<string, unknown>).slice(0, 15).join(", ")}`);
+    }
+    for (const dist of distributions) {
+      if (!dist || typeof dist !== "object") continue;
+      const url = pickFirstUrl(dist as Record<string, unknown>, [
+        "download_url",
+        "downloadURL",
+        "downloadurl",
+        "access_url",
+        "accessURL",
+        "accessurl",
+        "url",
+      ]);
+      if (!url) continue;
+      const formatStr = describeFormat((dist as Record<string, unknown>).format);
+      const mediaStr = describeFormat((dist as Record<string, unknown>).media_type)
+        || describeFormat((dist as Record<string, unknown>).mediaType);
+      const looksJson =
+        /json/i.test(formatStr) ||
+        /json/i.test(mediaStr) ||
+        url.toLowerCase().endsWith(".json");
+      if (looksJson) {
+        console.log(`[dg-comp] picked JSON distribution: ${url}`);
+        return url;
+      }
+    }
+    // Nothing matched — dump the first distribution so we can iterate
+    console.log(`[dg-comp] no JSON match; first distribution = ${JSON.stringify(distributions[0]).slice(0, 600)}`);
+  }
+
+  // Fallback: deep scan for any field that has both a URL and a JSON hint
+  const fallback = deepFindJsonUrl(root);
+  if (fallback) {
+    console.log(`[dg-comp] fallback JSON URL: ${fallback}`);
+  }
+  return fallback;
+}
+
+function pickArray(obj: unknown, keys: string[]): unknown[] | null {
+  if (!obj || typeof obj !== "object") return null;
+  const o = obj as Record<string, unknown>;
+  for (const k of keys) {
+    const v = o[k];
+    if (Array.isArray(v)) return v;
+  }
+  return null;
+}
+
+function pickFirstUrl(obj: Record<string, unknown>, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (Array.isArray(v) && v.length > 0 && typeof v[0] === "string") return (v[0] as string).trim();
+  }
+  return null;
+}
+
+function describeFormat(v: unknown): string {
+  if (!v) return "";
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return v.map(describeFormat).join(" ");
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    return [o.resource, o.label, o.title, o.id, o.uri]
+      .filter((x) => typeof x === "string")
+      .join(" ");
+  }
+  return "";
+}
+
+function deepFindJsonUrl(node: unknown): string | null {
+  if (!node) return null;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const u = deepFindJsonUrl(item);
+      if (u) return u;
+    }
+    return null;
+  }
+  if (typeof node !== "object") return null;
+  const n = node as Record<string, unknown>;
+  for (const value of Object.values(n)) {
+    if (typeof value === "string" && value.toLowerCase().endsWith(".json") && /^https?:/i.test(value)) {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        if (typeof v === "string" && v.toLowerCase().endsWith(".json") && /^https?:/i.test(v)) {
+          return v;
+        }
+      }
+    }
+  }
+  for (const value of Object.values(n)) {
+    if (value && typeof value === "object") {
+      const u = deepFindJsonUrl(value);
+      if (u) return u;
+    }
   }
   return null;
 }
