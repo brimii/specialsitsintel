@@ -201,3 +201,14 @@ export async function runDiscoveryNow(): Promise<void> {
   revalidatePath("/admin/review");
   revalidatePath("/admin");
 }
+
+// EU discovery: scans CMA (UK Atom feed) + DG COMP (EU Commission RSS) in
+// parallel and inserts new event-driven cases into the review queue.
+export async function runEuDiscoveryNow(): Promise<void> {
+  await requireAdmin();
+  const { discoverEuDeals } = await import("@/lib/discovery-eu");
+  const result = await discoverEuDeals({ daysBack: 30, maxCases: 50 });
+  console.log("[runEuDiscoveryNow]", JSON.stringify(result));
+  revalidatePath("/admin/review");
+  revalidatePath("/admin");
+}

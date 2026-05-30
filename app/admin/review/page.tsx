@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow } from "./actions";
+import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow } from "./actions";
 import { SubmitButton } from "./SubmitButton";
 import { PendingBar } from "../PendingBar";
 
@@ -73,8 +73,14 @@ export default async function AdminReview() {
             <PendingBar />
           </form>
           <form action={runDiscoveryNow}>
-            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="Discovery in progress… (~3-5 min)">
-              🔍 Discover new deals
+            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="US discovery… (~3-5 min)">
+              🇺🇸 Discover US deals
+            </SubmitButton>
+            <PendingBar />
+          </form>
+          <form action={runEuDiscoveryNow}>
+            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="EU discovery… (~2-3 min)">
+              🇪🇺 Discover EU deals
             </SubmitButton>
             <PendingBar />
           </form>
@@ -82,10 +88,10 @@ export default async function AdminReview() {
       </div>
       <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: "var(--sp-4)", lineHeight: 1.6 }}>
         <b>Update</b> = scan existing deals for changes (status, probability…).
-        <b> Discovery</b> = scan recent S-4 / DEFM14A / SC TO-T / SC 13D / 8-K filings to surface
-        new event-driven deals (up to 100 filings, 30 days back). Already-processed filings are
-        skipped automatically. Live logs in the <code>npm run dev</code> terminal (look for
-        <code>[runDiscoveryNow]</code>).
+        <b> US discovery</b> = scan recent S-4 / DEFM14A / SC TO-T / SC 13D / 8-K filings via SEC EDGAR.
+        <b> EU discovery</b> = scan CMA (UK Atom feed) + DG COMP (EU Commission RSS) for new
+        notifications. Already-processed cases are skipped automatically. Live logs in the
+        <code> npm run dev </code> terminal.
       </div>
 
       {items.length === 0 ? (
