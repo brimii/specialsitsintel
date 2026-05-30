@@ -198,8 +198,13 @@ export async function discoverEuDeals(opts: { daysBack?: number; maxCases?: numb
   let duplicates = 0;
 
   const all: Array<CmaCase | DgCompCase> = [...cmaCases, ...dgCompCases];
+  console.log(`[discovery-eu] fetched cma=${cmaCases.length} dgcomp=${dgCompCases.length} total=${all.length}`);
+  let parseFailures = 0;
+  let notDeal = 0;
+
   for (const c of all) {
     if (seenSources.has(c.url)) {
+      console.log(`[discovery-eu] DUP_URL ${c.source} :: ${c.url}`);
       duplicates++;
       continue;
     }
@@ -211,13 +216,29 @@ export async function discoverEuDeals(opts: { daysBack?: number; maxCases?: numb
       errors.push(`extract ${c.source} ${c.url}: ${(e as Error).message}`);
       return null;
     });
-    if (!resp || !resp.is_deal || !resp.deal) continue;
+    if (resp === null) {
+      parseFailures++;
+      console.log(`[discovery-eu] PARSE_FAIL ${c.source} :: ${c.title}`);
+      continue;
+    }
+    if (!resp.is_deal || !resp.deal) {
+      notDeal++;
+      console.log(`[discovery-eu] NOT_DEAL ${c.source} :: ${c.title}`);
+      continue;
+    }
     candidates++;
+    console.log(`[discovery-eu] CANDIDATE ${c.source} :: ${resp.deal.nm} / ${resp.deal.acq}`);
 
     const d = resp.deal;
     const targetKey = normalize(d.nm);
     const symKey = normalize(d.pr?.sym);
-    if (existingNames.has(targetKey) || (symKey && existingSyms.has(symKey))) {
+    if (existingNames.has(targetKey)) {
+      console.log(`[discovery-eu] DUP_NAME :: ${d.nm} -> "${targetKey}"`);
+      duplicates++;
+      continue;
+    }
+    if (symKey && existingSyms.has(symKey)) {
+      console.log(`[discovery-eu] DUP_SYM :: ${d.pr?.sym}`);
       duplicates++;
       continue;
     }
@@ -236,7 +257,10 @@ export async function discoverEuDeals(opts: { daysBack?: number; maxCases?: numb
     if (symKey) existingSyms.add(symKey);
     seenSources.add(c.url);
     inserted++;
+    console.log(`[discovery-eu] INSERTED :: ${d.nm}`);
   }
+
+  console.log(`[discovery-eu] funnel: scanned=${all.length} parseFail=${parseFailures} notDeal=${notDeal} candidates=${candidates} duplicates=${duplicates} inserted=${inserted}`);
 
   return {
     cmaScanned: cmaCases.length,

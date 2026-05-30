@@ -48,16 +48,19 @@ export async function fetchDgCompCases(opts: { daysBack?: number; limit?: number
   });
   if (!res.ok) throw new Error(`DG COMP latest-updates ${res.status}`);
   const html = await res.text();
+  console.log(`[dg-comp] fetched ${LATEST_UPDATES_URL} html.length=${html.length}`);
 
   // Strategy A: Next.js / Nuxt state hydration
   const nextDataMatch = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  console.log(`[dg-comp] __NEXT_DATA__ match: ${nextDataMatch ? "yes" : "no"}`);
   if (nextDataMatch) {
     try {
       const data = JSON.parse(nextDataMatch[1]);
       const fromState = harvestCasesFromState(data, limit);
+      console.log(`[dg-comp] strategy A (state) extracted ${fromState.length} cases`);
       if (fromState.length > 0) return fromState;
-    } catch {
-      // fall through to strategy B
+    } catch (e) {
+      console.log(`[dg-comp] state parse failed: ${(e as Error).message}`);
     }
   }
 
@@ -65,7 +68,9 @@ export async function fetchDgCompCases(opts: { daysBack?: number; limit?: number
   const cases: DgCompCase[] = [];
   const seen = new Set<string>();
   const anchorRe = /<a[^>]+href="(\/cases\/M[._][0-9]+[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
-  for (const m of html.matchAll(anchorRe)) {
+  const matches = Array.from(html.matchAll(anchorRe));
+  console.log(`[dg-comp] strategy B (regex) found ${matches.length} anchors`);
+  for (const m of matches) {
     const rawHref = m[1];
     const url = rawHref.startsWith("http") ? rawHref : `${HOME}${rawHref}`;
     if (seen.has(url)) continue;
@@ -82,6 +87,11 @@ export async function fetchDgCompCases(opts: { daysBack?: number; limit?: number
       caseNumber: caseNumberMatch?.[0],
     });
     if (cases.length >= limit) break;
+  }
+  // Debug: if both strategies failed but we got HTML, log a head sample to spot the structure.
+  if (cases.length === 0 && html.length > 0) {
+    const sample = html.replace(/\s+/g, " ").slice(0, 800);
+    console.log(`[dg-comp] no cases extracted. HTML head: ${sample}`);
   }
   return cases;
 }
