@@ -1,82 +1,155 @@
 import "server-only";
 
-const UA = process.env.SEC_EDGAR_UA ?? "SpecialSitsIntel research@specialsitsintel.com";
+// Browser-like UA: the EU Commission site blocks generic bot UAs with 403s.
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+const HOME = "https://competition-cases.ec.europa.eu";
+const LATEST_UPDATES_URL = `${HOME}/latest-updates/M`; // M = Mergers
 
 export type DgCompCase = {
   source: "DG COMP";
   title: string;
   url: string;
-  date: string;
+  date: string; // YYYY-MM-DD when available, "" otherwise
   summary: string;
+  caseNumber?: string; // e.g. "M.11521"
 };
 
-// DG COMP (European Commission, Directorate-General for Competition) publishes
-// merger notifications. Their site moved to https://competition-cases.ec.europa.eu/
-// but their legacy "weekly e-news" RSS still surfaces new notifications:
-//   https://ec.europa.eu/competition/elojade/isef/rss.cfm?proc_code=1_M
-// If the legacy feed is unavailable, this fetcher fails gracefully so the
-// orchestrator can keep running with CMA alone.
-const DG_COMP_RSS = "https://ec.europa.eu/competition/elojade/isef/rss.cfm?proc_code=1_M";
-
-function unescapeXml(s: string): string {
+function unescapeHtml(s: string): string {
   return s
+    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, "&");
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/gi, " ");
 }
 
+function stripTags(s: string): string {
+  return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+// Parse the public DG COMP "latest updates" page.
+// Strategy A : if the page embeds Next.js-style state via __NEXT_DATA__, extract from there.
+// Strategy B : fall back to regex extraction of case anchors (<a href="/cases/M.XXXXX">).
+// Either way, we end up with a list of case metadata that can be enriched
+// by fetchDgCompCaseText() for the Claude extractor.
 export async function fetchDgCompCases(opts: { daysBack?: number; limit?: number } = {}): Promise<DgCompCase[]> {
-  const daysBack = opts.daysBack ?? 30;
-  const limit = opts.limit ?? 50;
-  const res = await fetch(DG_COMP_RSS, {
-    headers: { "User-Agent": UA, Accept: "application/rss+xml, application/xml, text/xml" },
+  const limit = opts.limit ?? 30;
+  const res = await fetch(LATEST_UPDATES_URL, {
+    headers: {
+      "User-Agent": BROWSER_UA,
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`DG COMP RSS ${res.status}`);
-  const xml = await res.text();
-  const cutoff = new Date(Date.now() - daysBack * 86400000);
-  const items = Array.from(xml.matchAll(/<item\b[\s\S]*?<\/item>/g)).map((m) => m[0]);
+  if (!res.ok) throw new Error(`DG COMP latest-updates ${res.status}`);
+  const html = await res.text();
 
+  // Strategy A: Next.js / Nuxt state hydration
+  const nextDataMatch = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (nextDataMatch) {
+    try {
+      const data = JSON.parse(nextDataMatch[1]);
+      const fromState = harvestCasesFromState(data, limit);
+      if (fromState.length > 0) return fromState;
+    } catch {
+      // fall through to strategy B
+    }
+  }
+
+  // Strategy B: regex over case anchors
   const cases: DgCompCase[] = [];
-  for (const item of items) {
-    const title = unescapeXml(item.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() ?? "");
-    const link = item.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() ?? "";
-    const pubDate = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() ?? "";
-    const description = unescapeXml(item.match(/<description>([\s\S]*?)<\/description>/)?.[1]?.trim() ?? "");
-    if (!title || !link) continue;
-    const date = pubDate ? new Date(pubDate) : null;
-    if (date && date < cutoff) continue;
+  const seen = new Set<string>();
+  const anchorRe = /<a[^>]+href="(\/cases\/M[._][0-9]+[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+  for (const m of html.matchAll(anchorRe)) {
+    const rawHref = m[1];
+    const url = rawHref.startsWith("http") ? rawHref : `${HOME}${rawHref}`;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const inner = stripTags(unescapeHtml(m[2])).trim();
+    if (!inner) continue;
+    const caseNumberMatch = inner.match(/M[._][0-9]+/) ?? rawHref.match(/M[._][0-9]+/);
     cases.push({
       source: "DG COMP",
-      title,
-      url: link,
-      date: date ? date.toISOString().slice(0, 10) : "",
-      summary: description,
+      title: inner,
+      url,
+      date: "",
+      summary: "",
+      caseNumber: caseNumberMatch?.[0],
     });
     if (cases.length >= limit) break;
   }
   return cases;
 }
 
-// Best-effort detail page fetch — the new EU Commission site is dynamic so
-// content may be lighter than CMA. We still pull whatever HTML is there.
+// Try to recursively walk a hydration object and pluck out case rows.
+// Cases are typically objects with `caseNumber` + `title` + `lastUpdated`.
+function harvestCasesFromState(root: unknown, limit: number): DgCompCase[] {
+  const out: DgCompCase[] = [];
+  const seen = new Set<string>();
+  const visit = (node: unknown) => {
+    if (out.length >= limit) return;
+    if (!node) return;
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item);
+      return;
+    }
+    if (typeof node !== "object") return;
+    const n = node as Record<string, unknown>;
+    const caseNumber = pickString(n, ["caseNumber", "caseNo", "caseRef", "reference"]);
+    const title = pickString(n, ["title", "caseTitle", "name", "displayName"]);
+    const date = pickString(n, ["lastUpdated", "lastUpdateDate", "publishDate", "updateDate", "date"]);
+    if (caseNumber && title && caseNumber.startsWith("M") && !seen.has(caseNumber)) {
+      seen.add(caseNumber);
+      out.push({
+        source: "DG COMP",
+        title,
+        url: `${HOME}/cases/${caseNumber}`,
+        date: date ? date.slice(0, 10) : "",
+        summary: pickString(n, ["summary", "description", "shortDescription"]) ?? "",
+        caseNumber,
+      });
+    }
+    for (const value of Object.values(n)) visit(value);
+  };
+  visit(root);
+  return out;
+}
+
+function pickString(obj: Record<string, unknown>, keys: string[]): string {
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+// Fetch the public case detail page. Returns HTML-stripped text, truncated.
 export async function fetchDgCompCaseText(url: string, maxChars = 30000): Promise<string> {
   try {
-    const res = await fetch(url, { headers: { "User-Agent": UA }, cache: "no-store" });
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": BROWSER_UA,
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      cache: "no-store",
+    });
     if (!res.ok) return "";
     const html = await res.text();
-    return html
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, maxChars);
+    return unescapeHtml(
+      html
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
+    ).slice(0, maxChars);
   } catch {
     return "";
   }
