@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getAnthropic, EXTRACTION_MODEL } from "@/lib/anthropic";
+import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic";
 import { listMaterialFilings, fetchFilingText, type SecFiling } from "@/lib/sources/sec-edgar";
 
 // ════════════════════════════════════════════════════════════════════
@@ -89,7 +89,12 @@ Si \`is_deal\` est false, renvoie \`deal: null\`.
 - Si un champ n'est pas dans le dépôt, mets une valeur prudente ("TBD", 0, chaîne vide) plutôt que d'inventer.
 - Ne propose pas de spread ou proba_close (ce sera estimé en aval).
 
-Réponds uniquement avec le JSON, sans \`\`\`json fences, sans préface.`;
+CRITICAL OUTPUT FORMAT (strict):
+- Your FIRST character MUST be \`{\`.
+- Your LAST character MUST be \`}\`.
+- NO markdown code fences (no \`\`\`json, no \`\`\`).
+- NO prose, no preface, no suffix.
+- Your entire output is fed directly to \`JSON.parse()\`. Any extra character breaks it.`;
 
 type DiscoveredDeal = {
   nm: string;
@@ -136,18 +141,13 @@ ${text}`;
 
   const res = await anthropic.messages.create({
     model: EXTRACTION_MODEL,
-    max_tokens: 1024,
+    max_tokens: 1500,
     system: [{ type: "text", text: DISCOVERY_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: userMsg }],
   });
   const block = res.content[0];
-  const json = block && block.type === "text" ? block.text : "";
-  try {
-    return JSON.parse(json) as DiscoveryResponse;
-  } catch (e) {
-    console.error("[discovery] JSON parse failed:", (e as Error).message, json.slice(0, 200));
-    return null;
-  }
+  const text = block && block.type === "text" ? block.text : "";
+  return parseClaudeJson<DiscoveryResponse>(text);
 }
 
 export type DiscoveryResult = {

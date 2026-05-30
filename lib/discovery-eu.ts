@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getAnthropic, EXTRACTION_MODEL } from "@/lib/anthropic";
+import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic";
 import { fetchCmaCases, fetchCmaCaseText, type CmaCase } from "@/lib/sources/cma";
 import { fetchDgCompCases, fetchDgCompCaseText, type DgCompCase } from "@/lib/sources/dg-comp";
 
@@ -66,7 +66,14 @@ If \`is_deal\` is false, return \`"deal": null\`.
 - Don't invent values. Use "TBD" for unknown text fields, 0 for unknown numerics, "" for unknown ticker.
 - Don't propose \`spread\` or \`proba_close\` — those are computed downstream.
 
-Respond with the JSON object only.`;
+# CRITICAL OUTPUT FORMAT
+
+- The FIRST character of your response MUST be \`{\`.
+- The LAST character of your response MUST be \`}\`.
+- NO markdown code fences (no \`\`\`json, no \`\`\`).
+- NO prose before or after the JSON.
+- NO language preface ("Here's the JSON:", "Sure!", "I'll analyze...", etc).
+- Your entire output is passed directly to \`JSON.parse()\`. Any extra character crashes the parser.`;
 
 type DiscoveredDeal = {
   nm: string;
@@ -120,18 +127,13 @@ ${c.detailText}`;
 
   const res = await anthropic.messages.create({
     model: EXTRACTION_MODEL,
-    max_tokens: 1024,
+    max_tokens: 1500,
     system: [{ type: "text", text: EU_DISCOVERY_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: userMsg }],
   });
   const block = res.content[0];
-  const json = block && block.type === "text" ? block.text : "";
-  try {
-    return JSON.parse(json) as DiscoveryResponse;
-  } catch (e) {
-    console.error("[discovery-eu] JSON parse failed:", (e as Error).message, json.slice(0, 200));
-    return null;
-  }
+  const text = block && block.type === "text" ? block.text : "";
+  return parseClaudeJson<DiscoveryResponse>(text);
 }
 
 export type EuDiscoveryResult = {

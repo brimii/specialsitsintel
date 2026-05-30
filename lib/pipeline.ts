@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getAnthropic, EXTRACTION_MODEL } from "@/lib/anthropic";
+import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic";
 import { searchSecFilings, fetchFilingText, type SecFiling } from "@/lib/sources/sec-edgar";
 
 // ════════════════════════════════════════════════════════════════════
@@ -150,15 +150,16 @@ ${text}`;
 
   const res = await anthropic.messages.create({
     model: EXTRACTION_MODEL,
-    max_tokens: 1024,
+    max_tokens: 1500,
     system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: userMsg }],
   });
   const block = res.content[0];
-  const json = block && block.type === "text" ? block.text : "";
+  const text = block && block.type === "text" ? block.text : "";
+  const parsed = parseClaudeJson<{ updates?: unknown[] }>(text);
+  if (!parsed) return [];
+  const raw = Array.isArray(parsed.updates) ? parsed.updates : [];
   try {
-    const parsed = JSON.parse(json) as { updates?: unknown[] };
-    const raw = Array.isArray(parsed.updates) ? parsed.updates : [];
     return raw
       .map((r) => r as Record<string, unknown>)
       .filter((u) => ALLOWED_FIELDS.has(String(u.champ_modifie)))
@@ -174,7 +175,7 @@ ${text}`;
       }))
       .filter((u) => u.nouvelle_valeur !== "" && u.nouvelle_valeur !== u.ancienne_valeur);
   } catch (e) {
-    console.error("[pipeline] JSON parse failed:", (e as Error).message, json.slice(0, 200));
+    console.error("[pipeline] mapping failed:", (e as Error).message, text.slice(0, 200));
     return [];
   }
 }
