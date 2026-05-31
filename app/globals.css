@@ -319,7 +319,7 @@ body{padding-left:var(--nav-w)}
 
 /* ── DEAL TABLE ── */
 .table-head{
-  display:grid;grid-template-columns:minmax(0,1fr) .62fr .68fr .5fr .52fr .5fr .56fr;
+  display:grid;grid-template-columns:minmax(0,1fr) .48fr .58fr .64fr .46fr .5fr .48fr .54fr;
   gap:var(--sp-3);
   padding:9px var(--sp-5);
   font-family:var(--font-mono);font-size:7.5px;text-transform:uppercase;
@@ -336,7 +336,7 @@ body{padding-left:var(--nav-w)}
 .table-head span:hover .sort-arrow,.sort-active .sort-arrow{opacity:1}
 
 .deal-row{
-  display:grid;grid-template-columns:minmax(0,1fr) .62fr .68fr .5fr .52fr .5fr .56fr;
+  display:grid;grid-template-columns:minmax(0,1fr) .48fr .58fr .64fr .46fr .5fr .48fr .54fr;
   gap:var(--sp-3);
   padding:10px var(--sp-5);border-bottom:1px solid var(--border);
   align-items:center;cursor:pointer;transition:background var(--t-fast),box-shadow var(--t-fast);
@@ -1068,10 +1068,10 @@ select.form-input{cursor:pointer;-webkit-appearance:none;appearance:none;backgro
   .port-table-hd{grid-template-columns:1.8fr .8fr .7fr;font-size:7px}
   .port-table-hd span:nth-child(n+4),.port-row>span:nth-child(n+4){display:none}
   .port-row{grid-template-columns:1.8fr .8fr .7fr}
-  .table-head{grid-template-columns:minmax(0,1fr) .7fr .8fr .6fr}
-  .table-head span:nth-child(n+5){display:none}
-  .deal-row{grid-template-columns:minmax(0,1fr) .7fr .8fr .6fr}
-  .deal-row>span:nth-child(n+5){display:none}
+  .table-head{grid-template-columns:minmax(0,1fr) .55fr .7fr .8fr .6fr}
+  .table-head span:nth-child(n+6){display:none}
+  .deal-row{grid-template-columns:minmax(0,1fr) .55fr .7fr .8fr .6fr}
+  .deal-row>span:nth-child(n+6){display:none}
 
   .filter-btn{font-size:9px;padding:3px 9px}
   .search-wrap{margin-left:0;width:100%;order:10}
@@ -1084,10 +1084,10 @@ select.form-input{cursor:pointer;-webkit-appearance:none;appearance:none;backgro
 @media(max-width:480px){
   .kpi-bar{grid-template-columns:1fr 1fr}
   .kpi-cell:nth-child(n+5){display:none}
-  .table-head{grid-template-columns:minmax(0,1fr) .85fr .9fr}
-  .table-head span:nth-child(n+4){display:none}
-  .deal-row{grid-template-columns:minmax(0,1fr) .85fr .9fr}
-  .deal-row>span:nth-child(n+4){display:none}
+  .table-head{grid-template-columns:minmax(0,1fr) .55fr .85fr .9fr}
+  .table-head span:nth-child(n+5){display:none}
+  .deal-row{grid-template-columns:minmax(0,1fr) .55fr .85fr .9fr}
+  .deal-row>span:nth-child(n+5){display:none}
   .home-stats{grid-template-columns:1fr}
 }
 

@@ -80,6 +80,18 @@ If a company name is genuinely unknown from the title (e.g. "連結子会社" = 
   - "AAAAとBBBBの経営統合" → \`nm: "BBBB", acq: "AAAA"\` (or both as merger of equals).
 - Categories: TOB / 公開買付 → \`TENDER\`. MBO → \`MERGER\` (privatization). 株式取得 / 子会社化 → \`MERGER\`. 株式譲渡 (selling subsidiary) → \`SPINOFF\`. 株式交換 / 経営統合 / 合併 → \`MERGER\`. 会社分割 → \`SPINOFF\`. 資本業務提携 → \`MERGER\` if stake is material; otherwise \`is_deal: false\`.
 
+# Deal value & price (CRITICAL — do not skip)
+
+TDnet titles often (not always) include the TOB tender-offer price or aggregate transaction size — extract aggressively when present:
+
+- **v** (total deal value, string): "¥320B", "¥45.2B". Look for figures in the title or company name:
+  - Japanese unit conversion: 億 = 100 million, 兆 = 1 trillion. So "320億円" → "¥32B"; "1兆2,000億円" → "¥1.2T"; "450億円" → "¥45B".
+  - Always format as "¥XB", "¥XM" or "¥XT" with English scale letters (NEVER Japanese 億 / 兆 in the output).
+- **pr.o** (offer price per share, number): yen value as a plain number, no currency symbol. TOB announcements frequently state "1株あたり3,500円" or "公開買付価格 3,500円" or "TOB価格1,200円" → extract \`3500\` / \`1200\`. Strip commas. NEVER leave at 0 when the title mentions a per-share TOB price.
+- **pr.cur**: \`"¥"\` for Japan.
+
+If the title is a generic 株式取得 (share acquisition) or 子会社化 (subsidiarization) with no price disclosed, set \`v: "TBD"\` and \`pr.o: 0\`. Don't hallucinate a number.
+
 # Anti-hallucination
 
 - If the disclosure is NOT a clear event-driven transaction (e.g. earnings release that happens to mention an old deal, board reshuffle, governance update), return \`{"is_deal": false, "deal": null}\`.

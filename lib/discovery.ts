@@ -89,6 +89,16 @@ Si \`is_deal\` est false, renvoie \`deal: null\`.
 - Si un champ n'est pas dans le dépôt, mets une valeur prudente ("TBD", 0, chaîne vide) plutôt que d'inventer.
 - Ne propose pas de spread ou proba_close (ce sera estimé en aval).
 
+# Deal value & price (CRITICAL — do not skip)
+
+The terminal surfaces two numeric anchors per deal. Extract BOTH whenever the filing mentions them — these are the most commonly-missed fields in past runs.
+
+- **v** (total transaction value, string): the announced deal size — equity value, enterprise value, or implied total consideration. SEC merger filings (S-4, DEFM14A, SC TO-T) almost always disclose this verbatim: "aggregate transaction value of approximately $X.X billion", "implied enterprise value of $Y million", "$Z per share x N shares outstanding". Format with the deal's currency and an SI suffix: "$5.2B", "$840M", "€1.2B". If only a per-share offer price is given alongside a shares-outstanding figure, multiply and report (e.g. "$25.50 x 84M shares = $2.14B" → \`v: "$2.1B"\`). Only set \`v: "TBD"\` when the filing genuinely discloses no aggregate figure.
+- **pr.o** (offer price per share, number): the cash or stock-equivalent price per target share. SC TO-T, SC 14D9 and DEFM14A always state this. Extract the numeric value as a float (e.g. \`25.50\`, not \`"$25.50"\`). NEVER leave this at 0 when the document mentions a per-share price. All-stock deals: extract the implied per-share value at signing (typically disclosed as "implied value of $X per share based on a fixed exchange ratio of Y").
+- **pr.cur**: always \`"$"\` for SEC filings.
+
+If the filing is a SC 13D (activism), the target's market cap is the relevant size — use the most recent market cap stated in the filing or the cover page, e.g. "$147B cap".
+
 CRITICAL OUTPUT FORMAT (strict):
 - Your FIRST character MUST be \`{\`.
 - Your LAST character MUST be \`}\`.

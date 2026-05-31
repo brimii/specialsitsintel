@@ -1,9 +1,10 @@
-import { type Deal, pcol, ecol, BADGE_CL, CLS } from "../data/deals";
+import { type Deal, pcol, ecol, dealCapUSD, fmtCap, BADGE_CL, CLS } from "../data/deals";
 
-export type SortField = "name" | "spread" | "prob" | "ev" | "date";
+export type SortField = "name" | "size" | "spread" | "prob" | "ev" | "date";
 
 const COLS: { key: SortField | null; label: string }[] = [
   { key: "name", label: "Situation" },
+  { key: "size", label: "Size" },
   { key: "spread", label: "Ann. Spread" },
   { key: "prob", label: "Close Prob" },
   { key: "ev", label: "EV" },
@@ -81,6 +82,9 @@ export default function DealTable({
                   </div>
                   <div className="deal-sub">{sub}</div>
                 </div>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--text-2)", fontWeight: 600 }}>
+                  {fmtCap(dealCapUSD(deal.v))}
+                </span>
                 <span className="deal-spread" style={{ color: deal.s > 0 ? pc : "var(--text-3)" }}>
                   {deal.s > 0 ? deal.s.toFixed(1) + "%" : "—"}
                 </span>

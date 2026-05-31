@@ -62,6 +62,61 @@ export const pcol = (d: Deal): string =>
 export const ecol = (d: Deal): string =>
   d.ev > 0 ? "var(--navy)" : d.ev > -3 ? "var(--amber)" : "var(--crimson)";
 
+// Static FX rates to USD — good enough to sort deals across regions on one
+// scale. Refresh quarterly; off by a few % at any given moment but the rank
+// order is what matters for a sort column.
+const FX_TO_USD: Record<string, number> = {
+  USD: 1.0, EUR: 1.08, GBP: 1.27, JPY: 0.0064, CNY: 0.139,
+  CHF: 1.10, AUD: 0.65, CAD: 0.74, NZD: 0.60,
+  INR: 0.012, SAR: 0.267, AED: 0.272, KRW: 0.00073,
+  HKD: 0.128, SGD: 0.75, TWD: 0.031,
+  BRL: 0.18, MXN: 0.054, ZAR: 0.054,
+};
+
+// Parse a deal-value string like "$13.9B", "€11.7B", "¥320B", "$147B cap",
+// "A$9.1B" or "CHF 4.2B" into a numeric USD value. Returns 0 if unparseable
+// (e.g. "TBD" or "—") so those rows sink to the bottom of a descending sort.
+export function dealCapUSD(v: string | null | undefined): number {
+  if (!v) return 0;
+  const s = v.trim();
+  let cur = "USD";
+  if (/^A\$/i.test(s)) cur = "AUD";
+  else if (/^HK\$/i.test(s)) cur = "HKD";
+  else if (/^S\$/i.test(s)) cur = "SGD";
+  else if (/^C\$/i.test(s)) cur = "CAD";
+  else if (/^NZ\$/i.test(s)) cur = "NZD";
+  else if (/^NT\$/i.test(s)) cur = "TWD";
+  else if (/^R\$/i.test(s)) cur = "BRL";
+  else if (s.startsWith("$")) cur = "USD";
+  else if (s.startsWith("€")) cur = "EUR";
+  else if (s.startsWith("£")) cur = "GBP";
+  else if (s.startsWith("¥")) cur = "JPY";
+  else if (s.startsWith("₹")) cur = "INR";
+  else if (/^CHF\b/i.test(s)) cur = "CHF";
+  else if (/^SAR\b/i.test(s)) cur = "SAR";
+  else if (/^AED\b/i.test(s)) cur = "AED";
+  else if (/^KRW\b/i.test(s)) cur = "KRW";
+  else if (/^CNY\b/i.test(s)) cur = "CNY";
+  else if (/^MXN\b/i.test(s)) cur = "MXN";
+  else if (/^ZAR\b/i.test(s)) cur = "ZAR";
+
+  const m = s.match(/(\d+(?:[.,]\d+)?)\s*([BMTK])\b/i);
+  if (!m) return 0;
+  const num = Number.parseFloat(m[1].replace(",", "."));
+  const scale = m[2].toUpperCase();
+  const mult = scale === "T" ? 1e12 : scale === "B" ? 1e9 : scale === "M" ? 1e6 : 1e3;
+  return num * mult * (FX_TO_USD[cur] ?? 1);
+}
+
+// Format a USD numeric back to a compact column label: "$13.9B", "$420M", "—".
+export function fmtCap(usd: number): string {
+  if (!usd || usd <= 0) return "—";
+  if (usd >= 1e12) return `$${(usd / 1e12).toFixed(1)}T`;
+  if (usd >= 1e9) return `$${(usd / 1e9).toFixed(1)}B`;
+  if (usd >= 1e6) return `$${Math.round(usd / 1e6)}M`;
+  return `$${Math.round(usd)}`;
+}
+
 export const DEALS: Deal[] = [
 // ══ MERGER ARB (40) ══
 {id:1,f:"🇺🇸",nm:"Juniper Networks",acq:"Hewlett Packard Enterprise",v:"$13.9B",s:3.1,p:95,ev:2.7,r:"FTC",c:"MERGER",st:"Closing",sc:"G",reg:"US",cl:"Q3 2026",pr:{u:30.40,c:38.90,o:40.00,sym:"JNPR",cur:"$",ad:"Jan 2024"},desc:"FTC consent decree finalized March 2026 — Juniper must license campus switching tech for 7 years. Shareholder vote 94%. Settlement mechanics underway. Close Q3 2026.",ai:"95% — pure settlement spread 3.1%. FTC gate cleared. Harvest and redeploy on close.",tl:[{d:"Jan 2024",t:"ANNOUNCED",x:"$14.00/share HPE all-cash."},{d:"Mar 2026",t:"FTC CONSENT",x:"Licensing remedy 7 years."},{d:"Q3 2026",t:"CLOSING",x:"Settlement underway."}]},

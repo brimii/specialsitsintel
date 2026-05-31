@@ -66,6 +66,16 @@ If \`is_deal\` is false, return \`"deal": null\`.
 - Don't invent values. Use "TBD" for unknown text fields, 0 for unknown numerics, "" for unknown ticker.
 - Don't propose \`spread\` or \`proba_close\` — those are computed downstream.
 
+# Deal value & price (CRITICAL — do not skip)
+
+CMA case pages and DG COMP press releases frequently — though not always — state the deal value. When they do, extract aggressively:
+
+- **v** (total deal value, string): "€2.5B", "£800M". Look for phrases like "transaction valued at", "consideration of approximately", "equity value of", "enterprise value", "target's market capitalisation". Format with the deal's currency and SI suffix.
+- **pr.o** (offer price per share, number): float if explicitly stated (e.g. \`4.85\`, \`31.20\`). Many regulator filings don't include the per-share price — leave at \`0\` in that case rather than guess.
+- **pr.cur**: \`"€"\` for DG COMP / continental deals, \`"£"\` for CMA UK-domestic deals.
+
+If the case page genuinely doesn't disclose a value, set \`v: "TBD"\` and \`pr.o: 0\` — never hallucinate. But if the press release mentions even a rough order of magnitude ("approximately £500 million"), capture it as \`v: "£500M"\`.
+
 # CRITICAL OUTPUT FORMAT
 
 - The FIRST character of your response MUST be \`{\`.

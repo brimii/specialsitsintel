@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { type Deal } from "../data/deals";
+import { type Deal, dealCapUSD } from "../data/deals";
 import DealTable, { type SortField } from "./DealTable";
 import DealDetail from "./DealDetail";
 import AlertStrip from "./AlertStrip";
@@ -69,6 +69,7 @@ export default function DealUniverse({
       if (sortF === "spread") return (b.s - a.s) * sortD;
       if (sortF === "prob") return (b.p - a.p) * sortD;
       if (sortF === "ev") return (b.ev - a.ev) * sortD;
+      if (sortF === "size") return (dealCapUSD(b.v) - dealCapUSD(a.v)) * sortD;
       if (sortF === "name") return a.nm.localeCompare(b.nm) * sortD;
       if (sortF === "date") return (parseDate(b.pr?.ad) - parseDate(a.pr?.ad)) * sortD;
       return 0;
