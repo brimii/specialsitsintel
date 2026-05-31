@@ -86,28 +86,66 @@ function buildProbes(fromDate: string, toDate: string): Probe[] {
   ];
 }
 
-// Match a disclosure row in the servlet HTML response. The response format
-// varies but consistently contains a 5-digit code, a stock name, and a PDF
-// anchor whose link text is the headline. We anchor on those three pieces.
-function parseDisclosureRows(html: string, fallbackDate: string): HkexDisclosure[] {
+// The servlet returns JSON shaped like { result: "<stringified JSON array>" }
+// where each array entry is a disclosure record with STOCK_CODE / STOCK_NAME /
+// TITLE / FILE_LINK / DATE_TIME / LONG_TEXT (the category, e.g.
+// "Announcements and Notices - [Discloseable Transaction]"). Filter on the
+// combined category + title text — HKEX categorises every disclosure, so the
+// category labels are the most reliable M&A signal.
+type HkexRow = {
+  STOCK_CODE?: string;
+  STOCK_NAME?: string;
+  TITLE?: string;
+  FILE_LINK?: string;
+  DATE_TIME?: string;
+  LONG_TEXT?: string;
+  SHORT_TEXT?: string;
+};
+
+function parseDisclosureJson(body: string, limit: number): HkexDisclosure[] {
+  let outer: { result?: string };
+  try {
+    outer = JSON.parse(body);
+  } catch {
+    return [];
+  }
+  if (!outer.result) return [];
+  let rows: HkexRow[];
+  try {
+    rows = JSON.parse(outer.result) as HkexRow[];
+  } catch {
+    return [];
+  }
+
   const out: HkexDisclosure[] = [];
-  // 5-digit code in a cell, then nearby a stock name cell, then later an
-  // anchor to a .pdf with the headline as link text.
-  const rowRe =
-    /(\d{5})[\s\S]{0,1500}?<a[^>]+href="([^"]+\.(?:pdf|htm|aspx))"[^>]*>\s*([^<][^<]{8,})\s*<\/a>/gi;
-  for (const m of html.matchAll(rowRe)) {
-    const [, code, href, rawTitle] = m;
-    const title = rawTitle.replace(/\s+/g, " ").trim();
-    if (!title || title.length < 6) continue;
-    const url = href.startsWith("http")
-      ? href
-      : `https://www1.hkexnews.hk${href.startsWith("/") ? "" : "/"}${href}`;
-    // Try to pull the disclosure date from the PDF URL path (.../sehk/YYYY/MMDD/)
-    const dateMatch = url.match(/\/sehk\/(\d{4})\/(\d{2})(\d{2})\//);
-    const date = dateMatch
-      ? `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
-      : fallbackDate;
-    out.push({ source: "HKEX", date, code, company: "", title, url });
+  for (const r of rows) {
+    if (out.length >= limit) break;
+    const code = String(r.STOCK_CODE ?? "").trim();
+    const company = String(r.STOCK_NAME ?? "").trim();
+    const title = String(r.TITLE ?? "").replace(/\s+/g, " ").trim();
+    const fileLink = String(r.FILE_LINK ?? "").trim();
+    const category = String(r.LONG_TEXT ?? r.SHORT_TEXT ?? "").trim();
+    if (!code || !title || !fileLink) continue;
+
+    // HKEX puts the regulatory category in LONG_TEXT (e.g. "Announcements and
+    // Notices - [Discloseable Transaction]"). The TITLE is the headline,
+    // usually all-caps. Match against both together.
+    const haystack = (category + " " + title).toUpperCase();
+    const isMA = MA_KEYWORDS.some((kw) => haystack.includes(kw));
+    if (!isMA) continue;
+
+    const url = fileLink.startsWith("http")
+      ? fileLink
+      : `https://www1.hkexnews.hk${fileLink.startsWith("/") ? "" : "/"}${fileLink}`;
+
+    // Parse "31/05/2026 19:59" → "2026-05-31".
+    const dt = String(r.DATE_TIME ?? "");
+    const dm = dt.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    const date = dm
+      ? `${dm[3]}-${dm[2]}-${dm[1]}`
+      : new Date().toISOString().slice(0, 10);
+
+    out.push({ source: "HKEX", date, code, company, title, url });
   }
   return out;
 }
@@ -131,7 +169,7 @@ export async function fetchHkexDisclosures(
         method: probe.method,
         headers: {
           "User-Agent": BROWSER_UA,
-          Accept: "text/html,application/xhtml+xml",
+          Accept: "application/json,text/html,application/xhtml+xml",
           ...(probe.contentType ? { "Content-Type": probe.contentType } : {}),
         },
         cache: "no-store",
@@ -161,19 +199,9 @@ export async function fetchHkexDisclosures(
   }
   console.log(`[hkex] using ${usedLabel}, body length=${html.length}`);
 
-  const all = parseDisclosureRows(html, toDate.slice(0, 4) + "-" + toDate.slice(4, 6) + "-" + toDate.slice(6, 8));
-  console.log(`[hkex] parsed ${all.length} disclosure rows from search response`);
-
-  if (all.length === 0 && html.length > 0) {
-    const codeMatches = (html.match(/\b\d{5}\b/g) ?? []).length;
-    const pdfHrefs = (html.match(/href="[^"]*\.pdf"/gi) ?? []).slice(0, 5);
-    console.log(`[hkex][diag] 5digitCodes=${codeMatches} pdfHrefs=${pdfHrefs.length}`);
-    if (pdfHrefs.length) console.log(`[hkex][diag] first pdfs: ${pdfHrefs.join(" | ")}`);
-    const sample = html.slice(0, 3000).replace(/\s+/g, " ");
-    console.log(`[hkex][diag] body head: ${sample}`);
-  }
-
-  const filtered = all.filter((d) => MA_KEYWORDS.some((kw) => d.title.toUpperCase().includes(kw)));
-  console.log(`[hkex] keyword-filtered ${filtered.length} M&A-relevant of ${all.length} total`);
-  return filtered.slice(0, limit);
+  // Filtering happens inside the JSON parser so we cap on M&A-relevant rows
+  // rather than walking all 3000+ daily disclosures.
+  const filtered = parseDisclosureJson(html, limit);
+  console.log(`[hkex] kept ${filtered.length} M&A-relevant disclosures from servlet JSON`);
+  return filtered;
 }
