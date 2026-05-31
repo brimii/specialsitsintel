@@ -53,6 +53,18 @@ Disclosure titles are in Japanese. Common deal-signal keywords:
 
 The company code is a 4-digit ticker on the Tokyo exchange (e.g. "7203" = Toyota).
 
+# Language (CRITICAL)
+
+ALL output text fields MUST be in **English**. The terminal serves an English-speaking institutional audience — no Japanese characters (kanji, hiragana, katakana, full-width romans) may appear in any field.
+
+- \`nm\` (target) and \`acq\` (acquirer): use the company's **official English name** when it exists (e.g. トヨタ自動車 → "Toyota Motor", カカクコム → "Kakaku.com", カルチュア・コンビニエンス・クラブ → "Culture Convenience Club", 神戸物産 → "Kobe Bussan", ワタミ → "Watami", オリンパス → "Olympus", きんでん → "Kinden", ジモティー → "Jimoty"). Otherwise transliterate to **Romaji** (e.g. ニチリョク → "Nichiryoku", アクセルマーク → "Axel Mark", マキヤ → "Makiya", 弘電社 → "Kodensha"). Strip Japanese corporate suffixes: 株式会社 / ㈱ / (株) → drop entirely; HD / ホールディングス → "Holdings"; Ｇ－ (full-width "G-") → drop.
+- \`desc\` and \`ai\`: English sentences. Translate the Japanese disclosure title into a factual English description.
+- \`v\` (deal value): keep the original currency symbol with English number format (e.g. "¥320B", "¥45.2B"). No Japanese characters.
+- \`cl\` (expected close): English (e.g. "Q3 2026", "Apr 2026").
+- \`tl[].x\` (timeline blurb): English.
+
+If a company name is genuinely unknown from the title (e.g. "連結子会社" = "subsidiary" with no specific name disclosed), output \`"TBD"\` rather than leave Japanese characters or generic Japanese descriptors.
+
 # Rules
 
 - **f (flag)**: 🇯🇵 for TDnet (Japan) by default; later HKEX→🇭🇰, ASX→🇦🇺, SGX→🇸🇬.
