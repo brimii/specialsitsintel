@@ -14,6 +14,7 @@ const locks: Record<string, Promise<void> | null> = {
   fullScan: null,
   discoveryUs: null,
   discoveryEu: null,
+  discoveryApac: null,
 };
 
 async function withLock(key: keyof typeof locks, fn: () => Promise<void>): Promise<void> {
@@ -243,6 +244,19 @@ export async function runEuDiscoveryNow(): Promise<void> {
     const { discoverEuDeals } = await import("@/lib/discovery-eu");
     const result = await discoverEuDeals({ daysBack: 30, maxCases: 50 });
     console.log("[runEuDiscoveryNow]", JSON.stringify(result));
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+  });
+}
+
+// APAC discovery: starts with TDnet (Tokyo). HKEX / ASX / SGX will plug into
+// the same orchestrator via Promise.allSettled.
+export async function runApacDiscoveryNow(): Promise<void> {
+  await withLock("discoveryApac", async () => {
+    await requireAdmin();
+    const { discoverApacDeals } = await import("@/lib/discovery-apac");
+    const result = await discoverApacDeals({ daysBack: 7, maxCases: 30 });
+    console.log("[runApacDiscoveryNow]", JSON.stringify(result));
     revalidatePath("/admin/review");
     revalidatePath("/admin");
   });

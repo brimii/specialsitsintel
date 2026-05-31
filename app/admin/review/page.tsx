@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow } from "./actions";
+import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow } from "./actions";
 import { SubmitButton } from "./SubmitButton";
 import { PendingBar } from "../PendingBar";
 
@@ -84,14 +84,20 @@ export default async function AdminReview() {
             </SubmitButton>
             <PendingBar />
           </form>
+          <form action={runApacDiscoveryNow}>
+            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="APAC discovery… (~2-4 min)">
+              🌏 Discover APAC deals
+            </SubmitButton>
+            <PendingBar />
+          </form>
         </div>
       </div>
       <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: "var(--sp-4)", lineHeight: 1.6 }}>
         <b>Update</b> = scan existing deals for changes (status, probability…).
-        <b> US discovery</b> = scan recent S-4 / DEFM14A / SC TO-T / SC 13D / 8-K filings via SEC EDGAR.
-        <b> EU discovery</b> = scan CMA (UK Atom feed) + DG COMP (EU Commission RSS) for new
-        notifications. Already-processed cases are skipped automatically. Live logs in the
-        <code> npm run dev </code> terminal.
+        <b> US discovery</b> = SEC EDGAR (S-4 / DEFM14A / SC TO-T / SC 13D / 8-K).
+        <b> EU discovery</b> = CMA (UK Atom) + DG COMP (EU Commission Open Data JSON).
+        <b> APAC discovery</b> = TDnet (Tokyo, Japanese disclosures). Already-processed cases
+        are skipped automatically. Live logs in the <code>npm run dev</code> terminal.
       </div>
 
       {items.length === 0 ? (
