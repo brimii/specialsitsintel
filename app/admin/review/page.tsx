@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow } from "./actions";
+import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems } from "./actions";
 import { SubmitButton } from "./SubmitButton";
 import { PendingBar } from "../PendingBar";
 
@@ -90,6 +90,12 @@ export default async function AdminReview() {
             </SubmitButton>
             <PendingBar />
           </form>
+          <form action={reEnrichQueueItems}>
+            <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Enriching prices… (~1-3 min)">
+              💰 Enrich missing prices
+            </SubmitButton>
+            <PendingBar />
+          </form>
         </div>
       </div>
       <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: "var(--sp-4)", lineHeight: 1.6 }}>
@@ -98,7 +104,10 @@ export default async function AdminReview() {
         <b> EU discovery</b> = CMA (UK Atom) + DG COMP (EU Commission Open Data JSON).
         <b> APAC discovery</b> = TDnet (Tokyo, Japanese disclosures) + HKEX (Hong Kong, English
         Takeovers Code / Listing Rule headlines). Already-processed cases are skipped
-        automatically. Live logs in the <code>npm run dev</code> terminal.
+        automatically.
+        <b> Enrich missing prices</b> = re-runs the 2nd-pass enrichment on pending queue
+        items that lack <code>v</code> or <code>pr.o</code>. Skips items already complete.
+        Live logs in the <code>npm run dev</code> terminal.
       </div>
 
       {items.length === 0 ? (

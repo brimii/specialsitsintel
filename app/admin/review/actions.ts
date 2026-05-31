@@ -15,6 +15,7 @@ const locks: Record<string, Promise<void> | null> = {
   discoveryUs: null,
   discoveryEu: null,
   discoveryApac: null,
+  reEnrich: null,
 };
 
 async function withLock(key: keyof typeof locks, fn: () => Promise<void>): Promise<void> {
@@ -257,6 +258,137 @@ export async function runApacDiscoveryNow(): Promise<void> {
     const { discoverApacDeals } = await import("@/lib/discovery-apac");
     const result = await discoverApacDeals({ daysBack: 7, maxCases: 30 });
     console.log("[runApacDiscoveryNow]", JSON.stringify(result));
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+  });
+}
+
+// Retroactive 2nd-pass enrichment for pending review_queue items.
+// Only touches items where v is empty/TBD OR pr.o is 0 — we don't burn
+// Claude calls re-extracting already-complete proposals. Routes each item
+// to the right document fetcher based on the source URL pattern, runs
+// enrich, and writes the updated proposition back into the queue row.
+export async function reEnrichQueueItems(): Promise<void> {
+  await withLock("reEnrich", async () => {
+    await requireAdmin();
+    const admin = createAdminClient();
+    const { data: items, error } = await admin
+      .from("review_queue")
+      .select("id, proposition, source_url")
+      .eq("statut", "en_attente")
+      .not("source_url", "is", null);
+    if (error) {
+      console.error("[reEnrich] query failed:", error.message);
+      return;
+    }
+    if (!items?.length) {
+      console.log("[reEnrich] no pending items with source_url");
+      return;
+    }
+
+    const { fetchPdfText } = await import("@/lib/pdf");
+    const { enrichDealFromDocument } = await import("@/lib/enrich");
+    const { findCmaCasePdf } = await import("@/lib/sources/cma");
+    const { fetchDgCompCases } = await import("@/lib/sources/dg-comp");
+
+    // DG COMP PDF URLs aren't stored on the queue row; if we need any,
+    // re-fetch the dataset once and build a caseNumber → pdfUrl map.
+    const dgCompUrls = items.filter((r) => {
+      const u = String((r as { source_url: string | null }).source_url ?? "");
+      return u.includes("competition-cases.ec.europa.eu");
+    });
+    const dgMap = new Map<string, string>();
+    if (dgCompUrls.length > 0) {
+      const cases = await fetchDgCompCases({ daysBack: 3650, limit: 5000 }).catch(() => []);
+      for (const c of cases) {
+        if (c.caseNumber && c.decisionPdfUrl) dgMap.set(c.caseNumber, c.decisionPdfUrl);
+      }
+      console.log(`[reEnrich] DG COMP pdf map built: ${dgMap.size} entries`);
+    }
+
+    let scanned = 0;
+    let skippedComplete = 0;
+    let skippedNoPdf = 0;
+    let enriched = 0;
+    let unchanged = 0;
+
+    type QueueRow = { id: string; proposition: unknown; source_url: string | null };
+    type DealShape = {
+      nm: string;
+      v: string;
+      pr: { o: number; sym?: string; cur?: string; ad?: string; u?: number; c?: number };
+      [k: string]: unknown;
+    };
+
+    for (const raw of items as QueueRow[]) {
+      scanned++;
+      const prop = raw.proposition as { kind?: string; deal?: DealShape } | null;
+      if (!prop || prop.kind !== "new_deal" || !prop.deal) continue;
+      const deal = prop.deal;
+      const url = String(raw.source_url ?? "");
+
+      const needsValue = !deal.v || deal.v === "TBD" || deal.v === "";
+      const needsPrice = !deal.pr || !deal.pr.o || deal.pr.o === 0;
+      if (!needsValue && !needsPrice) {
+        skippedComplete++;
+        continue;
+      }
+
+      let pdfUrl: string | null = null;
+      if (url.includes("release.tdnet.info") || url.includes("hkexnews.hk")) {
+        pdfUrl = url; // already a PDF
+      } else if (url.includes("gov.uk/cma-cases")) {
+        pdfUrl = await findCmaCasePdf(url).catch(() => null);
+      } else if (url.includes("competition-cases.ec.europa.eu")) {
+        const caseMatch = url.match(/\/cases\/(M\.\d+)/);
+        if (caseMatch) pdfUrl = dgMap.get(caseMatch[1]) ?? null;
+      } else {
+        // SEC and other sources: skip — 1st pass already had full text.
+        skippedNoPdf++;
+        continue;
+      }
+      if (!pdfUrl) {
+        console.log(`[reEnrich] no pdf for ${deal.nm} :: ${url}`);
+        skippedNoPdf++;
+        continue;
+      }
+
+      const pdfText = await fetchPdfText(pdfUrl).catch(() => "");
+      if (!pdfText) {
+        console.log(`[reEnrich] empty pdf text :: ${deal.nm} :: ${pdfUrl}`);
+        skippedNoPdf++;
+        continue;
+      }
+
+      const before = `v=${deal.v} pr.o=${deal.pr?.o ?? 0}`;
+      const enrichedDeal = await enrichDealFromDocument(
+        deal as Parameters<typeof enrichDealFromDocument>[0],
+        pdfText,
+      );
+      const after = `v=${enrichedDeal.v} pr.o=${enrichedDeal.pr?.o ?? 0}`;
+
+      if (before === after) {
+        unchanged++;
+        console.log(`[reEnrich] no change :: ${deal.nm} :: ${before}`);
+        continue;
+      }
+
+      const { error: upErr } = await admin
+        .from("review_queue")
+        .update({ proposition: { kind: "new_deal", deal: enrichedDeal } })
+        .eq("id", raw.id);
+      if (upErr) {
+        console.error(`[reEnrich] update failed ${raw.id}: ${upErr.message}`);
+        continue;
+      }
+      enriched++;
+      console.log(`[reEnrich] ENRICHED :: ${deal.nm} :: ${before} → ${after}`);
+    }
+
+    console.log(
+      `[reEnrich] scanned=${scanned} enriched=${enriched} unchanged=${unchanged} ` +
+        `skippedComplete=${skippedComplete} skippedNoPdf=${skippedNoPdf}`,
+    );
     revalidatePath("/admin/review");
     revalidatePath("/admin");
   });
