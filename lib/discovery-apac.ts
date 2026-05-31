@@ -2,6 +2,9 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic";
 import { fetchTdnetDisclosures, type TdnetDisclosure } from "@/lib/sources/tdnet";
+import { fetchHkexDisclosures, type HkexDisclosure } from "@/lib/sources/hkex";
+
+type ApacDisclosure = TdnetDisclosure | HkexDisclosure;
 
 // ════════════════════════════════════════════════════════════════════
 // APAC discovery — Tokyo (TDnet) for now. HKEX / ASX / SGX can plug
@@ -53,6 +56,24 @@ Disclosure titles are in Japanese. Common deal-signal keywords:
 
 The company code is a 4-digit ticker on the Tokyo exchange (e.g. "7203" = Toyota).
 
+# HKEX (Hong Kong) — English disclosures
+
+HKEX disclosure headlines are all-caps English with a regulatory category up front. Common deal-signal categories:
+- **DISCLOSEABLE TRANSACTION** = HK Listing Rule 14.06 — transaction sized at 5-25% of the issuer's tests.
+- **MAJOR TRANSACTION** = 25-100% test — shareholder approval required.
+- **VERY SUBSTANTIAL ACQUISITION** / **VERY SUBSTANTIAL DISPOSAL** = >100% test, treated as reverse takeover.
+- **CONNECTED TRANSACTION** = related-party deal, may also be classified as Discloseable / Major.
+- **MAJOR AND CONNECTED TRANSACTION** = both rules apply.
+- **COMPOSITE DOCUMENT** = combined offeror/offeree document under the Takeovers Code.
+- **JOINT ANNOUNCEMENT** = typically the deal announcement signed by both parties.
+- **PRE-CONDITIONAL VOLUNTARY OFFER** / **VOLUNTARY CONDITIONAL CASH OFFER** = takeover offers.
+- **MANDATORY UNCONDITIONAL CASH OFFER** = triggered when a holder crosses 30% (HK Code Rule 26).
+- **SCHEME OF ARRANGEMENT** = HK / Cayman court-sanctioned merger or privatisation.
+- **PROPOSED PRIVATISATION** = take-private transaction.
+- **RESPONSE TO OFFER** / **OFFEREE BOARD CIRCULAR** = target's reply to a takeover.
+
+The company code is a **5-digit** HKEX ticker (e.g. "00700" = Tencent, "09988" = Alibaba, "01299" = AIA, "02899" = Zijin Mining). Strip leading zeros for display but keep the full 5-digit form in \`pr.sym\`.
+
 # Language (CRITICAL)
 
 ALL output text fields MUST be in **English**. The terminal serves an English-speaking institutional audience — no Japanese characters (kanji, hiragana, katakana, full-width romans) may appear in any field.
@@ -67,18 +88,19 @@ If a company name is genuinely unknown from the title (e.g. "連結子会社" = 
 
 # Rules
 
-- **f (flag)**: 🇯🇵 for TDnet (Japan) by default; later HKEX→🇭🇰, ASX→🇦🇺, SGX→🇸🇬.
-- **r (regulator)**: For TDnet, default \`JFTC\` for antitrust-relevant transactions; use \`TSE listing rules\` for pure disclosure obligations; \`METI\` for foreign-investment review under FEFTA.
+- **f (flag)**: 🇯🇵 for TDnet (Japan), 🇭🇰 for HKEX (Hong Kong); later ASX→🇦🇺, SGX→🇸🇬.
+- **r (regulator)**: For TDnet, default \`JFTC\` (antitrust) / \`TSE listing rules\` (pure disclosure) / \`METI\` (FEFTA foreign-investment). For HKEX, default \`SFC\` (Securities and Futures Commission — runs the Takeovers Code) / \`HKEX listing rules\` for pure listing-rule transactions / \`MOFCOM\` if mainland Chinese antitrust review is mentioned.
 - **st (status)**: announcement of a new tender offer or M&A agreement → \`Review\`; completed / settled → \`Closed\`; rumored → \`Rumored\`.
 - **sc (score color)**: G = clean / cleared, A = pending review / amber, R = contested or blocked, P = activist-driven, B = neutral.
 - **pr.cur**: \`¥\` for Japan, \`HK$\` for Hong Kong, \`A$\` for Australia, \`S$\` for Singapore.
-- **pr.sym**: the 4-digit code for Tokyo (e.g. \`"7203"\`), or the exchange ticker elsewhere.
+- **pr.sym**: the 4-digit code for Tokyo (e.g. \`"7203"\`), the 5-digit code for HKEX (e.g. \`"00700"\`), or the exchange ticker elsewhere.
 - **pr.ad**: month + year of the disclosure (e.g. \`"Apr 2026"\`).
 - **nm / acq**: extract from the title. Japanese title patterns:
   - "AAAAによるBBBBに対する公開買付け" → \`acq: "AAAA", nm: "BBBB"\`.
   - "BBBBの完全子会社化" → \`nm: "BBBB"\` (acquirer from filer / company name).
   - "AAAAとBBBBの経営統合" → \`nm: "BBBB", acq: "AAAA"\` (or both as merger of equals).
 - Categories: TOB / 公開買付 → \`TENDER\`. MBO → \`MERGER\` (privatization). 株式取得 / 子会社化 → \`MERGER\`. 株式譲渡 (selling subsidiary) → \`SPINOFF\`. 株式交換 / 経営統合 / 合併 → \`MERGER\`. 会社分割 → \`SPINOFF\`. 資本業務提携 → \`MERGER\` if stake is material; otherwise \`is_deal: false\`.
+- HKEX categories: PROPOSED PRIVATISATION / SCHEME OF ARRANGEMENT / MANDATORY UNCONDITIONAL CASH OFFER / PRE-CONDITIONAL VOLUNTARY OFFER / VOLUNTARY CONDITIONAL CASH OFFER → \`MERGER\` or \`TENDER\` (use TENDER when the headline contains "OFFER"). VERY SUBSTANTIAL DISPOSAL / DISPOSAL → \`SPINOFF\`. DISCLOSEABLE / MAJOR / VERY SUBSTANTIAL ACQUISITION → \`MERGER\`. COMPOSITE DOCUMENT / JOINT ANNOUNCEMENT → category drives from the underlying transaction described; if unclear from headline alone, default \`MERGER\`. CONNECTED TRANSACTION alone (no acquisition framing) → \`is_deal: false\` unless the headline also flags a transfer of control.
 
 # Deal value & price (CRITICAL — do not skip)
 
@@ -139,7 +161,7 @@ function normalize(s: string | null | undefined): string {
     .trim();
 }
 
-async function extractApacDiscovery(c: TdnetDisclosure): Promise<DiscoveryResponse | null> {
+async function extractApacDiscovery(c: ApacDisclosure): Promise<DiscoveryResponse | null> {
   const anthropic = getAnthropic();
   const userMsg = `APAC DISCLOSURE
 Source: ${c.source}
@@ -164,6 +186,7 @@ URL: ${c.url}
 
 export type ApacDiscoveryResult = {
   tdnetScanned: number;
+  hkexScanned: number;
   candidates: number;
   inserted: number;
   duplicates: number;
@@ -205,17 +228,23 @@ export async function discoverApacDeals(
     if (r.source_url) seenSources.add(r.source_url);
   }
 
-  // Fetch APAC sources (only TDnet for now — Promise.allSettled-ready)
-  const [tdnetRes] = await Promise.allSettled([
+  // Fetch APAC sources in parallel — each fails independently.
+  const [tdnetRes, hkexRes] = await Promise.allSettled([
     fetchTdnetDisclosures({ daysBack, limit: maxCases }),
+    fetchHkexDisclosures({ daysBack, limit: maxCases }),
   ]);
 
   let tdnetCases: TdnetDisclosure[] = [];
+  let hkexCases: HkexDisclosure[] = [];
   if (tdnetRes.status === "fulfilled") tdnetCases = tdnetRes.value;
   else errors.push(`TDnet: ${(tdnetRes.reason as Error).message}`);
+  if (hkexRes.status === "fulfilled") hkexCases = hkexRes.value;
+  else errors.push(`HKEX: ${(hkexRes.reason as Error).message}`);
 
-  const all: TdnetDisclosure[] = [...tdnetCases];
-  console.log(`[discovery-apac] fetched tdnet=${tdnetCases.length} total=${all.length}`);
+  const all: ApacDisclosure[] = [...tdnetCases, ...hkexCases];
+  console.log(
+    `[discovery-apac] fetched tdnet=${tdnetCases.length} hkex=${hkexCases.length} total=${all.length}`,
+  );
 
   let candidates = 0;
   let inserted = 0;
@@ -284,6 +313,7 @@ export async function discoverApacDeals(
 
   return {
     tdnetScanned: tdnetCases.length,
+    hkexScanned: hkexCases.length,
     candidates,
     inserted,
     duplicates,

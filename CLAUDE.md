@@ -122,6 +122,14 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - **Phase 2 — Gestion** : exploiter les dashboards Supabase + Stripe ; page `/admin` (rôle admin) si besoin.
 - **Phase 3 — Pipeline semi-automatique** : Cron + SEC EDGAR + extraction Claude API + `review_queue` + garde-fous.
 - **Phase 4 — Automatisation étendue** : publier seuls les changements mineurs à haute confiance ; l’humain garde le matériel.
+- **Phase 5 — Backfill historique** : peupler la base avec les deals event-driven passés à partir des sources déjà branchées. Ordre d'attaque prévu (selon rendement décroissant) :
+  1. **DG COMP 1990-aujourd'hui** — le JSON Open Data déjà consommé contient **10,232 cases historiques** (~6-8k deals exploitables après dédup). Aucune nouvelle source à brancher, juste retirer le filtre `daysBack` et batcher en plusieurs nuits.
+  2. **SEC EDGAR 2001-aujourd'hui** — full-text search remonte à 2001 (S-4 / DEFM14A / SC TO-T / SC 13D / 13E-3 / 8-K). Estimé ~12-20k filings → ~6-10k deals uniques. 2-3 nuits de batch.
+  3. **HKEX / ASX / SGX en temps réel** — finir la couverture APAC live AVANT d'attaquer leur historique (déjà difficile car archives plus courtes).
+  4. **CMA 2014-aujourd'hui** + archives Competition Commission pré-2014 via webarchive.nationalarchives.gov.uk si on creuse. Estimé ~600-800 cas récents + ~400 pré-2014.
+  - **TDnet** : l'archive quotidienne ne remonte qu'à 2-3 ans en URL pattern actuel ; au-delà il faut TDnet Premium (payant) — peu rentable pour le moment.
+  - **Coût Claude API estimé** : ~75-150 USD pour ~15-20k extractions avec prompt caching (50 req/min Tier 1 → ~5-7h cumulées de batch nocturne).
+  - **Avantage qualité** : les deals passés ont leur outcome connu → on enrichit automatiquement (`statut="Closed"`, `proba_close=100`, `spread=0`) → moins d'hallucinations possibles.
 
 -----
 

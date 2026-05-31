@@ -96,8 +96,9 @@ export default async function AdminReview() {
         <b>Update</b> = scan existing deals for changes (status, probability…).
         <b> US discovery</b> = SEC EDGAR (S-4 / DEFM14A / SC TO-T / SC 13D / 8-K).
         <b> EU discovery</b> = CMA (UK Atom) + DG COMP (EU Commission Open Data JSON).
-        <b> APAC discovery</b> = TDnet (Tokyo, Japanese disclosures). Already-processed cases
-        are skipped automatically. Live logs in the <code>npm run dev</code> terminal.
+        <b> APAC discovery</b> = TDnet (Tokyo, Japanese disclosures) + HKEX (Hong Kong, English
+        Takeovers Code / Listing Rule headlines). Already-processed cases are skipped
+        automatically. Live logs in the <code>npm run dev</code> terminal.
       </div>
 
       {items.length === 0 ? (
