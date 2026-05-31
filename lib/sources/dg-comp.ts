@@ -164,79 +164,56 @@ function deepFindJsonUrl(node: unknown): string | null {
   return null;
 }
 
-// Loose extraction of case rows from the downloaded JSON. The exact schema
-// is unknown from outside (Commission's choice) — we walk the tree and pick
-// objects that look like case rows (caseNumber/title/date heuristic).
+// DG COMP's open-data file is a top-level dict keyed by case number, each
+// value being { metadata: { ... }, decisions: [...], caseAttachments: [...] }.
+// Every metadata field is wrapped in an array (e.g. caseTitle: ["..."]).
+// We harvest the recent merger cases sorted by notification date desc.
 function harvestCasesFromData(root: unknown, limit: number, cutoff: Date): DgCompCase[] {
-  const out: DgCompCase[] = [];
-  const seen = new Set<string>();
+  if (!root || typeof root !== "object") return [];
+  const entries = Object.entries(root as Record<string, unknown>);
+  console.log(`[dg-comp] data has ${entries.length} top-level case entries`);
 
-  const visit = (node: unknown): void => {
-    if (out.length >= limit) return;
-    if (!node) return;
-    if (Array.isArray(node)) {
-      for (const item of node) visit(item);
-      return;
-    }
-    if (typeof node !== "object") return;
-    const n = node as Record<string, unknown>;
+  type Row = { caseNumber: string; title: string; date: string };
+  const rows: Row[] = [];
 
-    const caseNumber = pickString(n, [
-      "caseNumber",
-      "case_number",
-      "caseNo",
-      "caseRef",
-      "reference",
-      "casenum",
-    ]);
-    const title = pickString(n, [
-      "title",
-      "caseTitle",
-      "case_title",
-      "name",
-      "displayName",
-      "parties",
-    ]);
-    const date = pickString(n, [
-      "notificationDate",
-      "notification_date",
-      "lastUpdated",
-      "lastUpdateDate",
-      "publishDate",
-      "publish_date",
-      "decisionDate",
-      "decision_date",
-      "date",
-    ]);
-    const summary = pickString(n, ["summary", "description", "shortDescription"]) ?? "";
+  for (const [caseId, caseObj] of entries) {
+    if (!caseObj || typeof caseObj !== "object") continue;
+    const meta = (caseObj as Record<string, unknown>).metadata as Record<string, unknown> | undefined;
+    if (!meta) continue;
 
-    if (caseNumber && title && caseNumber.startsWith("M") && !seen.has(caseNumber)) {
-      seen.add(caseNumber);
-      const dateObj = date ? new Date(date) : null;
-      if (dateObj && dateObj < cutoff) {
-        // older than the window — skip
-      } else {
-        out.push({
-          source: "DG COMP",
-          title,
-          url: `https://competition-cases.ec.europa.eu/cases/${caseNumber}`,
-          date: dateObj ? dateObj.toISOString().slice(0, 10) : "",
-          summary,
-          caseNumber,
-        });
-      }
-    }
-    for (const value of Object.values(n)) visit(value);
-  };
-  visit(root);
-  return out;
+    const caseNumber = unwrapFirst(meta.caseNumber) || caseId;
+    if (!caseNumber.startsWith("M")) continue;
+    const title = unwrapFirst(meta.caseTitle) || unwrapFirst(meta.caseCompanies);
+    if (!title) continue;
+    // Prefer notification date; fall back to initiation / latest decision.
+    const dateStr =
+      unwrapFirst(meta.caseNotificationDate) ||
+      unwrapFirst(meta.caseInitiationDate) ||
+      unwrapFirst(meta.caseLastDecisionDate);
+    if (!dateStr) continue;
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime()) || d < cutoff) continue;
+
+    rows.push({ caseNumber, title, date: dateStr });
+  }
+
+  // Most recent first, then cap at limit.
+  rows.sort((a, b) => b.date.localeCompare(a.date));
+  const top = rows.slice(0, limit);
+  console.log(`[dg-comp] after date filter (>${cutoff.toISOString().slice(0, 10)}): ${rows.length} cases; taking top ${top.length}`);
+  return top.map((r) => ({
+    source: "DG COMP" as const,
+    title: r.title,
+    url: `https://competition-cases.ec.europa.eu/cases/${r.caseNumber}`,
+    date: r.date.slice(0, 10),
+    summary: "",
+    caseNumber: r.caseNumber,
+  }));
 }
 
-function pickString(obj: Record<string, unknown>, keys: string[]): string {
-  for (const k of keys) {
-    const v = obj[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
+function unwrapFirst(v: unknown): string {
+  if (typeof v === "string") return v.trim();
+  if (Array.isArray(v) && v.length > 0 && typeof v[0] === "string") return (v[0] as string).trim();
   return "";
 }
 
