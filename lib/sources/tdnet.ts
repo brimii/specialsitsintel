@@ -51,15 +51,19 @@ async function fetchTdnetDay(date: Date): Promise<TdnetDisclosure[]> {
   if (!res.ok) return [];
   const html = await res.text();
 
-  // TDnet daily page layout: a <table> whose rows have
-  // <td>HH:MM</td><td>code</td><td>company</td><td><a href="pdf">title</a></td>…
-  // Defensive regex tolerates whitespace and attribute order.
+  // TDnet daily page layout: each disclosure is a <tr> with four data <td>s
+  // bearing stable class names — kjTime / kjCode / kjName / kjTitle —
+  // followed by the PDF anchor inside kjTitle. Anchoring on the class names
+  // is far more robust than positional td-counting (the page also contains
+  // header / footer tables that would otherwise be misread). Codes are
+  // 5-char alphanumeric on Tokyo today (e.g. 21620, 298A0), no longer
+  // strictly the historical 4-digit form.
   const rowRe =
-    /<tr[^>]*>[\s\S]*?<td[^>]*>\s*(\d{2}:\d{2})\s*<\/td>[\s\S]*?<td[^>]*>\s*(\d{4})\s*<\/td>[\s\S]*?<td[^>]*>\s*([^<]+?)\s*<\/td>[\s\S]*?<td[^>]*>\s*<a[^>]*href="([^"]+\.pdf)"[^>]*>\s*([^<]+?)\s*<\/a>/gi;
+    /<td[^>]*kjCode[^>]*>\s*([0-9A-Z]+)\s*<\/td>\s*<td[^>]*kjName[^>]*>\s*([^<]*?)\s*<\/td>\s*<td[^>]*kjTitle[^>]*>\s*<a[^>]*href="([^"]+\.pdf)"[^>]*>\s*([^<]+?)\s*<\/a>/gi;
 
   const out: TdnetDisclosure[] = [];
   for (const m of html.matchAll(rowRe)) {
-    const [, , code, company, href, title] = m;
+    const [, code, company, href, title] = m;
     const pdfUrl = href.startsWith("http") ? href : `https://www.release.tdnet.info/inbs/${href}`;
     out.push({
       source: "TDnet",
