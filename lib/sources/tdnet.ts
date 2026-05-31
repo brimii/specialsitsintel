@@ -71,6 +71,22 @@ async function fetchTdnetDay(date: Date): Promise<TdnetDisclosure[]> {
     });
   }
   console.log(`[tdnet] ${dateStr}: parsed ${out.length} disclosure rows`);
+
+  // Diagnostic: when the regex matches nothing, dump key structural anchors
+  // so we can adjust the parser without running curl from the container
+  // (release.tdnet.info is not in the network allowlist here).
+  if (out.length === 0 && html.length > 0) {
+    const trCount = (html.match(/<tr/gi) ?? []).length;
+    const tdCount = (html.match(/<td/gi) ?? []).length;
+    const pdfHrefs = html.match(/href="[^"]*\.pdf"/gi)?.slice(0, 3) ?? [];
+    const tableIdx = html.search(/<table[^>]*>/i);
+    const snippet = tableIdx >= 0
+      ? html.slice(tableIdx, tableIdx + 2000)
+      : html.slice(0, 2000);
+    console.log(`[tdnet][diag] htmlLen=${html.length} trs=${trCount} tds=${tdCount} pdfHrefs=${pdfHrefs.length}`);
+    if (pdfHrefs.length) console.log(`[tdnet][diag] first pdfHrefs: ${pdfHrefs.join(" | ")}`);
+    console.log(`[tdnet][diag] snippet from <table>:\n${snippet.replace(/\s+/g, " ")}`);
+  }
   return out;
 }
 
