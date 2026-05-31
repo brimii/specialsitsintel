@@ -39,23 +39,65 @@ export type HkexDisclosure = {
   url: string; // disclosure PDF/HTM URL
 };
 
-function hkexUrlForDay(d: Date): string {
+// HKEX has rotated their daily-index filename a few times. Try the most
+// common variants in order — the first 200 wins. PDF disclosures clearly
+// live under /listedco/listconews/sehk/YYYY/MMDD/ (we see them in titles
+// linked from the candidate rows) so the directory itself exists; only
+// the index filename differs.
+function hkexUrlCandidates(d: Date): string[] {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  return `https://www1.hkexnews.hk/listedco/listconews/sehk/${yyyy}/${mm}${dd}/index_e.htm`;
+  const dir = `https://www1.hkexnews.hk/listedco/listconews/sehk/${yyyy}/${mm}${dd}`;
+  return [
+    `${dir}/index_e.htm`,
+    `${dir}/idx_e.htm`,
+    `${dir}/`,
+    `${dir}/index.htm`,
+    `${dir}/LTNINDEX1_e.htm`,
+  ];
 }
 
 async function fetchHkexDay(date: Date): Promise<HkexDisclosure[]> {
-  const url = hkexUrlForDay(date);
+  const candidates = hkexUrlCandidates(date);
   const dateStr = date.toISOString().slice(0, 10);
-  const res = await fetch(url, {
-    headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
-    cache: "no-store",
-  });
-  console.log(`[hkex] ${dateStr}: ${res.status} ${url}`);
-  if (!res.ok) return [];
-  const html = await res.text();
+  let html = "";
+  let usedUrl = "";
+  for (const url of candidates) {
+    const res = await fetch(url, {
+      headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
+      cache: "no-store",
+    });
+    console.log(`[hkex] ${dateStr}: ${res.status} ${url}`);
+    if (res.ok) {
+      html = await res.text();
+      usedUrl = url;
+      break;
+    }
+  }
+  if (!html) {
+    // All daily-index patterns failed. Probe the stable "today" landing
+    // page once — only worth doing for the most recent day in the window,
+    // but cheap enough to do every call as a diagnostic anchor so we know
+    // whether the host responds at all from the dev environment.
+    if (date.toDateString() === new Date().toDateString()) {
+      const todayUrl = "https://www1.hkexnews.hk/listedco/listconews/sehk/today_e.htm";
+      const tres = await fetch(todayUrl, {
+        headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
+        cache: "no-store",
+      });
+      console.log(`[hkex] ${dateStr}: today-fallback ${tres.status} ${todayUrl}`);
+      if (tres.ok) {
+        html = await tres.text();
+        usedUrl = todayUrl;
+      } else {
+        const sample = (await tres.text()).slice(0, 400).replace(/\s+/g, " ");
+        console.log(`[hkex][diag] today-fallback body head: ${sample}`);
+      }
+    }
+    if (!html) return [];
+  }
+  void usedUrl;
 
   // HKEX daily index pages list disclosures with: release time, 5-digit
   // stock code, short name, headline (with a PDF link). The layout has
