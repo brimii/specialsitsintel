@@ -1,0 +1,149 @@
+import "server-only";
+import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic";
+
+// ════════════════════════════════════════════════════════════════════
+// 2nd-pass enrichment — focused price/value extraction.
+//
+// The 1st-pass discovery prompts classify a headline as a deal and
+// extract structure. They run on either a SEC filing's full text (good
+// price coverage) or just a title (TDnet, HKEX — no price visible).
+//
+// This 2nd pass is called only on candidates that survived the 1st
+// pass, with the actual disclosure PDF / decision document text. The
+// prompt is tight: fill in v / pr.o / pr.sym / pr.cur / cl / desc when
+// the document says them; otherwise keep the input values unchanged.
+// ════════════════════════════════════════════════════════════════════
+
+const ENRICH_SYSTEM_PROMPT = `You receive a previously-extracted event-driven deal record plus the full text of the underlying disclosure document (SEC filing, regulator decision, takeover offer, Tokyo TDnet PDF, Hong Kong HKEX announcement, etc.). Your job is to FILL IN or CORRECT just the pricing, ticker and timing fields when the document gives you the answer — and to leave everything else alone.
+
+# Output
+
+Return JSON with ONLY these fields (no others):
+
+\`\`\`json
+{
+  "v": "$X.XB" | "€X.XM" | "¥XB" | "TBD",
+  "pr": {
+    "o": <per-share offer price as a plain number, e.g. 25.50>,
+    "sym": "<ticker if disclosed>",
+    "cur": "$" | "€" | "£" | "¥" | "HK$" | "A$" | "S$" | "CHF",
+    "ad": "MMM YYYY"
+  },
+  "cl": "Q3 2026" | "H2 2026" | "Mar 2027" | "TBD",
+  "desc": "<1-2 factual ENGLISH sentences describing the transaction>"
+}
+\`\`\`
+
+# Rules
+
+- **v** (total deal value): look for "aggregate consideration", "transaction value", "equity value", "implied enterprise value", "X per share x N shares", "total consideration of approximately", "valued at". Output in English scale letters (B/M/T) with the deal currency. Examples: "$5.2B", "€840M", "¥320B", "£1.4B", "HK$8.5B".
+- **pr.o** (per-share offer price): plain number, no currency symbol, no commas (e.g. \`25.50\`, \`3500\`, \`4.85\`). For all-stock deals, extract the implied per-share value at signing if explicitly stated ("implied value of $X per share based on the fixed exchange ratio"). Leave at 0 ONLY if the document genuinely doesn't disclose any per-share price.
+- **pr.sym**: stock ticker if the document mentions it (e.g. "TGT", "00700", "AAL", "7203").
+- **pr.cur**: currency symbol matching pr.o.
+- **pr.ad**: month + year of announcement / first disclosure ("Apr 2026").
+- **cl**: expected close timing if mentioned ("Q3 2026", "H2 2026", "Mar 2027"), otherwise "TBD".
+- **desc**: 1-2 factual sentences in English. Translate any Japanese/Chinese/French text to English. Don't editorialize.
+
+# Language
+
+ALL output text fields MUST be in English. Translate company names where they appear:
+- Japanese: トヨタ自動車 → "Toyota Motor", カカクコム → "Kakaku.com", ニチリョク → "Nichiryoku".
+- Chinese: 腾讯 → "Tencent", 阿里巴巴 → "Alibaba".
+Strip corporate suffixes: 株式会社 / 有限公司 / (株) / Co., Ltd. when redundant.
+
+Japanese number units: 億 = 100M, 兆 = 1T. Output "¥45B" not "450億円".
+
+# Critical: don't degrade
+
+- If the document doesn't help (e.g. it's a procedural notice without numbers), return the INPUT values unchanged for every field.
+- NEVER replace a known per-share price with 0.
+- NEVER replace a known "$X.XB" value with "TBD".
+- NEVER invent numbers.
+
+# CRITICAL OUTPUT FORMAT
+
+- FIRST character MUST be \`{\`.
+- LAST character MUST be \`}\`.
+- NO markdown fences (no \`\`\`json, no \`\`\`).
+- NO prose before or after the JSON.
+- Output goes directly to JSON.parse().`;
+
+export type DealLike = {
+  nm: string;
+  acq: string;
+  v: string;
+  c: string;
+  r: string;
+  st: string;
+  sc: string;
+  reg: string;
+  cl: string;
+  desc: string;
+  ai: string;
+  f: string;
+  pr: { u: number; c: number; o: number; sym: string; cur: string; ad: string };
+  tl: Array<{ d: string; t: string; x: string }>;
+};
+
+type EnrichPatch = Partial<Pick<DealLike, "v" | "cl" | "desc">> & {
+  pr?: Partial<DealLike["pr"]>;
+};
+
+// Call Claude with the disclosure document and merge the returned patch
+// back onto the input deal. Returns the merged deal (or the original
+// unchanged if the enrich call fails / returns nothing useful).
+export async function enrichDealFromDocument(
+  deal: DealLike,
+  documentText: string,
+): Promise<DealLike> {
+  if (!documentText || documentText.length < 200) return deal;
+
+  const anthropic = getAnthropic();
+  const userMsg = `INPUT DEAL RECORD:
+${JSON.stringify(deal)}
+
+DOCUMENT TEXT (${documentText.length} chars):
+${documentText}`;
+
+  try {
+    const res = await anthropic.messages.create({
+      model: EXTRACTION_MODEL,
+      max_tokens: 800,
+      system: [{ type: "text", text: ENRICH_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: userMsg }],
+    });
+    const block = res.content[0];
+    const text = block && block.type === "text" ? block.text : "";
+    const patch = parseClaudeJson<EnrichPatch>(text);
+    if (!patch) return deal;
+    return mergeDeal(deal, patch);
+  } catch (e) {
+    console.log(`[enrich] failed: ${(e as Error).message}`);
+    return deal;
+  }
+}
+
+// Merge an enrich patch onto a deal, preserving any 1st-pass value the
+// 2nd pass would otherwise erase (the prompt instructs Claude not to,
+// but defense in depth — the 1st pass already saw the headline and we
+// don't want a sparse document to wipe its findings).
+function mergeDeal(base: DealLike, patch: EnrichPatch): DealLike {
+  const merged: DealLike = { ...base };
+  if (patch.v && patch.v !== "TBD") merged.v = patch.v;
+  else if (patch.v === "TBD" && (!base.v || base.v === "TBD" || base.v === "")) merged.v = "TBD";
+
+  if (patch.cl && patch.cl !== "TBD") merged.cl = patch.cl;
+
+  if (patch.desc && patch.desc.length > 20) merged.desc = patch.desc;
+
+  if (patch.pr) {
+    merged.pr = {
+      ...base.pr,
+      o: patch.pr.o && patch.pr.o > 0 ? patch.pr.o : base.pr.o,
+      sym: patch.pr.sym && patch.pr.sym.length > 0 ? patch.pr.sym : base.pr.sym,
+      cur: patch.pr.cur && patch.pr.cur.length > 0 ? patch.pr.cur : base.pr.cur,
+      ad: patch.pr.ad && patch.pr.ad.length > 0 ? patch.pr.ad : base.pr.ad,
+    };
+  }
+  return merged;
+}

@@ -25,6 +25,7 @@ export type DgCompCase = {
   date: string;
   summary: string;
   caseNumber?: string;
+  decisionPdfUrl?: string;
 };
 
 async function fetchDatasetMetadata(): Promise<Record<string, unknown> | null> {
@@ -173,12 +174,13 @@ function harvestCasesFromData(root: unknown, limit: number, cutoff: Date): DgCom
   const entries = Object.entries(root as Record<string, unknown>);
   console.log(`[dg-comp] data has ${entries.length} top-level case entries`);
 
-  type Row = { caseNumber: string; title: string; date: string };
+  type Row = { caseNumber: string; title: string; date: string; pdfUrl?: string };
   const rows: Row[] = [];
 
   for (const [caseId, caseObj] of entries) {
     if (!caseObj || typeof caseObj !== "object") continue;
-    const meta = (caseObj as Record<string, unknown>).metadata as Record<string, unknown> | undefined;
+    const obj = caseObj as Record<string, unknown>;
+    const meta = obj.metadata as Record<string, unknown> | undefined;
     if (!meta) continue;
 
     const caseNumber = unwrapFirst(meta.caseNumber) || caseId;
@@ -194,7 +196,11 @@ function harvestCasesFromData(root: unknown, limit: number, cutoff: Date): DgCom
     const d = new Date(dateStr);
     if (Number.isNaN(d.getTime()) || d < cutoff) continue;
 
-    rows.push({ caseNumber, title, date: dateStr });
+    // Walk the case decisions/attachments for the first PDF URL we can
+    // find — this is what carries the deal value when published.
+    const pdfUrl = pickFirstPdfFromCase(obj);
+
+    rows.push({ caseNumber, title, date: dateStr, pdfUrl });
   }
 
   // Most recent first, then cap at limit.
@@ -208,7 +214,48 @@ function harvestCasesFromData(root: unknown, limit: number, cutoff: Date): DgCom
     date: r.date.slice(0, 10),
     summary: "",
     caseNumber: r.caseNumber,
+    decisionPdfUrl: r.pdfUrl,
   }));
+}
+
+// Walk a DG COMP case object (decisions / caseAttachments / press
+// releases) for the first PDF URL we can identify. The schema nests
+// these inside arrays of objects with varying field names; we look
+// for any string value ending in .pdf inside those branches.
+function pickFirstPdfFromCase(caseObj: Record<string, unknown>): string | undefined {
+  const candidates: unknown[] = [
+    caseObj.decisions,
+    caseObj.caseAttachments,
+    caseObj.pressReleases,
+    caseObj.publications,
+  ];
+  for (const branch of candidates) {
+    const url = deepFindPdfUrl(branch);
+    if (url) return url;
+  }
+  return undefined;
+}
+
+function deepFindPdfUrl(node: unknown): string | null {
+  if (!node) return null;
+  if (typeof node === "string") {
+    if (node.toLowerCase().endsWith(".pdf") && /^https?:/i.test(node)) return node;
+    return null;
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const u = deepFindPdfUrl(item);
+      if (u) return u;
+    }
+    return null;
+  }
+  if (typeof node === "object") {
+    for (const v of Object.values(node as Record<string, unknown>)) {
+      const u = deepFindPdfUrl(v);
+      if (u) return u;
+    }
+  }
+  return null;
 }
 
 function unwrapFirst(v: unknown): string {

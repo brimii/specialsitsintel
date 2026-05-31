@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic";
 import { fetchTdnetDisclosures, type TdnetDisclosure } from "@/lib/sources/tdnet";
 import { fetchHkexDisclosures, type HkexDisclosure } from "@/lib/sources/hkex";
+import { fetchPdfText } from "@/lib/pdf";
+import { enrichDealFromDocument, type DealLike } from "@/lib/enrich";
 
 type ApacDisclosure = TdnetDisclosure | HkexDisclosure;
 
@@ -276,7 +278,7 @@ export async function discoverApacDeals(
     candidates++;
     console.log(`[discovery-apac] CANDIDATE ${c.source} :: ${resp.deal.nm} / ${resp.deal.acq}`);
 
-    const d = resp.deal;
+    let d = resp.deal;
     const targetKey = normalize(d.nm);
     const symKey = normalize(d.pr?.sym);
     if (existingNames.has(targetKey)) {
@@ -288,6 +290,22 @@ export async function discoverApacDeals(
       console.log(`[discovery-apac] DUP_SYM :: ${d.pr?.sym}`);
       duplicates++;
       continue;
+    }
+
+    // 2nd pass: fetch the disclosure PDF and ask Claude to fill in price /
+    // value / close-date when the document discloses them. The 1st pass
+    // only saw the headline (TDnet and HKEX both publish title + PDF link,
+    // no detail HTML). Best-effort: if PDF fetch or extraction fails the
+    // 1st-pass deal goes through unchanged.
+    const pdfText = await fetchPdfText(c.url).catch(() => "");
+    if (pdfText) {
+      const before = `v=${d.v} pr.o=${d.pr?.o ?? 0}`;
+      d = await enrichDealFromDocument(d as DealLike, pdfText);
+      console.log(
+        `[discovery-apac] ENRICHED ${c.source} :: ${d.nm} :: ${before} → v=${d.v} pr.o=${d.pr?.o ?? 0}`,
+      );
+    } else {
+      console.log(`[discovery-apac] enrich skipped (no pdf text) :: ${d.nm}`);
     }
 
     const { error: insErr } = await admin.from("review_queue").insert({

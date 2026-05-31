@@ -1,8 +1,10 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic";
-import { fetchCmaCases, fetchCmaCaseText, type CmaCase } from "@/lib/sources/cma";
+import { fetchCmaCases, fetchCmaCaseText, findCmaCasePdf, type CmaCase } from "@/lib/sources/cma";
 import { fetchDgCompCases, fetchDgCompCaseText, type DgCompCase } from "@/lib/sources/dg-comp";
+import { fetchPdfText } from "@/lib/pdf";
+import { enrichDealFromDocument, type DealLike } from "@/lib/enrich";
 
 // ════════════════════════════════════════════════════════════════════
 // European discovery — UK CMA + EU Commission DG COMP.
@@ -239,7 +241,7 @@ export async function discoverEuDeals(opts: { daysBack?: number; maxCases?: numb
     candidates++;
     console.log(`[discovery-eu] CANDIDATE ${c.source} :: ${resp.deal.nm} / ${resp.deal.acq}`);
 
-    const d = resp.deal;
+    let d = resp.deal;
     const targetKey = normalize(d.nm);
     const symKey = normalize(d.pr?.sym);
     if (existingNames.has(targetKey)) {
@@ -251,6 +253,28 @@ export async function discoverEuDeals(opts: { daysBack?: number; maxCases?: numb
       console.log(`[discovery-eu] DUP_SYM :: ${d.pr?.sym}`);
       duplicates++;
       continue;
+    }
+
+    // 2nd pass: pull the regulator's decision/notice PDF and let Claude
+    // refine deal value + per-share price from it. CMA exposes the PDF on
+    // the case page; DG COMP carries it in the JSON dataset's decisions[].
+    // Best-effort — sparse cases just keep the 1st-pass deal.
+    let pdfUrl: string | null = null;
+    if (c.source === "CMA") pdfUrl = await findCmaCasePdf(c.url).catch(() => null);
+    else if (c.source === "DG COMP") pdfUrl = (c as DgCompCase).decisionPdfUrl ?? null;
+    if (pdfUrl) {
+      const pdfText = await fetchPdfText(pdfUrl).catch(() => "");
+      if (pdfText) {
+        const before = `v=${d.v} pr.o=${d.pr?.o ?? 0}`;
+        d = await enrichDealFromDocument(d as DealLike, pdfText);
+        console.log(
+          `[discovery-eu] ENRICHED ${c.source} :: ${d.nm} :: ${before} → v=${d.v} pr.o=${d.pr?.o ?? 0} (pdf=${pdfUrl})`,
+        );
+      } else {
+        console.log(`[discovery-eu] enrich skipped (empty pdf text) :: ${d.nm} :: ${pdfUrl}`);
+      }
+    } else {
+      console.log(`[discovery-eu] no decision pdf found :: ${c.source} :: ${d.nm}`);
     }
 
     const { error: insErr } = await admin.from("review_queue").insert({

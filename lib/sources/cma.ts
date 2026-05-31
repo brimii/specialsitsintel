@@ -74,3 +74,34 @@ export async function fetchCmaCaseText(url: string, maxChars = 30000): Promise<s
     .trim();
   return unescapeXml(text).slice(0, maxChars);
 }
+
+// Scrape the CMA case page for the most relevant decision/notice PDF.
+// CMA pages on gov.uk list attached documents as <a href="...assets...pdf">.
+// Priority: a "decision" or "final report" PDF (carries the deal value);
+// otherwise the first PDF found. Returns the absolute URL or null.
+export async function findCmaCasePdf(caseUrl: string): Promise<string | null> {
+  const res = await fetch(caseUrl, { headers: { "User-Agent": UA }, cache: "no-store" });
+  if (!res.ok) return null;
+  const html = await res.text();
+  const pdfs = Array.from(html.matchAll(/<a[^>]+href="([^"]+\.pdf)"[^>]*>([\s\S]*?)<\/a>/gi))
+    .map((m) => ({
+      url: m[1].startsWith("http") ? m[1] : `https://www.gov.uk${m[1]}`,
+      label: m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().toLowerCase(),
+    }));
+  if (pdfs.length === 0) return null;
+  const priorityKeywords = [
+    "decision",
+    "final report",
+    "provisional findings",
+    "phase 2 decision",
+    "phase 1 decision",
+    "summary of",
+    "notice of",
+    "reasoned decision",
+  ];
+  for (const kw of priorityKeywords) {
+    const hit = pdfs.find((p) => p.label.includes(kw));
+    if (hit) return hit.url;
+  }
+  return pdfs[0].url;
+}
