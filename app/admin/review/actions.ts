@@ -5,6 +5,33 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/server";
 
+// Module-level locks: prevent concurrent runs of the same long-running action.
+// In Next dev (single process) this is enough — clicking the button twice
+// while it's still working returns immediately on the 2nd click instead of
+// launching a parallel run that duplicates inserts and burns Claude tokens.
+const locks: Record<string, Promise<void> | null> = {
+  pipelineNow: null,
+  fullScan: null,
+  discoveryUs: null,
+  discoveryEu: null,
+};
+
+async function withLock(key: keyof typeof locks, fn: () => Promise<void>): Promise<void> {
+  if (locks[key]) {
+    console.log(`[${key}] another run is already in progress — ignoring this click`);
+    return;
+  }
+  const p = (async () => {
+    try {
+      await fn();
+    } finally {
+      locks[key] = null;
+    }
+  })();
+  locks[key] = p;
+  await p;
+}
+
 type UpdateProposition = {
   kind?: undefined | "update";
   deal_id: number;
@@ -176,39 +203,47 @@ export async function rejectItem(formData: FormData) {
 }
 
 export async function runPipelineNow(): Promise<void> {
-  await requireAdmin();
-  const { runPipeline } = await import("@/lib/pipeline");
-  const result = await runPipeline({ maxDeals: 10, maxFilingsPerDeal: 2 });
-  console.log("[runPipelineNow]", JSON.stringify(result));
-  revalidatePath("/admin/review");
-  revalidatePath("/admin");
+  await withLock("pipelineNow", async () => {
+    await requireAdmin();
+    const { runPipeline } = await import("@/lib/pipeline");
+    const result = await runPipeline({ maxDeals: 10, maxFilingsPerDeal: 2 });
+    console.log("[runPipelineNow]", JSON.stringify(result));
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+  });
 }
 
 export async function runFullScan(): Promise<void> {
-  await requireAdmin();
-  const { runPipeline } = await import("@/lib/pipeline");
-  const result = await runPipeline({ maxDeals: 250, maxFilingsPerDeal: 1, daysBack: 730 });
-  console.log("[runFullScan]", JSON.stringify(result));
-  revalidatePath("/admin/review");
-  revalidatePath("/admin");
+  await withLock("fullScan", async () => {
+    await requireAdmin();
+    const { runPipeline } = await import("@/lib/pipeline");
+    const result = await runPipeline({ maxDeals: 250, maxFilingsPerDeal: 1, daysBack: 730 });
+    console.log("[runFullScan]", JSON.stringify(result));
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+  });
 }
 
 export async function runDiscoveryNow(): Promise<void> {
-  await requireAdmin();
-  const { discoverNewDeals } = await import("@/lib/discovery");
-  const result = await discoverNewDeals({ daysBack: 30, maxFilings: 100 });
-  console.log("[runDiscoveryNow]", JSON.stringify(result));
-  revalidatePath("/admin/review");
-  revalidatePath("/admin");
+  await withLock("discoveryUs", async () => {
+    await requireAdmin();
+    const { discoverNewDeals } = await import("@/lib/discovery");
+    const result = await discoverNewDeals({ daysBack: 30, maxFilings: 100 });
+    console.log("[runDiscoveryNow]", JSON.stringify(result));
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+  });
 }
 
-// EU discovery: scans CMA (UK Atom feed) + DG COMP (EU Commission RSS) in
-// parallel and inserts new event-driven cases into the review queue.
+// EU discovery: scans CMA (UK Atom feed) + DG COMP (EU Commission Open Data
+// JSON) in parallel and inserts new event-driven cases into the review queue.
 export async function runEuDiscoveryNow(): Promise<void> {
-  await requireAdmin();
-  const { discoverEuDeals } = await import("@/lib/discovery-eu");
-  const result = await discoverEuDeals({ daysBack: 30, maxCases: 50 });
-  console.log("[runEuDiscoveryNow]", JSON.stringify(result));
-  revalidatePath("/admin/review");
-  revalidatePath("/admin");
+  await withLock("discoveryEu", async () => {
+    await requireAdmin();
+    const { discoverEuDeals } = await import("@/lib/discovery-eu");
+    const result = await discoverEuDeals({ daysBack: 30, maxCases: 50 });
+    console.log("[runEuDiscoveryNow]", JSON.stringify(result));
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+  });
 }
