@@ -140,10 +140,46 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - [x] Phase 0 — Socle (migration vers Next.js + base) ✅
 - [x] Phase 1 — Auth + Stripe + restriction par palier ✅
 - [x] Phase 2 — Gestion / admin ✅
-- [ ] Phase 3 — Pipeline de données semi-automatique
-- [ ] Phase 4 — Automatisation étendue
+- [x] Phase 3 — Pipeline de données semi-automatique ✅ (US/EU/APAC live + 2nd-pass enrichment opérationnels)
+- [ ] Phase 4 — Automatisation étendue (publication auto des changements mineurs)
+- [ ] Phase 5 — Backfill historique (voir feuille de route)
 
-**Session actuelle / notes** (maj 2026-05-25) — *Phases 0, 1, 2 terminées ✅. Phase 3 : fondation en place, à activer côté humain.* :
+**Session 2026-05-31 — Couverture APAC live + 2e passe + colonne Size** (état à la coupure) :
+
+- ✅ **APAC live = TDnet (Tokyo) + HKEX (Hong Kong)** branchés via `lib/discovery-apac.ts` (orchestrateur `Promise.allSettled`).
+  - `lib/sources/tdnet.ts` : scrape les pages d'index quotidiennes `release.tdnet.info/inbs/I_list_001_YYYYMMDD.html` ; regex anchoré sur classes `kjCode`/`kjName`/`kjTitle` ; codes 5 caractères alphanumériques ; pré-filtre Japonais (TOB/MBO/公開買付/株式取得/合併/etc.).
+  - `lib/sources/hkex.ts` : appelle le **servlet officiel** `https://www1.hkexnews.hk/search/titleSearchServlet.do` en GET (POST = 405) avec fenêtre `fromDate/toDate` → renvoie `{result: "<JSON array stringifié>"}` avec ~3900 disclosures par semaine ; parse + filtre catégorie HKEX (DISCLOSEABLE / MAJOR / VERY SUBSTANTIAL / SCHEME OF ARRANGEMENT / MANDATORY OFFER…) ; les anciennes URLs `/listedco/listconews/sehk/YYYY/MMDD/index_e.htm` sont TOUTES dépréciées (404).
+  - Prompt système APAC enrichi : section dédiée HKEX (5-digit codes, SFC/HKEX/MOFCOM routing) + section Language CRITICAL qui force tout en anglais (translittération Romaji ou nom officiel).
+
+- ✅ **2e passe d'enrichissement (CMA / DG COMP / TDnet / HKEX)** :
+  - `lib/pdf.ts` : `fetchPdfText(url)` via `unpdf` (lib pure-JS ESM, sans dépendance native). Cap à 60k chars.
+  - `lib/enrich.ts` : `enrichDealFromDocument(deal, docText)` → 2e appel Claude focalisé "prix only" avec garde-fous (NEVER replace known price with 0, NEVER replace `$X.XB` with `TBD`, conversion 億/兆 → English scale). Merge défensif.
+  - `lib/discovery-apac.ts` : pour chaque candidat TDnet/HKEX, fetch le PDF via `c.url` (qui EST déjà l'URL du PDF) → enrich → insert.
+  - `lib/sources/cma.ts` : nouveau `findCmaCasePdf(caseUrl)` scrape la page case sur gov.uk pour trouver le PDF Decision/Final Report (priorité keywords) → fetch → enrich.
+  - `lib/sources/dg-comp.ts` : étendu `DgCompCase.decisionPdfUrl` ; nouveau `pickFirstPdfFromCase` + `deepFindPdfUrl` walkent `decisions / caseAttachments / pressReleases / publications` du JSON Open Data → enrich.
+  - `lib/discovery-eu.ts` : branche les 2 enrichissements ; logs `ENRICHED ... :: before → after`.
+
+- ✅ **Bouton 💰 Enrich missing prices** dans `/admin/review` (server action `reEnrichQueueItems` dans `app/admin/review/actions.ts`) : retro-enrichit en 2 passes — (1) items `review_queue.statut='en_attente'` avec source_url (modifie `proposition.deal` en place) ; (2) `deals` rows avec `valeur` vide/TBD ou `price.o = 0`, lookup source dans `deal_updates._creation`, écrit un audit row `_enrich_price` après update. Lock dédié `reEnrich`. **Lancé en fin de session côté humain — résultats non encore observés.**
+
+- ✅ **Colonne "Size" triable** dans la table des deals (`app/components/DealTable.tsx`, position col 2 sur 8) :
+  - `app/data/deals.ts` : helpers `dealCapUSD(v)` + `fmtCap(usd)` ; FX statiques pour ~18 devises (USD/EUR/GBP/JPY/CHF/AUD/CAD/CNY/INR/SAR/AED/KRW/HKD/SGD/TWD/BRL/MXN/ZAR/NZD). Parse `$13.9B`, `€11.7B`, `£3.8B`, `¥320B`, `A$9.1B`, `CHF 4.2B`, `$147B cap`, `SAR 12B`, `₹500B` → numeric USD ; "TBD"/null → 0 (tombe au bas du tri descendant). Affichage `$X.XB` / `$XXM` / `—`. Grille CSS étendue à 8 colonnes (3 lignes touchées dans `app/globals.css` : default + medium + small breakpoints).
+  - `app/components/DealUniverse.tsx` : nouveau case `"size"` dans le comparateur.
+
+- ✅ **Prompts de prix renforcés (US + EU + APAC)** : section dédiée `# Deal value & price (CRITICAL — do not skip)` ajoutée aux 3 prompts système ; emphase sur extraction systématique de `v` (transaction value / equity value / enterprise value) et `pr.o` (per-share offer) quand la source les dévoile, anti-hallucination préservé.
+
+- ✅ **Phase 5 (backfill historique) enregistrée dans la feuille de route** (section 10 de ce CLAUDE.md). Ordre d'attaque : (1) DG COMP 1990-2026 — 10,232 cases déjà dans le JSON Open Data, ~6-8k deals exploitables ; (2) SEC EDGAR 2001-2026 — ~12-20k filings ; (3) HKEX/ASX/SGX live d'abord ; (4) CMA 2014-2026. Coût estimé Claude API : ~75-150 USD pour ~15-20k extractions avec prompt caching.
+
+**À faire à la prochaine session (ordre suggéré) :**
+1. Observer les résultats du bouton 💰 Enrich missing prices lancé en fin de session (logs `[reEnrich][queue] ENRICHED ...` et `[reEnrich][deals] ENRICHED ...`).
+2. **ASX (Australie)** : créer `lib/sources/asx.ts` (Market Announcements Atom/RSS), brancher dans `discovery-apac.ts` à côté de TDnet + HKEX.
+3. **SGX (Singapour)** : créer `lib/sources/sgx.ts` (SGXNet), même pattern.
+4. Quand APAC live est complet → attaquer Phase 5 historique (DG COMP d'abord, batch nocturne).
+
+**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (24d4105) = "reEnrich: also process approved deals, not just queue items".
+
+---
+
+**Session 2026-05-25 / 2026-05-29 — Phase 3 fondation + EU + admin** (archivée) :
 
 - **Phase 3 — Pipeline (fondation faite, attente activation)** : `@anthropic-ai/sdk` ; `lib/anthropic.ts` (client paresseux, model `claude-sonnet-4-6`) ; `lib/sources/sec-edgar.ts` (full-text search + fetch texte) ; `lib/pipeline.ts` (orchestrateur : SEC → extraction Claude JSON via system prompt cacheable → garde-fous **MAJEUR/confiance<85/source unique = review_queue**, sinon = `deals` + `deal_updates`) ; `/api/cron/run` (Bearer `CRON_SECRET`) + `vercel.json` (06:00 UTC) ; `/admin/review` (Approuver / Rejeter + « Lancer maintenant » via server actions). **À activer** : ajouter `ANTHROPIC_API_KEY` et `CRON_SECRET` dans `.env.local`, puis tester via le bouton « Lancer maintenant » dans `/admin/review`. Déploiement Vercel requis pour le Cron quotidien.
 
