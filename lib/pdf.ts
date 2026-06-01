@@ -50,11 +50,15 @@ export async function fetchPdfText(url: string, maxChars = 60000, depth = 0): Pr
           `bytes=${buf.byteLength} finalUrl=${finalUrl}`,
       );
       if (depth >= 1) return "";
-      // Try to surface an embedded PDF link from the HTML wrapper.
+      // Try to surface an embedded PDF link from the HTML wrapper. ASX in
+      // particular wraps its PDFs in a disclaimer page that uses meta
+      // refresh, a JS redirect, a form, or an embed.
       const html = new TextDecoder("utf-8", { fatal: false }).decode(buf);
       const embedMatch =
         html.match(/<(?:embed|iframe|object)[^>]+(?:src|data)="([^"]+)"/i) ??
+        html.match(/<meta\s+http-equiv=["']refresh["'][^>]*content=["']\d+\s*;\s*url=([^"']+)["']/i) ??
         html.match(/window\.location(?:\.href)?\s*=\s*["']([^"']+)["']/i) ??
+        html.match(/<form[^>]+action="([^"]+)"/i) ??
         html.match(/href="([^"]+\.pdf[^"]*)"/i);
       if (embedMatch && embedMatch[1]) {
         const inner = embedMatch[1].startsWith("http")
@@ -63,6 +67,10 @@ export async function fetchPdfText(url: string, maxChars = 60000, depth = 0): Pr
         console.log(`[pdf] following embedded url: ${inner}`);
         return fetchPdfText(inner, maxChars, depth + 1);
       }
+      // Couldn't find a follow-up URL — dump the HTML head so we can see
+      // what the page is offering and iterate.
+      const sample = html.slice(0, 1800).replace(/\s+/g, " ");
+      console.log(`[pdf][diag] html head: ${sample}`);
       return "";
     }
 
