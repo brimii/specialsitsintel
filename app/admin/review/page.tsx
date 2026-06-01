@@ -103,8 +103,8 @@ export default async function AdminReview() {
         <b> US discovery</b> = SEC EDGAR (S-4 / DEFM14A / SC TO-T / SC 13D / 8-K).
         <b> EU discovery</b> = CMA (UK Atom) + DG COMP (EU Commission Open Data JSON).
         <b> APAC discovery</b> = TDnet (Tokyo, Japanese disclosures) + HKEX (Hong Kong, English
-        Takeovers Code / Listing Rule headlines). Already-processed cases are skipped
-        automatically.
+        Takeovers Code / Listing Rule headlines) + ASX (Australia, Corporations Act Pt 5.1
+        schemes / Ch 6 bids). Already-processed cases are skipped automatically.
         <b> Enrich missing prices</b> = re-runs the 2nd-pass enrichment on pending queue
         items that lack <code>v</code> or <code>pr.o</code>. Skips items already complete.
         Live logs in the <code>npm run dev</code> terminal.

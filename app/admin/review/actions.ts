@@ -287,7 +287,11 @@ async function resolvePdfUrl(
   findCmaCasePdf: (url: string) => Promise<string | null>,
 ): Promise<string | null> {
   if (!sourceUrl) return null;
-  if (sourceUrl.includes("release.tdnet.info") || sourceUrl.includes("hkexnews.hk")) {
+  if (
+    sourceUrl.includes("release.tdnet.info") ||
+    sourceUrl.includes("hkexnews.hk") ||
+    sourceUrl.includes("asx.com.au")
+  ) {
     return sourceUrl;
   }
   if (sourceUrl.includes("gov.uk/cma-cases")) {
@@ -393,6 +397,21 @@ export async function reEnrichQueueItems(): Promise<void> {
     let enriched = 0;
     let unchanged = 0;
     let skippedNoPdf = 0;
+    let skippedNoName = 0;
+    let skippedDupUrl = 0;
+
+    // Skip deals whose name carries no useful signal — saves a Claude call
+    // and avoids polluting the audit log with "TBD → TBD" no-ops.
+    const isUselessName = (n: string | null | undefined): boolean => {
+      const t = (n ?? "").trim().toLowerCase();
+      return t === "" || t === "tbd" || t === "unknown" || t === "unknown target";
+    };
+
+    // Dedup within the deals pass: if two deal rows share the same
+    // _creation source_url (same M&A approved twice into the DB), only
+    // enrich one — the second would burn another Claude call on identical
+    // input. Track here, scoped to this run.
+    const seenSourceUrls = new Set<string>();
 
     // ── Pass 1: review_queue ──────────────────────────────────────────
     type QueueRow = { id: string; proposition: unknown; source_url: string | null };
@@ -401,6 +420,11 @@ export async function reEnrichQueueItems(): Promise<void> {
       if (!prop || prop.kind !== "new_deal" || !prop.deal) continue;
       const deal = prop.deal;
       const url = String(raw.source_url ?? "");
+
+      if (isUselessName(deal.nm)) {
+        skippedNoName++;
+        continue;
+      }
 
       const needsValue = !deal.v || deal.v === "TBD" || deal.v === "";
       const needsPrice = !deal.pr || !deal.pr.o || deal.pr.o === 0;
@@ -445,6 +469,16 @@ export async function reEnrichQueueItems(): Promise<void> {
     for (const row of incompleteDeals as DealRow[]) {
       const sourceUrl = dealSourceMap.get(row.id);
       if (!sourceUrl) continue; // no traceable origin → can't enrich
+
+      if (isUselessName(row.nom)) {
+        skippedNoName++;
+        continue;
+      }
+      if (seenSourceUrls.has(sourceUrl)) {
+        skippedDupUrl++;
+        continue;
+      }
+      seenSourceUrls.add(sourceUrl);
 
       const pdfUrl = await resolvePdfUrl(sourceUrl, dgMap, findCmaCasePdf);
       if (!pdfUrl) {
@@ -520,7 +554,8 @@ export async function reEnrichQueueItems(): Promise<void> {
     }
 
     console.log(
-      `[reEnrich] DONE :: enriched=${enriched} unchanged=${unchanged} skippedNoPdf=${skippedNoPdf}`,
+      `[reEnrich] DONE :: enriched=${enriched} unchanged=${unchanged} ` +
+        `skippedNoPdf=${skippedNoPdf} skippedNoName=${skippedNoName} skippedDupUrl=${skippedDupUrl}`,
     );
     revalidatePath("/admin/review");
     revalidatePath("/admin");
