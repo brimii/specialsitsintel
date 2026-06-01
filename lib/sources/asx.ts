@@ -263,10 +263,21 @@ export async function fetchAsxDisclosures(
   if (rows.length === 0) {
     const codes = (body.match(/\b[A-Z]{3}\b/g) ?? []).length;
     const pdfHrefs = (body.match(/href="[^"]*\.pdf"/gi) ?? []).slice(0, 3);
-    console.log(`[asx][diag] 3letterCodes=${codes} pdfHrefs=${pdfHrefs.length}`);
+    const allHrefs = (body.match(/href="[^"]+"/gi) ?? []);
+    const announcementHrefs = allHrefs
+      .filter((h) => /announcement|disclos|pdf/i.test(h))
+      .slice(0, 5);
+    console.log(
+      `[asx][diag] 3letterCodes=${codes} pdfHrefs=${pdfHrefs.length} totalHrefs=${allHrefs.length}`,
+    );
     if (pdfHrefs.length) console.log(`[asx][diag] first pdfs: ${pdfHrefs.join(" | ")}`);
-    const sample = body.slice(0, 2500).replace(/\s+/g, " ");
-    console.log(`[asx][diag] body head: ${sample}`);
+    if (announcementHrefs.length)
+      console.log(`[asx][diag] announcement-looking hrefs: ${announcementHrefs.join(" | ")}`);
+    // Dump the slice around the first row so we can see how a record is shaped.
+    const idx = body.search(/<tr[^>]*>\s*<td>\s*[A-Z0-9]{3,4}\s*<\/td>/i);
+    const where = idx >= 0 ? idx : 0;
+    const sample = body.slice(where, where + 4000).replace(/\s+/g, " ");
+    console.log(`[asx][diag] body slice from first row (offset=${where}): ${sample}`);
   }
 
   const filtered = rows.filter((d) =>
