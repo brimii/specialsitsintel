@@ -55,17 +55,25 @@ type Probe = {
 function buildProbes(): Probe[] {
   return [
     {
-      label: "markitdigital today",
-      url: "https://asx.api.markitdigital.com/asx-research/1.0/markets/announcements/today?count=200",
-      headers: { Accept: "application/json" },
+      label: "asx v2 announcements weekly",
+      url: "https://www.asx.com.au/asx/v2/statistics/announcements.do?by=asxCode&timeframe=W&period=W",
+    },
+    {
+      label: "asx v2 prevBusDayAnns",
+      url: "https://www.asx.com.au/asx/v2/statistics/prevBusDayAnns.do",
     },
     {
       label: "asx v2 todayAnns",
       url: "https://www.asx.com.au/asx/v2/statistics/todayAnns.do",
     },
     {
-      label: "asx v2 announcements weekly",
-      url: "https://www.asx.com.au/asx/v2/statistics/announcements.do?by=asxCode&timeframe=W&period=W",
+      label: "asx v2 announcements daily-period-week",
+      url: "https://www.asx.com.au/asx/v2/statistics/announcements.do?by=asxCode&timeframe=D&period=W",
+    },
+    {
+      label: "markitdigital today",
+      url: "https://asx.api.markitdigital.com/asx-research/1.0/markets/announcements/today?count=200",
+      headers: { Accept: "application/json" },
     },
     {
       label: "announcements site api",
@@ -200,6 +208,12 @@ export async function fetchAsxDisclosures(
       if (!res.ok) continue;
       const text = await res.text();
       if (text.length < 50) continue;
+      // ASX serves a polite "No company announcements have been published"
+      // page when a day is empty — don't stop on that, walk to the next probe.
+      if (/No company announcements have been published/i.test(text)) {
+        console.log(`[asx] ${probe.label}: 200 but empty (no announcements)`);
+        continue;
+      }
       body = text;
       label = probe.label;
       break;
