@@ -54,22 +54,33 @@ type Probe = {
 
 function buildProbes(): Probe[] {
   return [
-    {
-      label: "asx v2 announcements weekly",
-      url: "https://www.asx.com.au/asx/v2/statistics/announcements.do?by=asxCode&timeframe=W&period=W",
-    },
+    // Previous business day = the most reliable endpoint with real content:
+    // returns yesterday's published announcements with PDF links inline.
     {
       label: "asx v2 prevBusDayAnns",
       url: "https://www.asx.com.au/asx/v2/statistics/prevBusDayAnns.do",
     },
+    // Today's announcements — useful late in the trading day.
     {
       label: "asx v2 todayAnns",
       url: "https://www.asx.com.au/asx/v2/statistics/todayAnns.do",
     },
+    // Form-search endpoints; trigger an actual search by adding
+    // searchAction=announcement so the JSP returns results instead of the
+    // empty form page.
     {
-      label: "asx v2 announcements daily-period-week",
-      url: "https://www.asx.com.au/asx/v2/statistics/announcements.do?by=asxCode&timeframe=D&period=W",
+      label: "asx v2 announcements weekly search",
+      url:
+        "https://www.asx.com.au/asx/v2/statistics/announcements.do" +
+        "?searchAction=announcement&by=asxCode&timeframe=W&period=W",
     },
+    {
+      label: "asx v2 announcements daily-period-week search",
+      url:
+        "https://www.asx.com.au/asx/v2/statistics/announcements.do" +
+        "?searchAction=announcement&by=asxCode&timeframe=D&period=W",
+    },
+    // Modern JSON endpoints (long shots — may need cookies/auth).
     {
       label: "markitdigital today",
       url: "https://asx.api.markitdigital.com/asx-research/1.0/markets/announcements/today?count=200",
@@ -209,9 +220,20 @@ export async function fetchAsxDisclosures(
       const text = await res.text();
       if (text.length < 50) continue;
       // ASX serves a polite "No company announcements have been published"
-      // page when a day is empty — don't stop on that, walk to the next probe.
+      // page when a day is empty — walk to the next probe.
       if (/No company announcements have been published/i.test(text)) {
         console.log(`[asx] ${probe.label}: 200 but empty (no announcements)`);
+        continue;
+      }
+      // Some announcements.do URLs return the SEARCH FORM page rather than
+      // results (the form has JS like searchTypeChanged but no PDF links).
+      // Heuristic: an announcements RESULTS page always has at least one
+      // .pdf anchor; if none, treat this 200 as "form, not results".
+      const looksLikeForm =
+        /searchTypeChanged|jspOnLoad/i.test(text) &&
+        !/href="[^"]+\.pdf"/i.test(text);
+      if (looksLikeForm) {
+        console.log(`[asx] ${probe.label}: 200 but search form (no pdf links)`);
         continue;
       }
       body = text;
