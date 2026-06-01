@@ -173,27 +173,34 @@ function parseJsonRows(body: string): AsxDisclosure[] {
   return out;
 }
 
-// Defensive HTML-table fallback for the legacy todayAnns.do endpoint.
-// ASX rows there have: time | code | headline (linked to PDF) | pages.
+// ASX rows on /prevBusDayAnns.do and /todayAnns.do:
+//   <tr> <td>CODE</td> <td>DD/MM/YYYY<br><span>HH:MM</span></td>
+//        <td class="pricesens">[optional price-sens icon]</td>
+//        <td><a href="/asx/v2/statistics/displayAnnouncement.do?display=pdf&amp;idsId=NNNNNN">HEADLINE<br><img...></a></td>
+//   </tr>
+// The PDF columns were removed (`<!-- <th>Pages</th> <th>PDF</th> -->`);
+// the anchor now goes to displayAnnouncement.do?display=pdf which streams
+// the PDF content directly (we treat the URL as a PDF in resolvePdfUrl).
 function parseHtmlRows(html: string): AsxDisclosure[] {
   const out: AsxDisclosure[] = [];
-  const today = new Date().toISOString().slice(0, 10);
-  // Row pattern: time, 3-letter code, anchor with PDF + headline
   const rowRe =
-    /<tr[^>]*>[\s\S]{0,2000}?>\s*([A-Z0-9]{3,4})\s*<[\s\S]{0,800}?<a[^>]+href="([^"]+\.pdf)"[^>]*>\s*([^<][^<]{8,})\s*<\/a>/gi;
+    /<tr[^>]*>\s*<td>\s*([A-Z0-9]{3,4})\s*<\/td>\s*<td>\s*(\d{2}\/\d{2}\/\d{4})[\s\S]*?<\/td>[\s\S]{0,400}?<a[^>]+href="([^"]+displayAnnouncement\.do[^"]+)"[^>]*>\s*([^<]{4,200})/gi;
   for (const m of html.matchAll(rowRe)) {
-    const [, code, href, title] = m;
+    const [, code, dateRaw, hrefRaw, rawTitle] = m;
+    // HTML-decode the href so &amp; → & — without this the server gets
+    // a query string with a literal "amp;" and ignores idsId.
+    const href = hrefRaw.replace(/&amp;/g, "&");
     const url = href.startsWith("http")
       ? href
       : `https://www.asx.com.au${href.startsWith("/") ? "" : "/"}${href}`;
-    out.push({
-      source: "ASX",
-      date: today,
-      code,
-      company: "",
-      title: title.replace(/\s+/g, " ").trim(),
-      url,
-    });
+    // DD/MM/YYYY → ISO YYYY-MM-DD
+    const dm = dateRaw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    const date = dm
+      ? `${dm[3]}-${dm[2]}-${dm[1]}`
+      : new Date().toISOString().slice(0, 10);
+    const title = rawTitle.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (!title || title.length < 4) continue;
+    out.push({ source: "ASX", date, code, company: "", title, url });
   }
   return out;
 }
