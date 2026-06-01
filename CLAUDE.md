@@ -181,6 +181,51 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 
 ---
 
+**Session 2026-06-01 — ASX live + petits fixes reEnrich + ASX 2nd-pass deferred** :
+
+- ✅ **Petits fixes reEnrich** (`app/admin/review/actions.ts`) : skip `nm IN ('TBD','','Unknown')` (compteur `skippedNoName`) ; dédup par `source_url` dans la passe deals (compteur `skippedDupUrl`). Funnel observé : `skippedNoName=1 skippedDupUrl=3` confirme les fixes en place.
+
+- ✅ **ASX (Australie) live = 3e source APAC** (`lib/sources/asx.ts` + branchement dans `discovery-apac.ts`). Plusieurs itérations pour converger :
+  - URL pattern : l'endpoint principal qui marche = `https://www.asx.com.au/asx/v2/statistics/prevBusDayAnns.do` (renvoie la veille business day, ~1.2 MB HTML, ~527 disclosures).
+  - Autres probes en fallback (weekly endpoint = formulaire de recherche, todayAnns = vide tôt le matin).
+  - Détection des pages "no announcements" et "search form sans PDF" pour passer au probe suivant.
+  - Regex : anchore sur `<td>CODE</td>` (3-4 chars alphanum) + date `DD/MM/YYYY` + anchor `displayAnnouncement.do?display=pdf&amp;idsId=NNNNNN` ; HTML-decode `&amp;` → `&`.
+  - Prompt système APAC enrichi avec section ASX dédiée (Corporations Act Ch 6 bids, Pt 5.1 schemes, BIDDER'S STATEMENT / TARGET'S STATEMENT, ASIC/ACCC/FIRB, 3-letter tickers BHP/CBA/etc.).
+  - ~25 mots-clés M&A en pré-filtre (TAKEOVER / SCHEME OF ARRANGEMENT / MANDATORY UNCONDITIONAL CASH OFFER / SUBSTANTIAL HOLDER / etc.).
+  - Test live : `parsed 527 rows → keyword-filtered 42 M&A-relevant → 30 envoyés à Claude → 1 inséré (Coking Coal Assets)`. La majorité des "substantial holder" sont des passive funds (BlackRock/Vanguard/State Street/MUFG) correctement classés `NOT_DEAL` par Claude.
+
+- ⚠️ **ASX 2e passe (enrich PDF) NON RÉSOLUE — deferred** : l'URL `displayAnnouncement.do?display=pdf&idsId=N` renvoie une page de **disclaimer "Access to this site"** (HTML 4729 bytes) au lieu d'un PDF. `lib/pdf.ts` détecte maintenant les réponses non-PDF (check `%PDF-` magic) et tente plusieurs follow-ups (embed/iframe/object src, meta refresh, JS redirect, .pdf href). J'ai aussi câblé une POST sur `announcementTerms.do` avec `agree=true&action=Agree` → renvoie `302 + 5 cookies stored`, mais la requête PDF suivante avec ces cookies retombe sur la **même page disclaimer**.
+  - **Diagnostic** : ASX utilise probablement un flow "two-step" : (1) GET disclaimer page pour créer la JSESSIONID, (2) POST agrément avec cette même JSESSIONID, (3) GET PDF avec le cookie persistent. Mon flow actuel saute l'étape 1, donc le serveur ne lie pas mon agrément à un cookie réutilisable.
+  - **Solution future** (1-2 itérations) : ajouter dans `lib/pdf.ts` un cookie jar partagé qui (a) GET la disclaimer page d'abord pour récupérer la JSESSIONID, (b) POST l'agrément avec ce même cookie, (c) re-fetch le PDF avec le cookie persisté. Ou plus pragmatique : trouver une URL ASX alternative qui sert directement le PDF sans disclaimer.
+  - **Impact pratique faible** : la 1re passe ASX insère bien les deals dans la queue, et les titres ASX donnent rarement le prix de toute façon (Schemes/Bidder's Statements oui, mais les autres non). L'humain peut compléter le prix à l'approbation.
+
+- ✅ **Améliorations `lib/pdf.ts`** au passage : check PDF magic number (`%PDF-`) avant unpdf, suivi des URLs embarquées (embed/iframe/object/meta-refresh/JS-redirect/href.pdf), dump diag 1800 chars du body quand aucun match trouvé, Referer + redirect:follow par défaut.
+
+- ✅ **Yamadai enrichi en cours de session** : `[reEnrich][deals] ENRICHED :: Yamadai :: v=TBD pr.o=601 → v=¥667M pr.o=601`. Preuve que la 2e passe rétroactive continue d'améliorer les deals approuvés au fil des runs.
+
+**État de la queue review en fin de session :**
+- ~5 candidats TDnet en attente (V-Tex/Kitz, Yamadai, Landix, Sushimasu, TIGEREYE) — certains avec prix enrichis depuis le PDF
+- ~3 candidats HKEX en attente (Ritz-Carlton Perth, Extrawell, Oceanking) — sans prix (PDF HKEX rarement disclosé en headline)
+- 1 candidat ASX (Coking Coal Assets) — sans prix (disclaimer ASX bloque la 2e passe)
+- Le bouton 💰 Enrich missing prices a confirmé que les SEC URLs sont sautées par design (1re passe avait full text), les CMA pages ne contiennent souvent pas de PDF Decision parseable, et DG COMP marche quand le JSON Open Data fournit une URL.
+
+**À faire à la prochaine session (ordre suggéré) :**
+1. **SGX (Singapour)** — créer `lib/sources/sgx.ts` (SGXNet), brancher dans `discovery-apac.ts`, étendre le prompt avec section SGX (Securities and Futures Act, MAS regulator, 3-4 char tickers).
+2. **ASX 2nd-pass cookie jar** (optionnel, low priority) — flow 3-step pour débloquer le PDF derrière le disclaimer ASX.
+3. Quand APAC live est complet (TDnet + HKEX + ASX + SGX) → attaquer **Phase 5 historique** : DG COMP 1990-2026 d'abord (3893 PDFs déjà mappés dans la session, ~6-8k deals exploitables après dédup), batch nocturne avec rate-limiting Claude.
+4. Petits nettoyages : (a) supprimer les `Warning: TT: undefined function` et `cMapUrl` warnings d'unpdf qui polluent les logs ; (b) ajouter un compteur `skippedNoName` aussi à la passe queue (actuellement seulement deals).
+
+**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (87216b1) = "PDF: accept ASX terms before fetching disclosure PDFs".
+
+---
+
+**Session 2026-05-31 — Couverture APAC live + 2e passe + colonne Size** (état à la coupure) :
+4. Quand APAC live est complet → attaquer Phase 5 historique (DG COMP d'abord, batch nocturne).
+
+**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (24d4105) = "reEnrich: also process approved deals, not just queue items".
+
+---
+
 **Session 2026-05-25 / 2026-05-29 — Phase 3 fondation + EU + admin** (archivée) :
 
 - **Phase 3 — Pipeline (fondation faite, attente activation)** : `@anthropic-ai/sdk` ; `lib/anthropic.ts` (client paresseux, model `claude-sonnet-4-6`) ; `lib/sources/sec-edgar.ts` (full-text search + fetch texte) ; `lib/pipeline.ts` (orchestrateur : SEC → extraction Claude JSON via system prompt cacheable → garde-fous **MAJEUR/confiance<85/source unique = review_queue**, sinon = `deals` + `deal_updates`) ; `/api/cron/run` (Bearer `CRON_SECRET`) + `vercel.json` (06:00 UTC) ; `/admin/review` (Approuver / Rejeter + « Lancer maintenant » via server actions). **À activer** : ajouter `ANTHROPIC_API_KEY` et `CRON_SECRET` dans `.env.local`, puis tester via le bouton « Lancer maintenant » dans `/admin/review`. Déploiement Vercel requis pour le Cron quotidien.
