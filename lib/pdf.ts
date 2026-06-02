@@ -84,13 +84,17 @@ async function acceptAsxTerms(triggerUrl: string): Promise<string | null> {
       const v = tag.match(/value="([^"]*)"/i);
       if (n) hidden[n[1]] = v?.[1] ?? "";
     }
-    // Submit button — pick its name=value pair if present
+    // Submit button — when there are several (e.g. "Agree" and "Decline"),
+    // prefer the one whose value looks affirmative; fall back to the first.
     let submitName = "agree";
     let submitValue = "true";
-    const submitTag = formInner.match(/<(?:input|button)[^>]+type="submit"[^>]*>/i);
-    if (submitTag) {
-      const n = submitTag[0].match(/name="([^"]+)"/i);
-      const v = submitTag[0].match(/value="([^"]*)"/i);
+    const submitTags = formInner.match(/<(?:input|button)[^>]+type="submit"[^>]*>/gi) ?? [];
+    const affirmativeRe = /value="(agree|accept|yes|i agree)/i;
+    const chosen =
+      submitTags.find((t) => affirmativeRe.test(t)) ?? submitTags[0];
+    if (chosen) {
+      const n = chosen.match(/name="([^"]+)"/i);
+      const v = chosen.match(/value="([^"]*)"/i);
       if (n) submitName = n[1];
       if (v) submitValue = v[1];
     }
