@@ -3,48 +3,129 @@ import "server-only";
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-// ASX gates direct PDF access behind a terms-of-use page. The first request
-// to displayAnnouncement.do?display=pdf returns a disclaimer HTML page with
-// a form posting to announcementTerms.do. After that POST, the server sets
-// a session cookie that allows subsequent PDF GETs to stream the raw PDF.
-// We cache the cookie at module level — it lives for the dev process and
-// gets re-acquired automatically if it ever stops working.
+// ASX gates direct PDF access behind a "two-step" terms-of-use disclaimer:
+//   1. GET displayAnnouncement.do?display=pdf&idsId=N → server creates a
+//      JSESSIONID and returns an HTML disclaimer with a <form> POSTing to
+//      announcementTerms.do (plus hidden inputs identifying the target).
+//   2. POST that form (with the JSESSIONID cookie + the hidden inputs)
+//      → server marks the session as "agreed" and updates cookies.
+//   3. Re-GET the original URL with the same cookies → server now sees
+//      the agreement and streams the actual PDF.
+// Skipping step 1 (which is what we did before) means the server never
+// links the agreement to a persistable session — re-GETs still return
+// the disclaimer. Cache the established cookie jar at module level.
 let asxCookies: string | null = null;
 let asxTermsTried = false;
 
-async function acceptAsxTerms(): Promise<string | null> {
+function extractCookies(res: Response): string[] {
+  const headersAny = res.headers as Headers & { getSetCookie?: () => string[] };
+  const setCookieHeaders =
+    headersAny.getSetCookie?.() ??
+    (res.headers.get("set-cookie")?.split(/,(?=\s*[A-Za-z0-9_-]+=)/) ?? []);
+  const out: string[] = [];
+  for (const sc of setCookieHeaders) {
+    const cookiePart = sc.split(";")[0].trim();
+    if (cookiePart) out.push(cookiePart);
+  }
+  return out;
+}
+
+function mergeCookies(existing: string[], next: string[]): string[] {
+  const map = new Map<string, string>();
+  for (const c of [...existing, ...next]) {
+    const eq = c.indexOf("=");
+    if (eq > 0) map.set(c.slice(0, eq), c.slice(eq + 1));
+  }
+  return Array.from(map.entries()).map(([k, v]) => `${k}=${v}`);
+}
+
+// 3-step ASX terms acceptance flow. `triggerUrl` is the displayAnnouncement
+// URL we want a PDF from — the first GET to it returns the disclaimer page
+// whose form we then submit.
+async function acceptAsxTerms(triggerUrl: string): Promise<string | null> {
   if (asxCookies) return asxCookies;
   if (asxTermsTried) return null;
   asxTermsTried = true;
   try {
-    const res = await fetch("https://www.asx.com.au/asx/v2/statistics/announcementTerms.do", {
+    // ── Step 1: GET the trigger URL to establish JSESSIONID + see the form
+    const seedRes = await fetch(triggerUrl, {
+      method: "GET",
+      headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
+      cache: "no-store",
+      redirect: "manual",
+    });
+    const seedCookies = extractCookies(seedRes);
+    const disclaimerHtml = await seedRes.text();
+    console.log(
+      `[asx-terms] seed GET: ${seedRes.status}, bodyLen=${disclaimerHtml.length}, cookies=${seedCookies.length}`,
+    );
+
+    // Parse the form action + hidden inputs + submit button
+    const formMatch = disclaimerHtml.match(/<form[^>]+action="([^"]+)"[^>]*>([\s\S]*?)<\/form>/i);
+    if (!formMatch) {
+      console.log(`[asx-terms] no <form> in disclaimer body`);
+      if (seedCookies.length > 0) {
+        asxCookies = seedCookies.join("; ");
+        return asxCookies;
+      }
+      return null;
+    }
+    const rawAction = formMatch[1];
+    const formAction = rawAction.startsWith("http")
+      ? rawAction
+      : new URL(rawAction, triggerUrl).href;
+    const formInner = formMatch[2];
+
+    // Hidden inputs (any attribute order)
+    const hidden: Record<string, string> = {};
+    for (const tag of formInner.match(/<input[^>]+>/gi) ?? []) {
+      if (!/type="hidden"/i.test(tag)) continue;
+      const n = tag.match(/name="([^"]+)"/i);
+      const v = tag.match(/value="([^"]*)"/i);
+      if (n) hidden[n[1]] = v?.[1] ?? "";
+    }
+    // Submit button — pick its name=value pair if present
+    let submitName = "agree";
+    let submitValue = "true";
+    const submitTag = formInner.match(/<(?:input|button)[^>]+type="submit"[^>]*>/i);
+    if (submitTag) {
+      const n = submitTag[0].match(/name="([^"]+)"/i);
+      const v = submitTag[0].match(/value="([^"]*)"/i);
+      if (n) submitName = n[1];
+      if (v) submitValue = v[1];
+    }
+    const formFields = { ...hidden, [submitName]: submitValue };
+    const body = Object.entries(formFields)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join("&");
+    console.log(
+      `[asx-terms] form action=${formAction} hidden=[${Object.keys(hidden).join(",")}] submit=${submitName}=${submitValue}`,
+    );
+
+    // ── Step 2: POST the form with seed cookies
+    const postRes = await fetch(formAction, {
       method: "POST",
       headers: {
         "User-Agent": BROWSER_UA,
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "text/html",
-        Referer: "https://www.asx.com.au/asx/v2/statistics/prevBusDayAnns.do",
+        Cookie: seedCookies.join("; "),
+        Referer: triggerUrl,
       },
-      body: "agree=true&action=Agree",
+      body,
       cache: "no-store",
       redirect: "manual",
     });
-    console.log(`[asx-terms] POST: ${res.status}`);
-    const headersAny = res.headers as Headers & { getSetCookie?: () => string[] };
-    const setCookieHeaders =
-      headersAny.getSetCookie?.() ??
-      (res.headers.get("set-cookie")?.split(/,(?=\s*[A-Za-z0-9_-]+=)/) ?? []);
-    const cookies: string[] = [];
-    for (const sc of setCookieHeaders) {
-      const cookiePart = sc.split(";")[0].trim();
-      if (cookiePart) cookies.push(cookiePart);
+    const postCookies = extractCookies(postRes);
+    console.log(`[asx-terms] terms POST: ${postRes.status}, cookies=${postCookies.length}`);
+    const allCookies = mergeCookies(seedCookies, postCookies);
+    if (allCookies.length === 0) {
+      console.log(`[asx-terms] no cookies after POST — agreement likely failed`);
+      return null;
     }
-    if (cookies.length > 0) {
-      asxCookies = cookies.join("; ");
-      console.log(`[asx-terms] accepted, ${cookies.length} cookies stored`);
-      return asxCookies;
-    }
-    console.log(`[asx-terms] no Set-Cookie header on the response`);
+    asxCookies = allCookies.join("; ");
+    console.log(`[asx-terms] session established, ${allCookies.length} cookies merged`);
+    return asxCookies;
   } catch (e) {
     console.log(`[asx-terms] failed: ${(e as Error).message}`);
   }
@@ -66,7 +147,7 @@ export async function fetchPdfText(url: string, maxChars = 60000, depth = 0): Pr
       try { return new URL(url).origin; } catch { return ""; }
     })();
     const isAsx = /asx\.com\.au/i.test(url);
-    if (isAsx) await acceptAsxTerms();
+    if (isAsx) await acceptAsxTerms(url);
     const res = await fetch(url, {
       headers: {
         "User-Agent": BROWSER_UA,
