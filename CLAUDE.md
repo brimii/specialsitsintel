@@ -219,6 +219,52 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 
 ---
 
+**Session 2026-06-02 — SGX tenté + ASX 2nd-pass résolu** :
+
+- ❌ **SGX (Singapour) — abandonné, nécessite token d'auth** :
+  - Créé `lib/sources/sgx.ts` avec 7 probes en cascade (api.sgx.com v1.1/v1.0, api2.sgx.com, sgx.com/api, links.sgx.com, opendata.sgx.com, RSS) — testé sur Origin/Referer/X-Requested-With headers + détection SPA shell + ASP.NET error page.
+  - Verdict : `api.sgx.com/v1.1` répond **401 (Unauthorized)** — le SGX SPA bundle un token JWT/API key dans son JS qu'on ne peut pas extraire trivialement sans s'enregistrer sur leur portail développeur. `api2.sgx.com` = 404. `sgx.com/api/*` = catch-all Angular SPA shell (détecté + skip). `links.sgx.com` = ASP.NET legacy qui renvoie "No Record Found" (endpoint réel mais mauvais paramètres).
+  - Branchement dans `discovery-apac.ts` quand même fait (4e branche `Promise.allSettled`, type result étendu avec `sgxScanned`, section SGX dans le prompt système avec Takeovers Code / Listing Rules Ch 10 / SIC/MAS/CCCS / tickers D05/U11/Z74/C6L/Y92). Si un jour on obtient un token, le code est prêt — juste à brancher l'auth header.
+  - **Couverture APAC live finale : 3/4** — TDnet (Japan) + HKEX (Hong Kong) + ASX (Australia). SGX reste à brancher quand on aura le token.
+
+- ✅ **ASX 2nd-pass (PDF derrière disclaimer) RÉSOLU** :
+  - Flow 3-step implémenté dans `lib/pdf.ts` :
+    1. **GET** trigger URL `displayAnnouncement.do?display=pdf&idsId=N` → serveur crée JSESSIONID + renvoie HTML disclaimer avec `<form>`
+    2. Parser le form : action `announcementTerms.do`, hidden inputs (`pdfURL` notamment), bouton submit affirmatif (préfère "Agree/Accept/Yes" sur "Decline" via regex)
+    3. **POST** au form action avec : cookies du seed GET + hidden inputs + submit name/value affirmatif → serveur marque la session "agreed" (status 302 + 2 cookies en plus)
+    4. **GET** original URL avec cookies fusionnés (8 cookies total) → serveur sert le vrai PDF
+  - Helpers `extractCookies(res)` + `mergeCookies(a, b)` factorisés.
+  - **Test live confirmé** : Coking Coal Assets enrichi `v=TBD → v=A$3.1M`.
+
+- ✅ **Nouveaux deals insérés cette session** (8 total via le pipeline live + reEnrich) :
+  - 🇯🇵 **P-Sankoshouji** acquise par Sadoshima (TDnet)
+  - 🇯🇵 **Mitsui Sumitomo Construction Road** rachetée par Mitsui Sumitomo Construction (TDnet)
+  - 🇭🇰 **International Entertainment** enrichi `v=TBD → v=HK$1.6B` (HKEX 2e passe)
+  - 🇦🇺 **Qoria** + **Wakeling Automotive / PWR Holdings** (ASX 1re passe)
+  - 🇦🇺 **Coking Coal Assets** enrichi rétroactivement `v=TBD → v=A$3.1M` après débloquage ASX 2nd-pass
+
+**État de la couverture pipeline live à la fin de la session** :
+| Région | Source | 1re passe | 2e passe (enrich PDF) |
+|---|---|---|---|
+| 🇺🇸 US | SEC EDGAR | ✅ | N/A (full text 1re passe) |
+| 🇬🇧 EU | CMA (gov.uk Atom) | ✅ | ✅ |
+| 🇪🇺 EU | DG COMP (Open Data JSON) | ✅ | ✅ (3894 PDFs mappés) |
+| 🇯🇵 APAC | TDnet (Tokyo) | ✅ | ✅ |
+| 🇭🇰 APAC | HKEX (titleSearchServlet JSON) | ✅ | ✅ |
+| 🇦🇺 APAC | ASX (prevBusDayAnns.do) | ✅ | ✅ (3-step disclaimer flow) |
+| 🇸🇬 APAC | SGX | ❌ token requis | — |
+
+**À faire à la prochaine session (ordre suggéré) :**
+1. **Phase 5 — Backfill historique DG COMP** : le gros prize. 3894 PDFs déjà mappés dans le map cas→pdfUrl ; ~6-8k deals exploitables après dédup. Stratégie : nouveau bouton "Run historical batch" dans `/admin/review` qui boucle sur tous les cases DG COMP (statut closed/cleared/blocked = outcome connu → `proba_close=100`, `spread=0`, `statut="Closed"`). Rate-limit Claude à ~50 req/min Tier 1. Coût estimé ~$30-50.
+2. **Phase 5 SEC EDGAR 2001-2026** : ~12-20k filings, ~6-10k deals uniques. 2-3 nuits de batch après DG COMP.
+3. **SGX si on obtient un token dev** — sinon classer comme "couverture APAC 3/4, SG marché trop petit pour justifier l'effort d'inscription".
+4. Petits nettoyages : (a) supprimer les `Warning: TT: undefined function` et `cMapUrl` d'unpdf qui polluent les logs ; (b) ajouter un compteur `skippedNoName` aussi à la passe queue (actuellement seulement deals).
+5. Régler l'horloge Windows (warning `JWT issued at future` sur Supabase) — paramètres Windows → Heure Internet.
+
+**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (8b729bd) = "PDF: prefer the affirmative ASX submit button".
+
+---
+
 **Session 2026-05-31 — Couverture APAC live + 2e passe + colonne Size** (état à la coupure) :
 4. Quand APAC live est complet → attaquer Phase 5 historique (DG COMP d'abord, batch nocturne).
 
