@@ -307,6 +307,16 @@ export async function fetchSgxDisclosures(
         console.log(`[sgx] ${probe.label}: 200 but Angular SPA shell — skipping`);
         continue;
       }
+      // links.sgx.com is the legacy ASP.NET attachment server. When the
+      // query doesn't hit a real record it returns a "No Record Found"
+      // CustomErrorPage with a __VIEWSTATE input. Skip those too.
+      const looksLikeAspxError =
+        /__VIEWSTATE/i.test(text) &&
+        (/No Record Found/i.test(text) || /<title>\s*Error\s*<\/title>/i.test(text));
+      if (looksLikeAspxError) {
+        console.log(`[sgx] ${probe.label}: 200 but ASP.NET error page — skipping`);
+        continue;
+      }
       body = text;
       label = probe.label;
       break;
