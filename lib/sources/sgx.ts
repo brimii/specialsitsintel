@@ -68,28 +68,57 @@ function buildProbes(daysBack: number): Probe[] {
   from.setDate(from.getDate() - daysBack + 1);
   const fromYmd = ymd(from);
   const toYmd = ymd(now);
+  // Headers that mimic the SGX SPA's XHR calls — Origin + Referer make
+  // CORS-checked endpoints respond as if we were the official site. The
+  // 401 we saw without these strongly suggests a CORS / Origin check
+  // rather than a per-user API key.
+  const spaHeaders = {
+    Accept: "application/json, text/plain, */*",
+    Origin: "https://www.sgx.com",
+    Referer: "https://www.sgx.com/securities/company-announcements",
+    "X-Requested-With": "XMLHttpRequest",
+  };
   return [
-    // Modern SGX API used by company-announcements page on sgx.com.
+    // Modern SGX SPA backend — with Origin + Referer to bypass CORS check.
     {
-      label: "sgx api announcements v1.1",
+      label: "sgx api v1.1 SPA",
       url:
         `https://api.sgx.com/announcements/v1.1` +
         `?periodstart=${fromYmd}_000000&periodend=${toYmd}_235959&pagestart=0&pagesize=200`,
-      headers: { Accept: "application/json" },
+      headers: spaHeaders,
     },
-    // Same endpoint without paging params (lighter request).
+    // Some SPA calls use api2 as the host for the same paths.
     {
-      label: "sgx api announcements v1.0",
-      url: `https://api.sgx.com/announcements/v1.0?periodstart=${fromYmd}&periodend=${toYmd}`,
-      headers: { Accept: "application/json" },
+      label: "sgx api2 v1.1 SPA",
+      url:
+        `https://api2.sgx.com/announcements/v1.1` +
+        `?periodstart=${fromYmd}_000000&periodend=${toYmd}_235959&pagestart=0&pagesize=200`,
+      headers: spaHeaders,
     },
-    // Legacy SGX news search endpoint (HTML scrape).
+    // Drupal-style direct REST endpoint on the main site.
+    {
+      label: "sgx site rest announcements",
+      url: `https://www.sgx.com/api/announcements?periodstart=${fromYmd}&periodend=${toYmd}`,
+      headers: spaHeaders,
+    },
+    // Sister site for attachments — sometimes exposes a listing.
+    {
+      label: "links.sgx.com listing",
+      url: `https://links.sgx.com/api/v1/announcements?from=${fromYmd}&to=${toYmd}`,
+      headers: spaHeaders,
+    },
+    // Open data portal (no auth).
+    {
+      label: "sgx opendata",
+      url: `https://opendata.sgx.com/announcements?from=${fromYmd}&to=${toYmd}`,
+      headers: spaHeaders,
+    },
+    // Legacy fallbacks (HTML / RSS) — kept last for completeness.
     {
       label: "sgx news listing html",
       url: "https://www.sgx.com/securities/company-announcements",
       headers: { Accept: "text/html" },
     },
-    // SGX rss feed (if it still exists).
     {
       label: "sgx rss",
       url: "https://www.sgx.com/securities/company-announcements/feed",
