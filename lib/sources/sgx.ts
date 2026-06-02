@@ -296,6 +296,17 @@ export async function fetchSgxDisclosures(
       if (!res.ok) continue;
       const text = await res.text();
       if (text.length < 50) continue;
+      // sgx.com is an Angular SPA — any unknown path returns the same
+      // index.html shell with og:title "Singapore Exchange (SGX)" and
+      // a viewport meta. Skip these so we don't accept a non-result.
+      const looksLikeSpaShell =
+        /<title>[^<]*Singapore Exchange[^<]*<\/title>/i.test(text) &&
+        /<base href="\/">/i.test(text) &&
+        text.length < 30000;
+      if (looksLikeSpaShell) {
+        console.log(`[sgx] ${probe.label}: 200 but Angular SPA shell — skipping`);
+        continue;
+      }
       body = text;
       label = probe.label;
       break;
