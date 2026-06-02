@@ -4,10 +4,11 @@ import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic
 import { fetchTdnetDisclosures, type TdnetDisclosure } from "@/lib/sources/tdnet";
 import { fetchHkexDisclosures, type HkexDisclosure } from "@/lib/sources/hkex";
 import { fetchAsxDisclosures, type AsxDisclosure } from "@/lib/sources/asx";
+import { fetchSgxDisclosures, type SgxDisclosure } from "@/lib/sources/sgx";
 import { fetchPdfText } from "@/lib/pdf";
 import { enrichDealFromDocument, type DealLike } from "@/lib/enrich";
 
-type ApacDisclosure = TdnetDisclosure | HkexDisclosure | AsxDisclosure;
+type ApacDisclosure = TdnetDisclosure | HkexDisclosure | AsxDisclosure | SgxDisclosure;
 
 // ════════════════════════════════════════════════════════════════════
 // APAC discovery — Tokyo (TDnet) for now. HKEX / ASX / SGX can plug
@@ -91,6 +92,22 @@ ASX announcement headers identify M&A / event-driven categories explicitly:
 
 The company code is a **3-letter** ASX ticker (e.g. "BHP" = BHP Group, "CBA" = Commonwealth Bank, "ALU" = Altium). The takeovers regulator is the Australian Securities and Investments Commission (\`ASIC\`); the antitrust regulator is the Australian Competition and Consumer Commission (\`ACCC\`); foreign-investment review is the Foreign Investment Review Board (\`FIRB\`).
 
+# SGX (Singapore) — English disclosures
+
+SGX announcement titles classify M&A under the Singapore Takeovers Code and Listing Rules:
+- **VOLUNTARY GENERAL OFFER** / **VOLUNTARY CONDITIONAL OFFER** = a non-mandatory takeover bid.
+- **MANDATORY CONDITIONAL CASH OFFER** / **MANDATORY UNCONDITIONAL OFFER** = triggered when a holder crosses 30% (Singapore Takeovers Code Rule 14).
+- **PRE-CONDITIONAL** = an indicative offer subject to regulatory clearances.
+- **OFFER DOCUMENT** / **OFFEREE CIRCULAR** = the bidder's and target's mandatory documents.
+- **SCHEME OF ARRANGEMENT** = court-sanctioned merger or privatisation under Section 210 of the Companies Act.
+- **COMPULSORY ACQUISITION** = post-90% mop-up of remaining minority shares.
+- **PROPOSED ACQUISITION** / **PROPOSED DISPOSAL** / **PROPOSED MERGER** = generic deal announcements.
+- **DISCLOSEABLE TRANSACTION** / **MAJOR TRANSACTION** / **VERY SUBSTANTIAL ACQUISITION/DISPOSAL** = Listing Rules Chapter 10 size-test categories (5-25% / 25-100% / >100%).
+- **INTERESTED PERSON TRANSACTION** = related-party deal (Chapter 9).
+- **DELISTING** / **EXIT OFFER** = privatisation route via voluntary delisting + cash exit offer.
+
+The company code is a **3-4 character alphanumeric** SGX ticker (e.g. "D05" = DBS Group, "U11" = UOB, "Z74" = SingTel, "C6L" = SIA, "Y92" = ThaiBev). The takeovers regulator is the **Securities Industry Council** (\`SIC\`); the financial regulator is the **Monetary Authority of Singapore** (\`MAS\`); the antitrust regulator is the **Competition and Consumer Commission of Singapore** (\`CCCS\`).
+
 # Language (CRITICAL)
 
 ALL output text fields MUST be in **English**. The terminal serves an English-speaking institutional audience — no Japanese characters (kanji, hiragana, katakana, full-width romans) may appear in any field.
@@ -105,12 +122,12 @@ If a company name is genuinely unknown from the title (e.g. "連結子会社" = 
 
 # Rules
 
-- **f (flag)**: 🇯🇵 for TDnet (Japan), 🇭🇰 for HKEX (Hong Kong), 🇦🇺 for ASX (Australia); later SGX→🇸🇬.
-- **r (regulator)**: For TDnet, default \`JFTC\` (antitrust) / \`TSE listing rules\` (pure disclosure) / \`METI\` (FEFTA foreign-investment). For HKEX, default \`SFC\` / \`HKEX listing rules\` / \`MOFCOM\` if mainland Chinese antitrust review is mentioned. For ASX, default \`ASIC\` for takeover bids and schemes / \`ACCC\` if antitrust framing is explicit / \`FIRB\` if a foreign acquirer triggers foreign-investment review.
+- **f (flag)**: 🇯🇵 for TDnet (Japan), 🇭🇰 for HKEX (Hong Kong), 🇦🇺 for ASX (Australia), 🇸🇬 for SGX (Singapore).
+- **r (regulator)**: For TDnet, default \`JFTC\` (antitrust) / \`TSE listing rules\` (pure disclosure) / \`METI\` (FEFTA foreign-investment). For HKEX, default \`SFC\` / \`HKEX listing rules\` / \`MOFCOM\` if mainland Chinese antitrust review is mentioned. For ASX, default \`ASIC\` for takeover bids and schemes / \`ACCC\` if antitrust framing is explicit / \`FIRB\` if a foreign acquirer triggers foreign-investment review. For SGX, default \`SIC\` for takeover bids and schemes / \`MAS\` for financial-sector deals / \`CCCS\` if antitrust framing is explicit / \`SGX listing rules\` for pure disclosure obligations.
 - **st (status)**: announcement of a new tender offer or M&A agreement → \`Review\`; completed / settled → \`Closed\`; rumored → \`Rumored\`.
 - **sc (score color)**: G = clean / cleared, A = pending review / amber, R = contested or blocked, P = activist-driven, B = neutral.
 - **pr.cur**: \`¥\` for Japan, \`HK$\` for Hong Kong, \`A$\` for Australia, \`S$\` for Singapore.
-- **pr.sym**: the 4-digit code for Tokyo (e.g. \`"7203"\`), the 5-digit code for HKEX (e.g. \`"00700"\`), the 3-letter code for ASX (e.g. \`"BHP"\`), or the exchange ticker elsewhere.
+- **pr.sym**: the 4-digit code for Tokyo (e.g. \`"7203"\`), the 5-digit code for HKEX (e.g. \`"00700"\`), the 3-letter code for ASX (e.g. \`"BHP"\`), the 3-4 character code for SGX (e.g. \`"D05"\`, \`"Y92"\`), or the exchange ticker elsewhere.
 - **pr.ad**: month + year of the disclosure (e.g. \`"Apr 2026"\`).
 - **nm / acq**: extract from the title. Japanese title patterns:
   - "AAAAによるBBBBに対する公開買付け" → \`acq: "AAAA", nm: "BBBB"\`.
@@ -205,6 +222,7 @@ export type ApacDiscoveryResult = {
   tdnetScanned: number;
   hkexScanned: number;
   asxScanned: number;
+  sgxScanned: number;
   candidates: number;
   inserted: number;
   duplicates: number;
@@ -247,25 +265,30 @@ export async function discoverApacDeals(
   }
 
   // Fetch APAC sources in parallel — each fails independently.
-  const [tdnetRes, hkexRes, asxRes] = await Promise.allSettled([
+  const [tdnetRes, hkexRes, asxRes, sgxRes] = await Promise.allSettled([
     fetchTdnetDisclosures({ daysBack, limit: maxCases }),
     fetchHkexDisclosures({ daysBack, limit: maxCases }),
     fetchAsxDisclosures({ daysBack, limit: maxCases }),
+    fetchSgxDisclosures({ daysBack, limit: maxCases }),
   ]);
 
   let tdnetCases: TdnetDisclosure[] = [];
   let hkexCases: HkexDisclosure[] = [];
   let asxCases: AsxDisclosure[] = [];
+  let sgxCases: SgxDisclosure[] = [];
   if (tdnetRes.status === "fulfilled") tdnetCases = tdnetRes.value;
   else errors.push(`TDnet: ${(tdnetRes.reason as Error).message}`);
   if (hkexRes.status === "fulfilled") hkexCases = hkexRes.value;
   else errors.push(`HKEX: ${(hkexRes.reason as Error).message}`);
   if (asxRes.status === "fulfilled") asxCases = asxRes.value;
   else errors.push(`ASX: ${(asxRes.reason as Error).message}`);
+  if (sgxRes.status === "fulfilled") sgxCases = sgxRes.value;
+  else errors.push(`SGX: ${(sgxRes.reason as Error).message}`);
 
-  const all: ApacDisclosure[] = [...tdnetCases, ...hkexCases, ...asxCases];
+  const all: ApacDisclosure[] = [...tdnetCases, ...hkexCases, ...asxCases, ...sgxCases];
   console.log(
-    `[discovery-apac] fetched tdnet=${tdnetCases.length} hkex=${hkexCases.length} asx=${asxCases.length} total=${all.length}`,
+    `[discovery-apac] fetched tdnet=${tdnetCases.length} hkex=${hkexCases.length} ` +
+      `asx=${asxCases.length} sgx=${sgxCases.length} total=${all.length}`,
   );
 
   let candidates = 0;
@@ -353,6 +376,7 @@ export async function discoverApacDeals(
     tdnetScanned: tdnetCases.length,
     hkexScanned: hkexCases.length,
     asxScanned: asxCases.length,
+    sgxScanned: sgxCases.length,
     candidates,
     inserted,
     duplicates,

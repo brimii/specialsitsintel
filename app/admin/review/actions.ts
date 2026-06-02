@@ -290,7 +290,9 @@ async function resolvePdfUrl(
   if (
     sourceUrl.includes("release.tdnet.info") ||
     sourceUrl.includes("hkexnews.hk") ||
-    sourceUrl.includes("asx.com.au")
+    sourceUrl.includes("asx.com.au") ||
+    sourceUrl.includes("links.sgx.com") ||
+    sourceUrl.includes("sgx.com")
   ) {
     return sourceUrl;
   }
