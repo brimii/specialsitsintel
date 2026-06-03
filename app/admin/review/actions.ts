@@ -17,6 +17,7 @@ const locks: Record<string, Promise<void> | null> = {
   discoveryApac: null,
   reEnrich: null,
   rejectAllTbd: null,
+  approveAllClean: null,
   dgCompBackfill: null,
 };
 
@@ -612,6 +613,174 @@ export async function rejectAllTbd(): Promise<void> {
     console.log(`[rejectAllTbd] rejected ${toReject.length} TBD items`);
     revalidatePath("/admin/review");
     revalidatePath("/admin");
+  });
+}
+
+// Bulk-approve "clean" queue items: new_deal proposals where the AI knew
+// the target name (not TBD/Unknown), got a deal value (v ≠ TBD), and
+// flagged the find with confiance ≥ 75. These are the rows where manual
+// review adds nothing — Claude already has all the pieces. Pair to the
+// 🗑 Reject TBD button: enrich → approve all clean → reject leftovers.
+export async function approveAllClean(): Promise<void> {
+  await withLock("approveAllClean", async () => {
+    await requireAdmin();
+    const admin = createAdminClient();
+    const { data: items, error } = await admin
+      .from("review_queue")
+      .select("id, proposition, source_url, confiance")
+      .eq("statut", "en_attente");
+    if (error) {
+      console.error("[approveAllClean] query failed:", error.message);
+      return;
+    }
+    if (!items?.length) {
+      console.log("[approveAllClean] queue empty");
+      return;
+    }
+
+    const isUseless = (n: string | null | undefined): boolean => {
+      const t = (n ?? "").trim().toLowerCase();
+      return t === "" || t === "tbd" || t === "unknown" || t === "unknown target";
+    };
+
+    type CleanDeal = {
+      nm: string;
+      acq?: string;
+      v: string;
+      c?: string;
+      r?: string;
+      st?: string;
+      sc?: string;
+      reg?: string;
+      cl?: string;
+      desc?: string;
+      ai?: string;
+      f?: string;
+      pr?: { u?: number; c?: number; o?: number; sym?: string; cur?: string; ad?: string };
+      tl?: Array<{ d: string; t: string; x: string }>;
+    };
+    type CleanItem = {
+      id: string;
+      deal: CleanDeal;
+      source_url: string | null;
+      confiance: number | null;
+    };
+    const clean: CleanItem[] = [];
+    let skippedNoName = 0;
+    let skippedNoValue = 0;
+    let skippedLowConf = 0;
+    let skippedUpdates = 0;
+
+    for (const item of items as Array<{
+      id: string;
+      proposition: unknown;
+      source_url: string | null;
+      confiance: number | null;
+    }>) {
+      const prop = item.proposition as { kind?: string; deal?: CleanDeal } | null;
+      if (prop?.kind !== "new_deal" || !prop.deal) {
+        // Updates are NOT auto-approved by this button — they typically
+        // change a single field on an existing deal and the human is the
+        // last line of defense for those (MAJEUR vs MINEUR).
+        skippedUpdates++;
+        continue;
+      }
+      const d = prop.deal;
+      if (isUseless(d.nm)) {
+        skippedNoName++;
+        continue;
+      }
+      if (!d.v || d.v.trim().toUpperCase() === "TBD" || d.v.trim() === "") {
+        skippedNoValue++;
+        continue;
+      }
+      const conf = item.confiance ?? 0;
+      if (conf < 75) {
+        skippedLowConf++;
+        continue;
+      }
+      clean.push({ id: item.id, deal: d, source_url: item.source_url, confiance: conf });
+    }
+
+    if (clean.length === 0) {
+      console.log(
+        `[approveAllClean] no clean items :: skippedNoName=${skippedNoName} ` +
+          `skippedNoValue=${skippedNoValue} skippedLowConf=${skippedLowConf} ` +
+          `skippedUpdates=${skippedUpdates}`,
+      );
+      return;
+    }
+
+    // MAX(id)+1 starting point — incremented locally per insert. The lock
+    // prevents concurrent runs so a simple counter avoids one SELECT per
+    // row.
+    const { data: maxRow } = await admin
+      .from("deals")
+      .select("id")
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    let nextId = ((maxRow?.id as number | undefined) ?? 0) + 1;
+
+    let inserted = 0;
+    let errors = 0;
+
+    for (const item of clean) {
+      const d = item.deal;
+      const payload = {
+        id: nextId,
+        nom: d.nm,
+        acquereur: d.acq ?? null,
+        valeur: d.v,
+        regulateur: d.r ?? null,
+        categorie: d.c ?? null,
+        statut: d.st ?? "Review",
+        region: d.reg ?? "US",
+        description: d.desc ?? null,
+        ai_commentary: d.ai ?? null,
+        min_tier: "analyst",
+        flag: d.f ?? null,
+        score: d.sc ?? "G",
+        close_estimate: d.cl ?? null,
+        price: d.pr ?? { u: 0, c: 0, o: 0, sym: "", cur: "$", ad: "" },
+        timeline: d.tl ?? [],
+      };
+
+      const { error: insErr } = await admin.from("deals").insert(payload);
+      if (insErr) {
+        console.error(`[approveAllClean] insert failed for ${d.nm}: ${insErr.message}`);
+        errors++;
+        continue;
+      }
+
+      await admin.from("deal_updates").insert({
+        deal_id: nextId,
+        champ_modifie: "_creation",
+        ancienne_valeur: null,
+        nouvelle_valeur: `New deal created via Bulk Approve: ${d.nm} / ${d.acq ?? "?"}`,
+        source_url: item.source_url,
+        confiance: item.confiance,
+        auteur: "humain",
+      });
+
+      await admin
+        .from("review_queue")
+        .update({ statut: "approuve" })
+        .eq("id", item.id);
+
+      inserted++;
+      nextId++;
+    }
+
+    console.log(
+      `[approveAllClean] DONE :: inserted=${inserted} errors=${errors} ` +
+        `(skipped: noName=${skippedNoName} noValue=${skippedNoValue} ` +
+        `lowConf=${skippedLowConf} updates=${skippedUpdates})`,
+    );
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath("/archive");
   });
 }
 

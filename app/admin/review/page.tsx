@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems, rejectAllTbd, runDgCompHistoricalBatch } from "./actions";
+import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems, rejectAllTbd, approveAllClean, runDgCompHistoricalBatch } from "./actions";
 import { SubmitButton } from "./SubmitButton";
 import { PendingBar } from "../PendingBar";
 
@@ -104,11 +104,17 @@ export default async function AdminReview() {
 
         <ToolbarGroup
           label="QUEUE MAINTENANCE"
-          hint="Clean up and improve the existing review queue."
+          hint="Workflow: enrich missing prices → bulk-approve clean items (nm valid + v ≠ TBD + confiance ≥ 75) → reject the leftover TBD junk."
         >
           <form action={reEnrichQueueItems}>
             <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Enriching prices… (~1-3 min)">
               💰 Enrich missing prices
+            </SubmitButton>
+            <PendingBar />
+          </form>
+          <form action={approveAllClean}>
+            <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Approving…">
+              ✅ Approve all clean
             </SubmitButton>
             <PendingBar />
           </form>
