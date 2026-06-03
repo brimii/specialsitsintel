@@ -16,6 +16,7 @@ const locks: Record<string, Promise<void> | null> = {
   discoveryEu: null,
   discoveryApac: null,
   reEnrich: null,
+  rejectAllTbd: null,
 };
 
 async function withLock(key: keyof typeof locks, fn: () => Promise<void>): Promise<void> {
@@ -563,5 +564,52 @@ export async function reEnrichQueueItems(): Promise<void> {
     revalidatePath("/admin");
     revalidatePath("/");
     revalidatePath("/archive");
+  });
+}
+
+// Bulk-reject queue items whose target name carries no useful signal —
+// "TBD" / "" / "Unknown" / "Unknown target". Discovery sometimes inserts
+// these when the source headline says e.g. "(連結子会社の異動)" without
+// disclosing the target, and they pile up in /admin/review. A single
+// click clears them instead of N per-row rejects.
+export async function rejectAllTbd(): Promise<void> {
+  await withLock("rejectAllTbd", async () => {
+    await requireAdmin();
+    const admin = createAdminClient();
+    const { data: items, error } = await admin
+      .from("review_queue")
+      .select("id, proposition")
+      .eq("statut", "en_attente");
+    if (error) {
+      console.error("[rejectAllTbd] query failed:", error.message);
+      return;
+    }
+    const isUseless = (n: string | null | undefined): boolean => {
+      const t = (n ?? "").trim().toLowerCase();
+      return t === "" || t === "tbd" || t === "unknown" || t === "unknown target";
+    };
+    const toReject: string[] = [];
+    for (const item of (items ?? []) as Array<{ id: string; proposition: unknown }>) {
+      const prop = item.proposition as
+        | { kind?: string; deal?: { nm?: string } }
+        | null;
+      if (prop?.kind !== "new_deal") continue;
+      if (isUseless(prop.deal?.nm)) toReject.push(item.id);
+    }
+    if (toReject.length === 0) {
+      console.log("[rejectAllTbd] no TBD items to reject");
+      return;
+    }
+    const { error: upErr } = await admin
+      .from("review_queue")
+      .update({ statut: "rejete" })
+      .in("id", toReject);
+    if (upErr) {
+      console.error("[rejectAllTbd] update failed:", upErr.message);
+      return;
+    }
+    console.log(`[rejectAllTbd] rejected ${toReject.length} TBD items`);
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
   });
 }

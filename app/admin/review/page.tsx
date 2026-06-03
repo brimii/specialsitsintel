@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems } from "./actions";
+import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems, rejectAllTbd } from "./actions";
 import { SubmitButton } from "./SubmitButton";
 import { PendingBar } from "../PendingBar";
 
@@ -96,6 +96,12 @@ export default async function AdminReview() {
             </SubmitButton>
             <PendingBar />
           </form>
+          <form action={rejectAllTbd}>
+            <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Rejecting…">
+              🗑 Reject TBD items
+            </SubmitButton>
+            <PendingBar />
+          </form>
         </div>
       </div>
       <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: "var(--sp-4)", lineHeight: 1.6 }}>
@@ -108,7 +114,8 @@ export default async function AdminReview() {
         Already-processed cases are skipped automatically.
         <b> Enrich missing prices</b> = re-runs the 2nd-pass enrichment on pending queue
         items that lack <code>v</code> or <code>pr.o</code>. Skips items already complete.
-        Live logs in the <code>npm run dev</code> terminal.
+        <b> Reject TBD items</b> = bulk-rejects pending items whose target name is
+        TBD / empty / Unknown. Live logs in the <code>npm run dev</code> terminal.
       </div>
 
       {items.length === 0 ? (
