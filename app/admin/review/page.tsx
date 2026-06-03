@@ -55,11 +55,39 @@ export default async function AdminReview() {
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
-        <div style={{ fontSize: 13, color: "var(--text-2)" }}>
-          <b>{items.length}</b> pending proposal(s). Source: SEC EDGAR + Claude extraction.
+      <div style={{ marginBottom: "var(--sp-3)" }}>
+        <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: "var(--sp-3)" }}>
+          <b>{items.length}</b> pending proposal(s) in review queue.
         </div>
-        <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+
+        <ToolbarGroup
+          label="DISCOVER NEW DEALS"
+          hint="Scan public regulator + exchange feeds for M&A we don't yet track. Candidates land in the review queue."
+        >
+          <form action={runDiscoveryNow}>
+            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="US discovery… (~3-5 min)">
+              🇺🇸 US (SEC EDGAR)
+            </SubmitButton>
+            <PendingBar />
+          </form>
+          <form action={runEuDiscoveryNow}>
+            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="EU discovery… (~2-3 min)">
+              🇪🇺 EU (CMA + DG COMP)
+            </SubmitButton>
+            <PendingBar />
+          </form>
+          <form action={runApacDiscoveryNow}>
+            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="APAC discovery… (~2-4 min)">
+              🌏 APAC (TDnet + HKEX + ASX)
+            </SubmitButton>
+            <PendingBar />
+          </form>
+        </ToolbarGroup>
+
+        <ToolbarGroup
+          label="UPDATE EXISTING DEALS"
+          hint="Re-scan SEC filings for status / probability / spread changes on deals already in the database."
+        >
           <form action={runPipelineNow}>
             <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Scanning… (~30s)">
               ▶ Quick update (10 deals)
@@ -72,24 +100,12 @@ export default async function AdminReview() {
             </SubmitButton>
             <PendingBar />
           </form>
-          <form action={runDiscoveryNow}>
-            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="US discovery… (~3-5 min)">
-              🇺🇸 Discover US deals
-            </SubmitButton>
-            <PendingBar />
-          </form>
-          <form action={runEuDiscoveryNow}>
-            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="EU discovery… (~2-3 min)">
-              🇪🇺 Discover EU deals
-            </SubmitButton>
-            <PendingBar />
-          </form>
-          <form action={runApacDiscoveryNow}>
-            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="APAC discovery… (~2-4 min)">
-              🌏 Discover APAC deals
-            </SubmitButton>
-            <PendingBar />
-          </form>
+        </ToolbarGroup>
+
+        <ToolbarGroup
+          label="QUEUE MAINTENANCE"
+          hint="Clean up and improve the existing review queue."
+        >
           <form action={reEnrichQueueItems}>
             <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Enriching prices… (~1-3 min)">
               💰 Enrich missing prices
@@ -102,6 +118,12 @@ export default async function AdminReview() {
             </SubmitButton>
             <PendingBar />
           </form>
+        </ToolbarGroup>
+
+        <ToolbarGroup
+          label="HISTORICAL BACKFILL (PHASE 5)"
+          hint="Heavy + costly. Each click processes 300 settled DG COMP cases (~6 min, ~$3-5). Inserts directly into deals with statut=Closed. Idempotent."
+        >
           <form action={runDgCompHistoricalBatch}>
             <SubmitButton
               className="btn btn-secondary btn-sm"
@@ -112,25 +134,7 @@ export default async function AdminReview() {
             </SubmitButton>
             <PendingBar />
           </form>
-        </div>
-      </div>
-      <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: "var(--sp-4)", lineHeight: 1.6 }}>
-        <b>Update</b> = scan existing deals for changes (status, probability…).
-        <b> US discovery</b> = SEC EDGAR (S-4 / DEFM14A / SC TO-T / SC 13D / 8-K).
-        <b> EU discovery</b> = CMA (UK Atom) + DG COMP (EU Commission Open Data JSON).
-        <b> APAC discovery</b> = TDnet (Tokyo, Japanese disclosures) + HKEX (Hong Kong, English
-        Takeovers Code / Listing Rule headlines) + ASX (Australia, Corporations Act Pt 5.1
-        schemes / Ch 6 bids) + SGX (Singapore, Takeovers Code / Listing Rules Ch 10).
-        Already-processed cases are skipped automatically.
-        <b> Enrich missing prices</b> = re-runs the 2nd-pass enrichment on pending queue
-        items that lack <code>v</code> or <code>pr.o</code>. Skips items already complete.
-        <b> Reject TBD items</b> = bulk-rejects pending items whose target name is
-        TBD / empty / Unknown.
-        <b> DG COMP backfill</b> = Phase 5 historical pull: each click processes 300 cases
-        from the DG COMP Open Data JSON (~6 min, ~$3-5 Claude API), inserts settled deals
-        directly into the <code>deals</code> table with <code>statut=&quot;Closed&quot;</code>.
-        Idempotent — re-clicking picks up where the previous batch left off. Live logs in
-        the <code>npm run dev</code> terminal.
+        </ToolbarGroup>
       </div>
 
       {items.length === 0 ? (
@@ -146,6 +150,49 @@ export default async function AdminReview() {
         </div>
       )}
     </>
+  );
+}
+
+function ToolbarGroup({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--sp-2)",
+        padding: "var(--sp-3)",
+        marginBottom: "var(--sp-2)",
+        background: "var(--bg-1)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--r-md)",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 8.5,
+          letterSpacing: ".08em",
+          color: "var(--text-3)",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "center" }}>
+        {children}
+      </div>
+      <div style={{ fontSize: 10, color: "var(--text-3)", lineHeight: 1.5 }}>
+        {hint}
+      </div>
+    </div>
   );
 }
 
