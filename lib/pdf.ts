@@ -3,6 +3,32 @@ import "server-only";
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+// pdfjs (the engine inside unpdf) prints non-fatal noise through console.log
+// with a "Warning: " prefix: missing font tables, missing cMapUrl, indexing
+// notices, hex-string sanitisation, etc. None of it affects the extracted
+// text but it clutters the dev log enough that real signals get lost.
+// We temporarily filter those messages while parsing.
+const PDFJS_NOISE_RE =
+  /^Warning: (TT: undefined function|loadFont|getHexString|Indexing all PDF objects|Ensure that the .?cMapUrl)/i;
+
+async function silencePdfjsNoise<T>(fn: () => Promise<T>): Promise<T> {
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  const filter = (orig: (...a: unknown[]) => void) =>
+    (msg: unknown, ...args: unknown[]) => {
+      if (typeof msg === "string" && PDFJS_NOISE_RE.test(msg)) return;
+      orig(msg, ...args);
+    };
+  console.log = filter(originalLog) as typeof console.log;
+  console.warn = filter(originalWarn) as typeof console.warn;
+  try {
+    return await fn();
+  } finally {
+    console.log = originalLog;
+    console.warn = originalWarn;
+  }
+}
+
 // ASX gates direct PDF access behind a "two-step" terms-of-use disclaimer:
 //   1. GET displayAnnouncement.do?display=pdf&idsId=N → server creates a
 //      JSESSIONID and returns an HTML disclaimer with a <form> POSTing to
@@ -213,8 +239,12 @@ export async function fetchPdfText(url: string, maxChars = 60000, depth = 0): Pr
     }
 
     const { getDocumentProxy, extractText } = await import("unpdf");
-    const pdf = await getDocumentProxy(buf);
-    const { text } = await extractText(pdf, { mergePages: true });
+    const { pdf, text } = await silencePdfjsNoise(async () => {
+      const pdfDoc = await getDocumentProxy(buf);
+      const { text } = await extractText(pdfDoc, { mergePages: true });
+      return { pdf: pdfDoc, text };
+    });
+    void pdf;
     const flat = Array.isArray(text) ? text.join("\n") : String(text ?? "");
     const clean = flat.replace(/[ -]+/g, " ").replace(/\s+/g, " ").trim();
     return clean.slice(0, maxChars);
