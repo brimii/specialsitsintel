@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { type Deal, dealCapUSD } from "../data/deals";
+import { type Deal, dealCapUSD, fmtCap } from "../data/deals";
 import DealTable, { type SortField } from "./DealTable";
 import DealDetail from "./DealDetail";
 import AlertStrip from "./AlertStrip";
@@ -37,6 +37,64 @@ function parseDate(s?: string): number {
   if (p.length >= 2 && MONTHS[p[0]]) return parseInt(p[1] || p[2] || "2026") * 100 + MONTHS[p[0]];
   if (p.length >= 2 && MONTHS[p[1]]) return parseInt(p[2] || p[0] || "2026") * 100 + MONTHS[p[1]];
   return 0;
+}
+
+// Statuses that mean the deal is settled — won, lost, or terminated.
+// Everything else (Review, Closing, Litigation, Active, Rumored, etc.) is
+// considered "active" / still moving.
+const CLOSED_STATUSES = new Set([
+  "closed",
+  "blocked",
+  "dead",
+  "terminated",
+  "withdrawn",
+]);
+
+function StatsCell({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "baseline", gap: 4 }}>
+      <span style={{ color: "var(--text-3)" }}>{label}</span>
+      <span style={{ color: "var(--text)", fontWeight: 600 }}>{value}</span>
+      {hint ? <span style={{ color: "var(--text-3)" }}>{hint}</span> : null}
+    </span>
+  );
+}
+
+function StatsStrip({ deals }: { deals: Deal[] }) {
+  const total = deals.length;
+  if (total === 0) return null;
+  const closed = deals.filter((d) => CLOSED_STATUSES.has((d.st ?? "").toLowerCase())).length;
+  const active = total - closed;
+  const withValue = deals.filter((d) => {
+    const v = (d.v ?? "").trim().toUpperCase();
+    return v !== "" && v !== "TBD";
+  }).length;
+  const withPrice = deals.filter((d) => (d.pr?.o ?? 0) > 0).length;
+  const totalCap = deals.reduce((sum, d) => sum + dealCapUSD(d.v), 0);
+  const pct = (n: number) => `${Math.round((n / total) * 100)}%`;
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "var(--sp-4)",
+        flexWrap: "wrap",
+        alignItems: "center",
+        padding: "8px var(--sp-5)",
+        fontFamily: "var(--font-mono)",
+        fontSize: 9.5,
+        color: "var(--text-2)",
+        background: "var(--bg-2)",
+        borderBottom: "1px solid var(--border)",
+      }}
+    >
+      <StatsCell label="Shown" value={String(total)} />
+      <StatsCell label="Active" value={String(active)} hint={`(${pct(active)})`} />
+      <StatsCell label="Closed" value={String(closed)} hint={`(${pct(closed)})`} />
+      <StatsCell label="With value" value={pct(withValue)} hint={`(${withValue})`} />
+      <StatsCell label="With offer price" value={pct(withPrice)} hint={`(${withPrice})`} />
+      <StatsCell label="Total cap" value={fmtCap(totalCap)} />
+    </div>
+  );
 }
 
 export default function DealUniverse({
@@ -206,6 +264,8 @@ export default function DealUniverse({
               />
             </div>
           </div>
+
+          <StatsStrip deals={filtered} />
 
           <div className="universe-table">
             {view === "deals" ? (
