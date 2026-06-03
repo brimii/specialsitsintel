@@ -17,6 +17,7 @@ const locks: Record<string, Promise<void> | null> = {
   discoveryApac: null,
   reEnrich: null,
   rejectAllTbd: null,
+  dgCompBackfill: null,
 };
 
 async function withLock(key: keyof typeof locks, fn: () => Promise<void>): Promise<void> {
@@ -611,5 +612,289 @@ export async function rejectAllTbd(): Promise<void> {
     console.log(`[rejectAllTbd] rejected ${toReject.length} TBD items`);
     revalidatePath("/admin/review");
     revalidatePath("/admin");
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Phase 5 — Historical backfill (DG COMP)
+//
+// Walks the DG COMP Open Data JSON (~10k cases since 1990), fetches the
+// decision PDF for each, runs a focused Claude extraction with the
+// outcome already known ("Closed"), and inserts directly into the
+// deals table (no review_queue — these aren't candidates, they're
+// settled historical events).
+//
+// Idempotent: dedupes against existing deals by normalized name AND
+// against any DG COMP URL already in deal_updates.source_url. Rate-
+// limits Claude calls to stay within Tier 1 (~50 req/min). Processes a
+// fixed batch per click so each run takes ~6 min and you can do
+// incremental nights.
+// ══════════════════════════════════════════════════════════════════════
+
+const HISTORICAL_BATCH_SIZE = 300;
+const HISTORICAL_RATE_LIMIT_MS = 1200; // ~50 req/min
+
+const HISTORICAL_DG_COMP_PROMPT = `You receive a DG COMP (EU Commission Directorate-General for Competition) merger case with the full text of its decision PDF. The case is CLOSED — the outcome (cleared / cleared with remedies / blocked) is already in the document. Extract the deal as a settled historical event-driven situation.
+
+# Output
+
+JSON only, no markdown fences, no preface, no suffix:
+
+\`\`\`json
+{
+  "is_deal": true | false,
+  "deal": {
+    "nm": "Target Company",
+    "acq": "Acquirer Company",
+    "v": "€2.5B",
+    "c": "MERGER" | "DISTRESSED" | "SPINOFF" | "REORG" | "TENDER",
+    "r": "DG COMP",
+    "st": "Closed" | "Blocked",
+    "sc": "G" | "A" | "R",
+    "reg": "EU",
+    "cl": "MMM YYYY",
+    "desc": "1-2 factual sentences about what the deal was and how it was resolved.",
+    "ai": "1 analytical sentence on what the decision tells us (precedent / remedy type / market signal).",
+    "f": "🇪🇺" | "🇫🇷" | "🇩🇪" | "🇮🇹" | "🇪🇸" | "🇳🇱" | etc.,
+    "pr": { "u": 0, "c": 0, "o": 0, "sym": "", "cur": "€", "ad": "MMM YYYY" },
+    "tl": [{ "d": "MMM YYYY", "t": "NOTIFIED", "x": "..." }, { "d": "MMM YYYY", "t": "CLEARED", "x": "..." }]
+  }
+}
+\`\`\`
+
+# Rules
+
+- **st (status)**: \`Closed\` if cleared (with or without conditions/remedies). \`Blocked\` only if explicitly prohibited.
+- **sc (score color)**: \`G\` = cleared without remedies, \`A\` = cleared with commitments / Phase II remedies, \`R\` = blocked.
+- **f (flag)**: country flag if a single nationality dominates the deal; \`🇪🇺\` for cross-border / EU-wide deals.
+- **v** (transaction value): "€X.XB" / "€XM" if disclosed in the decision text; "TBD" otherwise.
+- **pr.ad** (announcement date): "MMM YYYY" of the notification — provided in the user message.
+- **cl** (close date): "MMM YYYY" of the final clearance / decision date.
+- **tl** (timeline): 2-3 entries minimum — NOTIFIED → (PHASE II if applicable) → CLEARED / BLOCKED with brief descriptions.
+- **desc** + **ai** in English, factual, no speculation.
+- If the document is actually a withdrawal, a no-jurisdiction finding, or a referral to a member state — return \`{"is_deal": false, "deal": null}\`.
+
+# CRITICAL OUTPUT FORMAT
+
+- FIRST char MUST be \`{\`.
+- LAST char MUST be \`}\`.
+- NO markdown fences, NO prose.
+- Output is fed directly to JSON.parse().`;
+
+type HistoricalDeal = {
+  is_deal: boolean;
+  deal: {
+    nm: string;
+    acq: string;
+    v: string;
+    c: string;
+    r: string;
+    st: string;
+    sc: string;
+    reg: string;
+    cl: string;
+    desc: string;
+    ai: string;
+    f: string;
+    pr: { u: number; c: number; o: number; sym: string; cur: string; ad: string };
+    tl: Array<{ d: string; t: string; x: string }>;
+  } | null;
+};
+
+function normalizeName(s: string | null | undefined): string {
+  if (!s) return "";
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[,.()]/g, "")
+    .replace(/\s+(inc|corp|corporation|holdings|group|ltd|plc|ag|sa|nv|co|company|llc|llp|trust|reit|sas|gmbh|spa|kgaa)\.?$/i, "")
+    .trim();
+}
+
+export async function runDgCompHistoricalBatch(): Promise<void> {
+  await withLock("dgCompBackfill", async () => {
+    await requireAdmin();
+    const admin = createAdminClient();
+
+    const { fetchDgCompCases } = await import("@/lib/sources/dg-comp");
+    const { fetchPdfText } = await import("@/lib/pdf");
+    const { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } = await import("@/lib/anthropic");
+
+    // 1. Pull the full dataset (no date filter — we want history)
+    const cases = await fetchDgCompCases({ daysBack: 365 * 50, limit: 50000 }).catch((e) => {
+      console.error(`[dgCompBackfill] fetch failed: ${(e as Error).message}`);
+      return [];
+    });
+    console.log(`[dgCompBackfill] fetched ${cases.length} DG COMP cases total`);
+    if (cases.length === 0) return;
+
+    // 2. Build dedup indexes
+    const { data: existing } = await admin.from("deals").select("nom");
+    const existingNames = new Set<string>();
+    for (const d of (existing ?? []) as Array<{ nom: string }>) {
+      existingNames.add(normalizeName(d.nom));
+    }
+
+    const { data: processed } = await admin
+      .from("deal_updates")
+      .select("source_url")
+      .like("source_url", "%competition-cases.ec.europa.eu%");
+    const processedUrls = new Set<string>();
+    for (const r of (processed ?? []) as Array<{ source_url: string | null }>) {
+      if (r.source_url) processedUrls.add(r.source_url);
+    }
+
+    // 3. Filter: must have a decision PDF + not already processed
+    const todo = cases.filter(
+      (c) => c.decisionPdfUrl && !processedUrls.has(c.url),
+    );
+    console.log(
+      `[dgCompBackfill] todo=${todo.length} (after pdf+url filter from ${cases.length}); ` +
+        `existing deals=${existingNames.size}, processed urls=${processedUrls.size}`,
+    );
+
+    // 4. Take the batch
+    const batch = todo.slice(0, HISTORICAL_BATCH_SIZE);
+    console.log(`[dgCompBackfill] processing batch of ${batch.length} this click`);
+
+    let inserted = 0;
+    let skippedDup = 0;
+    let skippedNotDeal = 0;
+    let skippedNoPdf = 0;
+    let errors = 0;
+
+    // Cache nextId locally — refresh from DB on each insert to avoid races
+    // would be safer but slower; the lock prevents concurrent runs so a
+    // simple monotonic counter starting from MAX(id) is fine.
+    const { data: maxRow } = await admin
+      .from("deals")
+      .select("id")
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    let nextId = ((maxRow?.id as number | undefined) ?? 0) + 1;
+
+    const anthropic = getAnthropic();
+
+    for (let i = 0; i < batch.length; i++) {
+      const c = batch[i];
+
+      // Pre-fetch dedup by case title (cheap, avoids burning Claude on
+      // names we already have)
+      if (existingNames.has(normalizeName(c.title))) {
+        skippedDup++;
+        continue;
+      }
+
+      try {
+        const pdfText = await fetchPdfText(c.decisionPdfUrl as string).catch(() => "");
+        if (!pdfText || pdfText.length < 500) {
+          skippedNoPdf++;
+          continue;
+        }
+
+        const userMsg = `DG COMP CASE
+Number: ${c.caseNumber ?? "(unknown)"}
+Title: ${c.title}
+Notified: ${c.date}
+Case URL: ${c.url}
+
+DECISION PDF TEXT (truncated):
+${pdfText}`;
+
+        const res = await anthropic.messages.create({
+          model: EXTRACTION_MODEL,
+          max_tokens: 1500,
+          system: [
+            { type: "text", text: HISTORICAL_DG_COMP_PROMPT, cache_control: { type: "ephemeral" } },
+          ],
+          messages: [{ role: "user", content: userMsg }],
+        });
+        const block = res.content[0];
+        const responseText = block && block.type === "text" ? block.text : "";
+        const parsed = parseClaudeJson<HistoricalDeal>(responseText);
+
+        if (!parsed || !parsed.is_deal || !parsed.deal) {
+          skippedNotDeal++;
+          continue;
+        }
+        const d = parsed.deal;
+        const targetKey = normalizeName(d.nm);
+        if (!targetKey || existingNames.has(targetKey)) {
+          skippedDup++;
+          continue;
+        }
+
+        const payload = {
+          id: nextId,
+          nom: d.nm,
+          acquereur: d.acq,
+          valeur: d.v ?? "TBD",
+          regulateur: d.r ?? "DG COMP",
+          categorie: d.c ?? "MERGER",
+          statut: "Closed",
+          region: "EU",
+          description: d.desc ?? null,
+          ai_commentary: d.ai ?? null,
+          min_tier: "analyst",
+          flag: d.f ?? "🇪🇺",
+          score: d.sc ?? "G",
+          close_estimate: d.cl ?? c.date.slice(0, 7),
+          price: d.pr ?? { u: 0, c: 0, o: 0, sym: "", cur: "€", ad: c.date.slice(0, 7) },
+          timeline: d.tl ?? [],
+          spread: 0,
+          proba_close: 100,
+          ev: 0,
+        };
+
+        const { error: insErr } = await admin.from("deals").insert(payload);
+        if (insErr) {
+          console.error(`[dgCompBackfill] insert failed ${c.caseNumber}: ${insErr.message}`);
+          errors++;
+          continue;
+        }
+
+        await admin.from("deal_updates").insert({
+          deal_id: nextId,
+          champ_modifie: "_creation",
+          ancienne_valeur: null,
+          nouvelle_valeur: `Historical backfill from DG COMP ${c.caseNumber ?? ""}: ${d.nm} / ${d.acq ?? "?"}`,
+          source_url: c.url,
+          confiance: 90,
+          auteur: "ia",
+        });
+
+        existingNames.add(targetKey);
+        processedUrls.add(c.url);
+        inserted++;
+        nextId++;
+
+        if (inserted % 10 === 0) {
+          console.log(
+            `[dgCompBackfill] progress ${i + 1}/${batch.length} :: ` +
+              `inserted=${inserted} dup=${skippedDup} notDeal=${skippedNotDeal} ` +
+              `noPdf=${skippedNoPdf} errors=${errors}`,
+          );
+        }
+      } catch (e) {
+        errors++;
+        console.error(`[dgCompBackfill] ${c.caseNumber} error: ${(e as Error).message}`);
+      }
+
+      // Rate limit ~50 req/min (Anthropic Tier 1)
+      if (i < batch.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, HISTORICAL_RATE_LIMIT_MS));
+      }
+    }
+
+    console.log(
+      `[dgCompBackfill] DONE :: inserted=${inserted} dup=${skippedDup} notDeal=${skippedNotDeal} ` +
+        `noPdf=${skippedNoPdf} errors=${errors} remaining≈${todo.length - batch.length}`,
+    );
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath("/archive");
   });
 }

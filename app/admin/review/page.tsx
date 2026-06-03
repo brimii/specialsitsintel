@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems, rejectAllTbd } from "./actions";
+import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems, rejectAllTbd, runDgCompHistoricalBatch } from "./actions";
 import { SubmitButton } from "./SubmitButton";
 import { PendingBar } from "../PendingBar";
 
@@ -102,6 +102,16 @@ export default async function AdminReview() {
             </SubmitButton>
             <PendingBar />
           </form>
+          <form action={runDgCompHistoricalBatch}>
+            <SubmitButton
+              className="btn btn-secondary btn-sm"
+              pendingLabel="Backfill batch… (~6 min, 300 cases)"
+              style={{ borderColor: "var(--amber)", color: "var(--amber)" }}
+            >
+              📚 DG COMP backfill (300/click)
+            </SubmitButton>
+            <PendingBar />
+          </form>
         </div>
       </div>
       <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: "var(--sp-4)", lineHeight: 1.6 }}>
@@ -115,7 +125,12 @@ export default async function AdminReview() {
         <b> Enrich missing prices</b> = re-runs the 2nd-pass enrichment on pending queue
         items that lack <code>v</code> or <code>pr.o</code>. Skips items already complete.
         <b> Reject TBD items</b> = bulk-rejects pending items whose target name is
-        TBD / empty / Unknown. Live logs in the <code>npm run dev</code> terminal.
+        TBD / empty / Unknown.
+        <b> DG COMP backfill</b> = Phase 5 historical pull: each click processes 300 cases
+        from the DG COMP Open Data JSON (~6 min, ~$3-5 Claude API), inserts settled deals
+        directly into the <code>deals</code> table with <code>statut=&quot;Closed&quot;</code>.
+        Idempotent — re-clicking picks up where the previous batch left off. Live logs in
+        the <code>npm run dev</code> terminal.
       </div>
 
       {items.length === 0 ? (
