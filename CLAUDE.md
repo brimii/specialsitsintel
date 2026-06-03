@@ -265,6 +265,72 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 
 ---
 
+**Session 2026-06-03 — Nettoyage logs + admin UX + Phase 5 scaffold + dashboard + bulk approve + stats strip** :
+
+- ✅ **Logs propres : filtre pdfjs noise** (`lib/pdf.ts`) — helper `silencePdfjsNoise()` swap temporairement `console.log` + `console.warn` pendant l'extraction PDF et bloque 5 patterns bruyants connus (`TT: undefined function`, `loadFont`, `cMapUrl`, `Indexing all PDF objects`, `getHexString`). Vrais warnings préservés. Plus de pollution dans les terminaux dev (10-15 lignes de bruit en moins par enrich).
+
+- ✅ **Bouton 🗑 Reject TBD items** (`actions.ts` + `page.tsx`) — bulk-rejette tous les items `en_attente` dont `proposition.deal.nm` ∈ {TBD, '', Unknown, Unknown target}. Réutilise le predicate `isUseless` de reEnrich. Lock `rejectAllTbd`.
+
+- ✅ **Phase 5 scaffold — bouton 📚 DG COMP backfill (300/click)** (`actions.ts` + `page.tsx`) :
+  - Pull les 10k+ cases DG COMP (no date filter), dédup contre `deals.nom` normalisé + `deal_updates.source_url` (idempotent à 100%)
+  - Filtre les cases avec `decisionPdfUrl` et non déjà traitées
+  - Process 300 cases par clic (~6 min wall clock à 1.2s rate-limit = ~50 req/min Tier 1)
+  - Insert direct dans `deals` (skip queue — outcomes connus) avec `statut="Closed"`, `spread=0`, `proba_close=100`, `ev=0`
+  - Audit row `_creation` dans `deal_updates` avec source URL → la prochaine run sait quels cases ont déjà été traités
+  - Prompt focalisé "historical" qui reconnaît `Cleared` / `Cleared with remedies` / `Blocked` + score G/A/R par niveau de remède
+  - Withdrawals / no-jurisdiction findings → `is_deal: false`
+  - **Pas lancé ce soir** — scaffolding seulement. Coût estimé total ~$30-50 sur 20-30 clics pour les ~6-8k deals exploitables.
+
+- ✅ **Reorg `/admin/review` toolbar en 4 groupes labellisés** (`page.tsx` + helper `ToolbarGroup`) :
+  - **DISCOVER NEW DEALS** : 🇺🇸 US (SEC) / 🇪🇺 EU (CMA + DG COMP) / 🌏 APAC (TDnet + HKEX + ASX)
+  - **UPDATE EXISTING DEALS** : ▶ Quick / ▶▶ Full
+  - **QUEUE MAINTENANCE** : 💰 Enrich missing prices / ✅ Approve all clean / 🗑 Reject TBD items
+  - **HISTORICAL BACKFILL (PHASE 5)** : 📚 DG COMP backfill (style amber pour signaler action lourde)
+  - Chaque groupe a un label mono uppercase + une description en hint sous les boutons. Labels longs raccourcis ("🇺🇸 US (SEC EDGAR)" au lieu de "🇺🇸 Discover US deals").
+
+- ✅ **Mini-dashboard `/admin`** (`app/admin/page.tsx`) — 3 nouvelles sections sous les KPIs commerciaux existants :
+  - **COVERAGE** : deals par région (US/EU/APAC/Other avec %) + par source (Seeded/SEC/CMA/DG COMP/TDnet/HKEX/ASX, bucketé via URL pattern dans `deal_updates._creation`)
+  - **DATA QUALITY** : % avec valeur (`v ≠ TBD`) / % avec offer price (`pr.o > 0`) / Active vs Closed split
+  - **PIPELINE ACTIVITY** : queue counts (en_attente / approuve / rejete) + breakdown par source des pending + "Last approved deal" en relatif (`5h ago`, `2d ago`...) avec détail per-source pour repérer une source morte
+  - Helpers `DashSection` + `DashCell` qui matchent le look existant `port-kpi`.
+
+- ✅ **Bouton ✅ Approve all clean** (`actions.ts` + `page.tsx`, dans QUEUE MAINTENANCE) — bulk-approuve les `en_attente` qui sont "complets" :
+  - `proposition.kind === "new_deal"` (les updates restent manuels — MAJEUR/MINEUR critique)
+  - `nm` valide (pas TBD/empty/Unknown)
+  - `v ≠ TBD` (a une deal value)
+  - `confiance ≥ 75`
+  - Même flow que `approveItem` single (insert deals + `_creation` audit + queue status='approuve'), avec `nextId` incrémenté localement après un seul SELECT MAX(id)+1 au début (lock empêche concurrent runs)
+  - Compteurs au funnel : `inserted / errors (skipped: noName / noValue / lowConf / updates)`
+  - Workflow naturel triade : enrich → approve all clean → reject leftovers.
+
+- ✅ **Stats strip réactive sur `/`** (`DealUniverse.tsx` + composants `StatsStrip`/`StatsCell`) — petite barre mono entre la filter bar et la deal table, qui montre pour les `filtered` deals :
+  - `Shown` (count après filtres) · `Active` / `Closed` avec % · `With value` (%) · `With offer price` (%) · `Total cap` (USD normalisé via `dealCapUSD` + `fmtCap`)
+  - Recompute reactif sur le même `useMemo(filtered)` — pas de state additionnel
+  - `CLOSED_STATUSES = {closed, blocked, dead, terminated, withdrawn}` — tout le reste est actif
+  - Cachée si filtered vide.
+
+**État final ce soir :**
+| Surface | Avant | Après |
+|---|---|---|
+| Logs dev | bruit pdfjs tous les enrich | propre, seulement vrais signaux |
+| `/admin/review` toolbar | 8 boutons en 1 ligne wrap | 4 groupes empilés labellisés |
+| `/admin` overview | 4 KPIs commerciaux | + Coverage / Data quality / Pipeline activity |
+| Queue maintenance | manuel item par item | Enrich → Approve clean → Reject TBD (3 bulk actions) |
+| `/` deal table | filter bar seule | + stats strip réactive (Total cap incluse) |
+| Phase 5 | plan documenté | scaffolding ready-to-click |
+
+**À faire à la prochaine session (ordre suggéré) :**
+1. **Lancer le bouton 📚 DG COMP backfill** — observer le 1er run de 300 cases (~6 min, ~$3-5), valider que les inserts se font bien et que la dédup tient. Re-cliquer 20-25 fois pour traiter ~6k deals historiques.
+2. **Phase 5 SEC EDGAR 2001-2026** : même pattern que DG COMP backfill mais pour SEC EDGAR full-text search.
+3. **Améliorer extraction nom acquéreur TDnet** (option B encore deferred ce soir) : prompt 2e passe pour extraire les deux noms depuis le PDF lui-même, réduit `CANDIDATE TDnet :: X / TBD`.
+4. **Per-deal source badge dans `DealTable`** : pastille à côté du nom (SEC / CMA / DG COMP / TDnet / HKEX / ASX / Seeded) pour visibilité immédiate.
+5. **SGX si on obtient un token dev** — sinon classer comme "couverture APAC 3/4 acceptée".
+6. **Horloge Windows** (warning `JWT issued at future`) — paramètres Windows → Heure Internet.
+
+**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (ed934ca) = "DealUniverse: inline stats strip below the filter bar".
+
+---
+
 **Session 2026-05-31 — Couverture APAC live + 2e passe + colonne Size** (état à la coupure) :
 4. Quand APAC live est complet → attaquer Phase 5 historique (DG COMP d'abord, batch nocturne).
 
