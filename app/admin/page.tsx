@@ -2,18 +2,68 @@ import { createAdminClient } from "@/lib/supabase/server";
 
 const PRICE: Record<string, number> = { analyst: 150, institutional: 600, enterprise: 2500 };
 
+// Map a source URL to a short label. Used to bucket deals + queue items by
+// the regulator / exchange they came from. URLs not in this list (typically
+// the 213 originally-seeded fixtures) get bucketed as "Seeded".
+function sourceLabel(url: string | null | undefined): string {
+  if (!url) return "Seeded";
+  if (url.includes("release.tdnet.info")) return "TDnet";
+  if (url.includes("hkexnews.hk")) return "HKEX";
+  if (url.includes("asx.com.au")) return "ASX";
+  if (url.includes("sec.gov")) return "SEC";
+  if (url.includes("gov.uk/cma-cases")) return "CMA";
+  if (url.includes("competition-cases.ec.europa.eu")) return "DG COMP";
+  return "Other";
+}
+
+function fmtRelative(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms) || ms < 0) return "—";
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
 export default async function AdminOverview() {
   const admin = createAdminClient();
-  const [profilesRes, subsRes, dealsRes] = await Promise.all([
+  const [profilesRes, subsRes, dealsRes, queueRes, creationsRes] = await Promise.all([
     admin.from("profiles").select("tier"),
     admin.from("subscriptions").select("tier,status"),
-    admin.from("deals").select("id"),
+    admin
+      .from("deals")
+      .select("id, region, statut, valeur, price"),
+    admin
+      .from("review_queue")
+      .select("id, statut, source_url"),
+    admin
+      .from("deal_updates")
+      .select("deal_id, source_url, created_at")
+      .eq("champ_modifie", "_creation"),
   ]);
 
   const profiles = profilesRes.data ?? [];
   const subs = (subsRes.data ?? []).filter((s) => s.status === "active");
-  const deals = dealsRes.data ?? [];
+  type DealRow = {
+    id: number;
+    region: string | null;
+    statut: string | null;
+    valeur: string | null;
+    price: { o?: number } | null;
+  };
+  const deals = (dealsRes.data ?? []) as DealRow[];
+  type QueueRow = { id: string; statut: string; source_url: string | null };
+  const queue = (queueRes.data ?? []) as QueueRow[];
+  type Creation = { deal_id: number; source_url: string | null; created_at: string };
+  const creations = (creationsRes.data ?? []) as Creation[];
 
+  // ── Headline KPIs ───────────────────────────────────────────────────
   const byTier = profiles.reduce<Record<string, number>>((acc, p) => {
     const t = (p.tier as string) ?? "free";
     acc[t] = (acc[t] ?? 0) + 1;
@@ -21,22 +71,172 @@ export default async function AdminOverview() {
   }, {});
   const mrr = subs.reduce((sum, s) => sum + (PRICE[s.tier as string] ?? 0), 0);
 
-  const cells = [
-    { l: "Users", v: String(profiles.length), s: `free ${byTier.free ?? 0} · analyst ${byTier.analyst ?? 0} · inst ${byTier.institutional ?? 0} · ent ${byTier.enterprise ?? 0}` },
+  const headline = [
+    {
+      l: "Users",
+      v: String(profiles.length),
+      s: `free ${byTier.free ?? 0} · analyst ${byTier.analyst ?? 0} · inst ${byTier.institutional ?? 0} · ent ${byTier.enterprise ?? 0}`,
+    },
     { l: "Active subs", v: String(subs.length), s: "status = active" },
     { l: "Estimated MRR", v: `€${mrr.toLocaleString("en-US")}`, s: "sum of active tier prices" },
     { l: "Deals in DB", v: String(deals.length), s: "public deals table" },
   ];
 
+  // ── Coverage — by region + by source ────────────────────────────────
+  const byRegion: Record<string, number> = { US: 0, EU: 0, APAC: 0, Other: 0 };
+  for (const d of deals) {
+    const r = (d.region ?? "Other").toUpperCase();
+    if (r === "US" || r === "EU" || r === "APAC") byRegion[r]++;
+    else byRegion.Other++;
+  }
+
+  const creationByDealId = new Map<number, Creation>();
+  for (const c of creations) creationByDealId.set(c.deal_id, c);
+  const bySource: Record<string, number> = {};
+  for (const d of deals) {
+    const c = creationByDealId.get(d.id);
+    const label = sourceLabel(c?.source_url);
+    bySource[label] = (bySource[label] ?? 0) + 1;
+  }
+
+  // Last creation per source label
+  const latestBySource: Record<string, string> = {};
+  for (const c of creations) {
+    const label = sourceLabel(c.source_url);
+    const cur = latestBySource[label];
+    if (!cur || c.created_at > cur) latestBySource[label] = c.created_at;
+  }
+
+  // ── Data quality ────────────────────────────────────────────────────
+  const isClosed = (s: string | null) => {
+    const t = (s ?? "").toLowerCase();
+    return t === "closed" || t === "blocked" || t === "dead" || t === "terminated";
+  };
+  const closedCount = deals.filter((d) => isClosed(d.statut)).length;
+  const activeCount = deals.length - closedCount;
+
+  const hasValue = (d: DealRow) =>
+    d.valeur != null && d.valeur !== "" && d.valeur.trim().toUpperCase() !== "TBD";
+  const hasPrice = (d: DealRow) => (d.price?.o ?? 0) > 0;
+  const withValueCount = deals.filter(hasValue).length;
+  const withPriceCount = deals.filter(hasPrice).length;
+  const pct = (n: number) => (deals.length === 0 ? "—" : `${Math.round((n / deals.length) * 100)}%`);
+
+  // ── Pipeline activity (review queue) ────────────────────────────────
+  const queuePending = queue.filter((q) => q.statut === "en_attente").length;
+  const queueApproved = queue.filter((q) => q.statut === "approuve").length;
+  const queueRejected = queue.filter((q) => q.statut === "rejete").length;
+  const queueBySource: Record<string, number> = {};
+  for (const q of queue.filter((q) => q.statut === "en_attente")) {
+    const label = sourceLabel(q.source_url);
+    queueBySource[label] = (queueBySource[label] ?? 0) + 1;
+  }
+  const pendingSourceBreakdown = Object.entries(queueBySource)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${k} ${v}`)
+    .join(" · ") || "—";
+
   return (
-    <div className="port-kpis" style={{ marginBottom: "var(--sp-6)" }}>
-      {cells.map((c) => (
-        <div className="port-kpi" key={c.l}>
-          <div className="port-kpi-l">{c.l}</div>
-          <div className="port-kpi-v">{c.v}</div>
-          <div className="port-kpi-d">{c.s}</div>
-        </div>
-      ))}
+    <>
+      <div className="port-kpis" style={{ marginBottom: "var(--sp-5)" }}>
+        {headline.map((c) => (
+          <div className="port-kpi" key={c.l}>
+            <div className="port-kpi-l">{c.l}</div>
+            <div className="port-kpi-v">{c.v}</div>
+            <div className="port-kpi-d">{c.s}</div>
+          </div>
+        ))}
+      </div>
+
+      <DashSection label="Coverage" hint="How the deals table breaks down across regions and discovery sources.">
+        <DashCell label="US" value={String(byRegion.US)} hint={`${pct(byRegion.US)} of total`} />
+        <DashCell label="EU" value={String(byRegion.EU)} hint={`${pct(byRegion.EU)} of total`} />
+        <DashCell label="APAC" value={String(byRegion.APAC)} hint={`${pct(byRegion.APAC)} of total`} />
+        <DashCell
+          label="By source"
+          value={String(Object.keys(bySource).length)}
+          hint={
+            Object.entries(bySource)
+              .sort((a, b) => b[1] - a[1])
+              .map(([k, v]) => `${k} ${v}`)
+              .join(" · ") || "—"
+          }
+        />
+      </DashSection>
+
+      <DashSection
+        label="Data quality"
+        hint="What share of deals carries a transaction value or per-share offer price, and how many are settled vs still active."
+      >
+        <DashCell label="With value" value={pct(withValueCount)} hint={`${withValueCount} of ${deals.length} have v ≠ TBD`} />
+        <DashCell label="With offer price" value={pct(withPriceCount)} hint={`${withPriceCount} of ${deals.length} have pr.o > 0`} />
+        <DashCell label="Active" value={String(activeCount)} hint={`${pct(activeCount)} of total`} />
+        <DashCell label="Closed / Blocked" value={String(closedCount)} hint={`${pct(closedCount)} of total`} />
+      </DashSection>
+
+      <DashSection
+        label="Pipeline activity"
+        hint="What's sitting in the review queue right now, and when each source last produced an approved deal."
+      >
+        <DashCell label="Pending review" value={String(queuePending)} hint={pendingSourceBreakdown} />
+        <DashCell label="Approved" value={String(queueApproved)} hint="cumulative" />
+        <DashCell label="Rejected" value={String(queueRejected)} hint="cumulative" />
+        <DashCell
+          label="Last approved deal"
+          value={
+            (Object.values(latestBySource).sort().reverse()[0] &&
+              fmtRelative(Object.values(latestBySource).sort().reverse()[0])) || "—"
+          }
+          hint={
+            Object.entries(latestBySource)
+              .sort((a, b) => (a[1] > b[1] ? -1 : 1))
+              .slice(0, 4)
+              .map(([k, v]) => `${k} ${fmtRelative(v)}`)
+              .join(" · ") || "—"
+          }
+        />
+      </DashSection>
+    </>
+  );
+}
+
+function DashSection({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: "var(--sp-4)" }}>
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 9,
+          letterSpacing: ".08em",
+          color: "var(--text-3)",
+          textTransform: "uppercase",
+          marginBottom: "var(--sp-2)",
+        }}
+      >
+        {label}
+      </div>
+      <div className="port-kpis" style={{ marginBottom: "var(--sp-2)" }}>
+        {children}
+      </div>
+      <div style={{ fontSize: 10, color: "var(--text-3)", lineHeight: 1.5 }}>{hint}</div>
+    </div>
+  );
+}
+
+function DashCell({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="port-kpi">
+      <div className="port-kpi-l">{label}</div>
+      <div className="port-kpi-v">{value}</div>
+      <div className="port-kpi-d">{hint}</div>
     </div>
   );
 }
