@@ -112,6 +112,13 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - **Montrer avant d’enregistrer** les fichiers de configuration sensibles (SQL, env, webhooks).
 - Après chaque étape qui marche : proposer un **commit** et signaler s’il faut mettre à jour ce `CLAUDE.md`.
 - En cas d’erreur : demander l’erreur brute complète, donner la cause probable en langage simple, la correction minimale, et comment vérifier.
+- **Au début de chaque nouvelle session côté humain** : rappeler en premier message les commandes PowerShell pour lancer le projet localement + l'URL locale à ouvrir dans le navigateur. Format type :
+  ```
+  cd "C:\Users\loren\<chemin-vers>\specialsitsintel"
+  git pull
+  npm run dev
+  ```
+  Puis : `http://localhost:3000/admin/review` (ou `/` selon ce qu'on travaille). Si le chemin du projet n'est pas connu, donner d'abord la commande pour le retrouver : `Get-ChildItem -Path C:\Users\loren -Recurse -Directory -Filter "specialsitsintel" -ErrorAction SilentlyContinue | Select-Object FullName`.
 
 -----
 
