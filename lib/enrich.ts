@@ -14,7 +14,7 @@ import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic
 // the document says them; otherwise keep the input values unchanged.
 // ════════════════════════════════════════════════════════════════════
 
-const ENRICH_SYSTEM_PROMPT = `You receive a previously-extracted event-driven deal record plus the full text of the underlying disclosure document (SEC filing, regulator decision, takeover offer, Tokyo TDnet PDF, Hong Kong HKEX announcement, etc.). Your job is to FILL IN or CORRECT just the pricing, ticker and timing fields when the document gives you the answer — and to leave everything else alone.
+const ENRICH_SYSTEM_PROMPT = `You receive a previously-extracted event-driven deal record plus the full text of the underlying disclosure document (SEC filing, regulator decision, takeover offer, Tokyo TDnet PDF, Hong Kong HKEX announcement, etc.). Your job is to FILL IN or CORRECT the pricing, timing, AND party-name fields when the document gives you the answer — and to leave fields the input already has correct alone.
 
 # Output
 
@@ -22,6 +22,8 @@ Return JSON with ONLY these fields (no others):
 
 \`\`\`json
 {
+  "nm": "<target company name in English>",
+  "acq": "<acquirer / offeror name in English>",
   "v": "$X.XB" | "€X.XM" | "¥XB" | "TBD",
   "pr": {
     "o": <per-share offer price as a plain number, e.g. 25.50>,
@@ -36,6 +38,8 @@ Return JSON with ONLY these fields (no others):
 
 # Rules
 
+- **nm** (target / offeree): the company being acquired, taken private, merged into, or whose shares the offer is for. Common signals: Japanese "対象者" / "対象会社" / "被買収会社" / "対象株式" / "完全子会社化される" — in "AによるBの株式取得" / "AによるBの完全子会社化" / "Aの公開買付け対象", **B is the target**. English: "Target Company", "the Offeree", "in respect of the shares of X".
+- **acq** (acquirer / offeror): the company doing the acquiring. Common signals: Japanese "公開買付者" / "買付者" / "買収会社" / "取得会社" — in "AによるBの株式取得", **A is the acquirer**. For MBOs / management-led buyouts, the acquirer is the SPV name (often something like "BCJ-XX 株式会社" or "[Founder]'s Holdings KK"). English: "Bidder", "Offeror", "X plc as Acquirer".
 - **v** (total deal value): look for "aggregate consideration", "transaction value", "equity value", "implied enterprise value", "X per share x N shares", "total consideration of approximately", "valued at". Output in English scale letters (B/M/T) with the deal currency. Examples: "$5.2B", "€840M", "¥320B", "£1.4B", "HK$8.5B".
 - **pr.o** (per-share offer price): plain number, no currency symbol, no commas (e.g. \`25.50\`, \`3500\`, \`4.85\`). For all-stock deals, extract the implied per-share value at signing if explicitly stated ("implied value of $X per share based on the fixed exchange ratio"). Leave at 0 ONLY if the document genuinely doesn't disclose any per-share price.
 - **pr.sym**: stock ticker if the document mentions it (e.g. "TGT", "00700", "AAL", "7203").
@@ -47,9 +51,9 @@ Return JSON with ONLY these fields (no others):
 # Language
 
 ALL output text fields MUST be in English. Translate company names where they appear:
-- Japanese: トヨタ自動車 → "Toyota Motor", カカクコム → "Kakaku.com", ニチリョク → "Nichiryoku".
+- Japanese: トヨタ自動車 → "Toyota Motor", カカクコム → "Kakaku.com", ニチリョク → "Nichiryoku", 神戸物産 → "Kobe Bussan", オリンパス → "Olympus".
 - Chinese: 腾讯 → "Tencent", 阿里巴巴 → "Alibaba".
-Strip corporate suffixes: 株式会社 / 有限公司 / (株) / Co., Ltd. when redundant.
+Strip Japanese corporate suffixes: 株式会社 / ㈱ / (株) → drop entirely. HD / ホールディングス → "Holdings". Ｇ－ (full-width "G-") prefix → drop.
 
 Japanese number units: 億 = 100M, 兆 = 1T. Output "¥45B" not "450億円".
 
@@ -58,7 +62,9 @@ Japanese number units: 億 = 100M, 兆 = 1T. Output "¥45B" not "450億円".
 - If the document doesn't help (e.g. it's a procedural notice without numbers), return the INPUT values unchanged for every field.
 - NEVER replace a known per-share price with 0.
 - NEVER replace a known "$X.XB" value with "TBD".
+- NEVER replace a known company name with "TBD" or "Unknown".
 - NEVER invent numbers.
+- For \`nm\` and \`acq\`: only fill in / fix when the input value is in {"TBD", "", "Unknown", "Unknown target"}. If the input nm/acq is a real company name, return it unchanged even if the document gives you a different reading — the 1st pass had context you don't.
 
 # CRITICAL OUTPUT FORMAT
 
@@ -85,9 +91,16 @@ export type DealLike = {
   tl: Array<{ d: string; t: string; x: string }>;
 };
 
-type EnrichPatch = Partial<Pick<DealLike, "v" | "cl" | "desc">> & {
+type EnrichPatch = Partial<Pick<DealLike, "nm" | "acq" | "v" | "cl" | "desc">> & {
   pr?: Partial<DealLike["pr"]>;
 };
+
+// Names the 1st pass may emit when it couldn't pin down a party from the
+// headline alone. The 2nd pass is allowed to overwrite ONLY these values.
+export function isUselessName(n: string | null | undefined): boolean {
+  const t = (n ?? "").trim().toLowerCase();
+  return t === "" || t === "tbd" || t === "unknown" || t === "unknown target";
+}
 
 // Call Claude with the disclosure document and merge the returned patch
 // back onto the input deal. Returns the merged deal (or the original
@@ -129,6 +142,18 @@ ${documentText}`;
 // don't want a sparse document to wipe its findings).
 function mergeDeal(base: DealLike, patch: EnrichPatch): DealLike {
   const merged: DealLike = { ...base };
+
+  // Party names: only overwrite when the base name carries no signal AND
+  // the patch gives us a real one. The prompt instructs Claude to do the
+  // same but we double-up here so a hallucinated alternate name never
+  // replaces a good 1st-pass extraction.
+  if (patch.nm && !isUselessName(patch.nm) && isUselessName(base.nm)) {
+    merged.nm = patch.nm;
+  }
+  if (patch.acq && !isUselessName(patch.acq) && isUselessName(base.acq)) {
+    merged.acq = patch.acq;
+  }
+
   if (patch.v && patch.v !== "TBD") merged.v = patch.v;
   else if (patch.v === "TBD" && (!base.v || base.v === "TBD" || base.v === "")) merged.v = "TBD";
 

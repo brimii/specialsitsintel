@@ -6,7 +6,7 @@ import { fetchHkexDisclosures, type HkexDisclosure } from "@/lib/sources/hkex";
 import { fetchAsxDisclosures, type AsxDisclosure } from "@/lib/sources/asx";
 import { fetchSgxDisclosures, type SgxDisclosure } from "@/lib/sources/sgx";
 import { fetchPdfText } from "@/lib/pdf";
-import { enrichDealFromDocument, type DealLike } from "@/lib/enrich";
+import { enrichDealFromDocument, isUselessName, type DealLike } from "@/lib/enrich";
 
 type ApacDisclosure = TdnetDisclosure | HkexDisclosure | AsxDisclosure | SgxDisclosure;
 
@@ -322,33 +322,47 @@ export async function discoverApacDeals(
     console.log(`[discovery-apac] CANDIDATE ${c.source} :: ${resp.deal.nm} / ${resp.deal.acq}`);
 
     let d = resp.deal;
-    const targetKey = normalize(d.nm);
     const symKey = normalize(d.pr?.sym);
-    if (existingNames.has(targetKey)) {
-      console.log(`[discovery-apac] DUP_NAME :: ${d.nm} -> "${targetKey}"`);
-      duplicates++;
-      continue;
-    }
     if (symKey && existingSyms.has(symKey)) {
       console.log(`[discovery-apac] DUP_SYM :: ${d.pr?.sym}`);
       duplicates++;
       continue;
     }
 
+    // If the 1st-pass name is real, dedup against existing deals NOW —
+    // saves a Claude enrich call on a guaranteed dupe. If the name is
+    // useless ("TBD" / "" / "Unknown"), DON'T dedup yet: "tbd"-keyed
+    // dedup is meaningless and we'd block real new deals just because
+    // the title was ambiguous. Try the 2nd-pass enrich first, then
+    // re-check after it (hopefully) fills in the real name.
+    const nameWasUseful = !isUselessName(d.nm);
+    if (nameWasUseful && existingNames.has(normalize(d.nm))) {
+      console.log(`[discovery-apac] DUP_NAME :: ${d.nm} -> "${normalize(d.nm)}"`);
+      duplicates++;
+      continue;
+    }
+
     // 2nd pass: fetch the disclosure PDF and ask Claude to fill in price /
-    // value / close-date when the document discloses them. The 1st pass
-    // only saw the headline (TDnet and HKEX both publish title + PDF link,
-    // no detail HTML). Best-effort: if PDF fetch or extraction fails the
-    // 1st-pass deal goes through unchanged.
+    // value / close-date AND any TBD party names when the document
+    // discloses them. The 1st pass only saw the headline (TDnet and HKEX
+    // both publish title + PDF link, no detail HTML). Best-effort: if PDF
+    // fetch or extraction fails the 1st-pass deal goes through unchanged.
     const pdfText = await fetchPdfText(c.url).catch(() => "");
     if (pdfText) {
-      const before = `v=${d.v} pr.o=${d.pr?.o ?? 0}`;
+      const before = `nm=${d.nm} acq=${d.acq} v=${d.v} pr.o=${d.pr?.o ?? 0}`;
       d = await enrichDealFromDocument(d as DealLike, pdfText);
-      console.log(
-        `[discovery-apac] ENRICHED ${c.source} :: ${d.nm} :: ${before} → v=${d.v} pr.o=${d.pr?.o ?? 0}`,
-      );
+      const after = `nm=${d.nm} acq=${d.acq} v=${d.v} pr.o=${d.pr?.o ?? 0}`;
+      console.log(`[discovery-apac] ENRICHED ${c.source} :: ${before} → ${after}`);
     } else {
       console.log(`[discovery-apac] enrich skipped (no pdf text) :: ${d.nm}`);
+    }
+
+    // Post-enrich dedup: if we held off because the name was useless and
+    // the enrich filled in a real one, dedup now.
+    if (!nameWasUseful && !isUselessName(d.nm) && existingNames.has(normalize(d.nm))) {
+      console.log(`[discovery-apac] DUP_NAME (post-enrich) :: ${d.nm} -> "${normalize(d.nm)}"`);
+      duplicates++;
+      continue;
     }
 
     const { error: insErr } = await admin.from("review_queue").insert({
@@ -361,7 +375,7 @@ export async function discoverApacDeals(
       errors.push(`queue insert ${c.url}: ${insErr.message}`);
       continue;
     }
-    existingNames.add(targetKey);
+    if (!isUselessName(d.nm)) existingNames.add(normalize(d.nm));
     if (symKey) existingSyms.add(symKey);
     seenSources.add(c.url);
     inserted++;
