@@ -276,6 +276,41 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 
 ---
 
+**Session 2026-06-07 — Extraction nm/acq dans 2e passe + chemin local enregistré** :
+
+- ✅ **Préférence "session-start" enregistrée** dans CLAUDE.md (section 9) — surface systématique des commandes PowerShell de lancement + URL locale en début de chaque session. Le **dossier de travail confirmé** côté humain est `C:\Users\loren\Documents\specialsitsintel` (sur la branche `claude/create-claude-md-memory-o4d1u`). Le dossier orphelin `C:\Users\loren\specialsitsintel` (sur `main`, juste l'initial commit) est à supprimer un jour pour éviter la confusion.
+
+- ✅ **Extraction nm/acq dans la 2e passe** (`lib/enrich.ts` + `lib/discovery-apac.ts`) — répare le pain point principal "tonnes de TBD" en queue :
+  - **Prompt enrich étendu** avec règles d'extraction `nm`/`acq` + patterns japonais (公開買付者=acquirer, 対象者/対象会社=target, schéma "AによるBの株式取得", MBO SPVs reconnus avec leurs noms "BCJ-XX 株式会社"). Le merge défensif override `nm`/`acq` UNIQUEMENT si la base est `useless` (TBD/empty/Unknown) ET le patch a un vrai nom — jamais remplacer un vrai nom 1ère passe.
+  - **EnrichPatch type étendu** avec `nm` + `acq`. Helper `isUselessName(n)` exporté pour réutilisation.
+  - **Dedup intelligent dans `discovery-apac`** : DUP_NAME skippé quand 1ère passe → `nm=TBD` (dedup sur "tbd" est non-sens et bloquait des vrais nouveaux deals). Enrich lancé AVANT le dedup, puis re-check DUP_NAME avec le nom corrigé. `existingNames.add(...)` filtre les useless pour ne jamais polluer le set.
+  - **Log ENRICHED amélioré** : montre `nm/acq/v/pr.o` before→after au lieu de juste v/pr.o.
+
+- ✅ **Test live confirmé — meilleur run APAC jamais fait** :
+  - `[discovery-apac] funnel: scanned=67 candidates=19 inserted=13` (vs 1-2 d'habitude)
+  - Extractions remarquables :
+    - 🇯🇵 TDnet `TBD / Dual Tap` → **`City Index Hospitality / Dual Tap`** + `v=¥220M`
+    - 🇯🇵 TDnet `LINK&M / TBD` → `LINK&M / **Tokio Co., Ltd. and Yuki Co., Ltd.**`
+    - 🇭🇰 HKEX `Con Aero Tech / TBD` → **`Con Aero Tech / Mobile Acquisitionco, LLC`** + `v=$535.4M pr.o=0.419`
+    - 🇦🇺 ASX `MCE Systems / TBD` → **`MCE Systems / Advanced Innergy Solutions Australia`**
+  - Workflow QUEUE MAINTENANCE complet : Enrich (+1 deal V-Tex `pr.o=10375`) → ✅ Approve all clean (**6 inserted** dans `deals` : Ayumi Pharm, G-Genie, City Index, T&D Financial, New Focus, Con Aero Tech) → 7 leftover en queue (v=TBD) pour review manuel.
+
+- ⚠️ **Petits trucs à clarifier au prochain refresh du prompt** (pas urgents) :
+  - Claude écrit parfois `acq=N/A` au lieu de `acq=TBD` (vu sur Brainchip Holdings ASX) — le prompt dit TBD, à durcir.
+  - `New Focus Auto Tech Holdings / New Focus Auto Tech Holdings` — même nom buyer/seller (la société qui disclose) ; faux positif probable, à filtrer en post-process si récurrent.
+
+**État queue à la fin de session :** 7 candidats avec `v=TBD` (Nippon Dry Chemical, Wiseman, Hakodate Wine, LINK&M, Luk Hing Entertainment, MCE Systems, Brainchip Holdings) — l'humain tranche à la main ou rejette si pas d'info supplémentaire qui arrive.
+
+**À faire à la prochaine session (ordre suggéré) :**
+1. **Lancer le 📚 DG COMP backfill pour de vrai** — le scaffold est ready depuis 2026-06-03. Premier clic, observer le 1er run de 300 cases (~6 min, ~$3-5), valider, puis re-cliquer 20-25 fois.
+2. **Per-deal source badge dans `DealTable`** — pastille à côté du nom (SEC / CMA / DG COMP / TDnet / HKEX / ASX / Seeded). UX win immédiat sur `/`.
+3. **Refresh du prompt enrich** pour fixer le `N/A` au lieu de TBD + détecter le cas "même nom buyer/seller".
+4. **Phase 5 SEC EDGAR backfill** : même pattern que DG COMP mais pour les US.
+
+**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (a7bb5ff) = "CLAUDE.md: record the confirmed local project path".
+
+---
+
 **Session 2026-06-03 — Nettoyage logs + admin UX + Phase 5 scaffold + dashboard + bulk approve + stats strip** :
 
 - ✅ **Logs propres : filtre pdfjs noise** (`lib/pdf.ts`) — helper `silencePdfjsNoise()` swap temporairement `console.log` + `console.warn` pendant l'extraction PDF et bloque 5 patterns bruyants connus (`TT: undefined function`, `loadFont`, `cMapUrl`, `Indexing all PDF objects`, `getHexString`). Vrais warnings préservés. Plus de pollution dans les terminaux dev (10-15 lignes de bruit en moins par enrich).
