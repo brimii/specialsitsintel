@@ -123,6 +123,7 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
   npm run dev
   ```
   Puis : `http://localhost:3000/admin/review` (ou `/` selon ce qu'on travaille). La branche active est `claude/create-claude-md-memory-o4d1u`.
+- **Backfill historique (Phase 5) = à faire À LA TOUTE FIN.** Tant que des features live / UX ne sont pas finalisées, ne JAMAIS proposer le backfill DG COMP / SEC EDGAR comme prochaine étape principale. Le scaffold est ready (bouton 📚 dans `/admin/review`) — on attend la consigne explicite "on attaque le backfill" avant de lancer.
 
 -----
 
