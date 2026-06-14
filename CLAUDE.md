@@ -33,6 +33,30 @@ Corollaires appliqués partout :
 
 -----
 
+## 2 bis. Règle produit (positionnement)
+
+> **Ne JAMAIS exposer aux clients les URLs source brutes** (SEC EDGAR filings, gov.uk CMA case pages, DG COMP cases, TDnet PDFs, HKEX disclosures, ASX announcements).
+
+Le produit se vend comme un **terminal d'intelligence event-driven curé par IA + validation humaine**, pas comme un agrégateur de liens. Exposer les URLs sources :
+
+- révèle que les données viennent de feeds publics gratuits → commoditise le produit ;
+- permet à un client de paster l'URL dans son propre scraper et de reproduire le service à coût quasi nul ;
+- mine la perception "premium" du terminal vs Bloomberg / Reorg / Octus.
+
+**Ce qui reste OK côté UI client** :
+- Le label de la source (badge "SEC" / "CMA" / "DG COMP" / "TDnet" / "HKEX" / "ASX") — montre la breadth de couverture sans donner le lien.
+- Le drapeau et le régulateur (`FTC`, `DOJ`, `DG COMP`...) — métadonnée standard du marché.
+- Les dates, valeurs, commentaire IA, scoring — c'est la valeur curée qu'on vend.
+
+**Ce qui doit rester côté admin uniquement** :
+- `deal_updates.source_url` (la vraie URL du filing).
+- Les boutons Discover / Enrich / Approve / Reject / Backfill.
+- Les logs de discovery.
+
+Le `/admin/review` peut montrer les URLs (c'est le panneau admin). Le `/` public ne doit JAMAIS rendre `source_url` cliquable, ni le sérialiser dans le HTML du browser.
+
+-----
+
 ## 3. La stack
 
 |Couche                   |Outil                                              |Rôle                                           |
@@ -155,6 +179,46 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - [x] Phase 3 — Pipeline de données semi-automatique ✅ (US/EU/APAC live + 2nd-pass enrichment opérationnels)
 - [ ] Phase 4 — Automatisation étendue (publication auto des changements mineurs)
 - [ ] Phase 5 — Backfill historique (voir feuille de route)
+
+**Session 2026-06-14 — Source badges + filtre source + fixes qualité enrich + règle produit "ne pas exposer les URLs"** :
+
+- ✅ **Per-deal source badge** dans `DealTable` (`app/data/deals.ts` + `lib/deals.ts` + `app/components/DealTable.tsx`) — petite pastille colorée à côté du nom du deal qui indique d'où il vient. Couleurs : SEC=cobalt, CMA=crimson, DG COMP=navy, TDnet=amber, HKEX=violet, ASX=cobalt. Bucketage via URL pattern depuis `deal_updates._creation` (cohérent avec le dashboard `/admin`).
+
+- ✅ **Heuristique source pour les 213 seeded** (`deriveSourceFromDeal()` dans `app/data/deals.ts`) — pour ne plus afficher "Seeded" gris sur les fixtures d'origine, on dérive la source du drapeau :
+  - 🇺🇸 / 🇨🇦 / 🇮🇳 / 🇸🇦 → SEC (ADR-filers)
+  - 🇬🇧 → CMA
+  - 🇩🇪 / 🇫🇷 / 🇸🇪 / 🇨🇭 / autres EU continentaux → DG COMP
+  - 🇯🇵 → TDnet · 🇭🇰 / 🇨🇳 → HKEX · 🇦🇺 / 🇳🇿 → ASX
+  - Fallback final sur `reg` (EU/APAC/US)
+  - URL réelle wins toujours quand disponible (l'heuristique n'est qu'un fallback).
+
+- ✅ **Filtre SOURCE dans la filter-bar de `/`** (`DealUniverse.tsx`) — nouvelle ligne de boutons après REGION : All / SEC / CMA / DG COMP / TDnet / HKEX / ASX. Chaque chip tinté avec la couleur de son badge. Click pour ne voir que les deals de cette source. Reset filters remet à All.
+
+- ✅ **Fixes qualité dans la 2e passe enrich** (`lib/enrich.ts` + propagation) :
+  - `isUselessName()` étendu : couvre maintenant N/A, na, not available, not disclosed, none, null, undisclosed, unknown acquirer.
+  - Prompt enrich strictement renforcé : "placeholder is ALWAYS TBD, NEVER N/A / None / Null / Not Available / etc." + règle sur self-disclosures.
+  - Nouveau helper `nmEqualsAcq()` : normalise les 2 noms (strip Inc/Corp/Ltd/Plc/Holdings/HD/Co + ponctuation) et détecte les faux positifs où la cible et l'acquéreur sont la même entité (typiquement un buyback / AGM circular / restructuring notice mal classé en M&A par la 1ère passe). Smoke-testé sur 8 cas (8/8 pass).
+  - Check `SELF_NAME` câblé dans `discovery-apac.ts`, `discovery-eu.ts`, et `approveAllClean()` (compteur `skippedSelfName` au funnel).
+  - Dedupe : 3 copies locales de `isUseless` dans `actions.ts` remplacées par le shared import.
+
+- ✅ **Règle produit "ne pas exposer les URLs source" enregistrée** (section 2 bis de CLAUDE.md) — positionnement premium du terminal vs Bloomberg/Reorg/Octus. Le label source en badge reste OK (montre la breadth), mais jamais d'URL cliquable côté client. Le scope `source_url` reste admin-only.
+
+**Commits de la session :**
+- `5f94655` — DealTable: source badge next to deal name
+- `e950f03` — Deals: derive source label from flag for seeded fixtures
+- `00ad9ce` — DealUniverse: SOURCE filter row
+- `05aa2dc` — Enrich: handle N/A placeholders + self-deal false positives
+- + CLAUDE.md (cea7252 backfill rule, af32cbf session-start rule, a7bb5ff path)
+
+**À faire à la prochaine session (ordre suggéré) :**
+1. (Optionnel) Améliorer le DealDetail panel — sans exposer les URLs, mais en montrant peut-être un meilleur layout des infos source/regulator.
+2. Refresh prompt 1ère passe pour TDnet — réduire les faux positifs où nm == acq dès la première extraction (économise un Claude call à la 2e passe).
+3. SEC EDGAR backfill scaffold (même pattern que DG COMP, deferred avec le reste du backfill à la toute fin).
+4. **Backfill historique** — reste programmé pour la TOUTE FIN (DG COMP d'abord, puis SEC EDGAR).
+
+**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (05aa2dc) = "Enrich: handle N/A placeholders + self-deal false positives".
+
+---
 
 **Session 2026-05-31 — Couverture APAC live + 2e passe + colonne Size** (état à la coupure) :
 
