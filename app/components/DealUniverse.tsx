@@ -25,6 +25,16 @@ const REGIONS = [
   { id: "APAC", label: "🌏 APAC" },
 ];
 
+const SOURCES: { id: string; label: string; style?: CSSProperties }[] = [
+  { id: "ALL", label: "All" },
+  { id: "SEC", label: "SEC", style: { color: "var(--cobalt)", borderColor: "var(--cobalt-bd)" } },
+  { id: "CMA", label: "CMA", style: { color: "var(--crimson)", borderColor: "var(--crimson-bd)" } },
+  { id: "DG COMP", label: "DG COMP", style: { color: "var(--navy)", borderColor: "var(--navy-bd)" } },
+  { id: "TDnet", label: "TDnet", style: { color: "var(--amber)", borderColor: "var(--amber-bd)" } },
+  { id: "HKEX", label: "HKEX", style: { color: "var(--violet)", borderColor: "var(--violet-bd)" } },
+  { id: "ASX", label: "ASX", style: { color: "var(--cobalt)", borderColor: "var(--cobalt-bd)" } },
+];
+
 const MONTHS: Record<string, number> = {
   Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
   Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
@@ -109,6 +119,7 @@ export default function DealUniverse({
   const locked = tier === "free";
   const [cat, setCat] = useState("ALL");
   const [reg, setReg] = useState("ALL");
+  const [src, setSrc] = useState("ALL");
   const [q, setQ] = useState("");
   const [sortF, setSortF] = useState<SortField>("spread");
   const [sortD, setSortD] = useState(-1);
@@ -120,6 +131,7 @@ export default function DealUniverse({
     const d = deals.filter((x) => {
       if (cat !== "ALL" && x.c !== cat) return false;
       if (reg !== "ALL" && x.reg !== reg) return false;
+      if (src !== "ALL" && (x.source ?? "Other") !== src) return false;
       if (ql && !(x.nm + x.acq + x.c + x.r).toLowerCase().includes(ql)) return false;
       return true;
     });
@@ -133,7 +145,7 @@ export default function DealUniverse({
       return 0;
     });
     return d;
-  }, [deals, cat, reg, q, sortF, sortD]);
+  }, [deals, cat, reg, src, q, sortF, sortD]);
 
   const selDeal = selId == null ? null : deals.find((d) => d.id === selId) ?? null;
 
@@ -147,6 +159,7 @@ export default function DealUniverse({
   const onReset = () => {
     setCat("ALL");
     setReg("ALL");
+    setSrc("ALL");
     setQ("");
   };
 
@@ -238,6 +251,18 @@ export default function DealUniverse({
                 onClick={() => setReg(r.id)}
               >
                 {r.label}
+              </button>
+            ))}
+            <div className="filter-sep" />
+            <span className="filter-label">SOURCE</span>
+            {SOURCES.map((s) => (
+              <button
+                key={s.id}
+                className={`filter-btn${src === s.id ? " active" : ""}`}
+                style={s.style}
+                onClick={() => setSrc(s.id)}
+              >
+                {s.label}
               </button>
             ))}
             <span className="count-pill" style={{ marginLeft: "auto", marginRight: "var(--sp-2)" }}>
