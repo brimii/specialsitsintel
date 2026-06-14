@@ -65,6 +65,8 @@ Japanese number units: 億 = 100M, 兆 = 1T. Output "¥45B" not "450億円".
 - NEVER replace a known company name with "TBD" or "Unknown".
 - NEVER invent numbers.
 - For \`nm\` and \`acq\`: only fill in / fix when the input value is in {"TBD", "", "Unknown", "Unknown target"}. If the input nm/acq is a real company name, return it unchanged even if the document gives you a different reading — the 1st pass had context you don't.
+- When you don't know a value, the placeholder is **always "TBD"** — never write "N/A", "N\\A", "Not Available", "Not Disclosed", "None", "Null", "Undisclosed", or any other variation. Stick to "TBD" for text fields and 0 for numeric.
+- If \`nm\` and \`acq\` would refer to the SAME entity (the disclosing company is just talking about itself — share buyback, AGM circular, restructuring notice, etc.), still return both as you found them; the caller will treat that as a non-deal. Don't try to invent a different acquirer or target to make the record look like a real M&A.
 
 # CRITICAL OUTPUT FORMAT
 
@@ -97,9 +99,36 @@ type EnrichPatch = Partial<Pick<DealLike, "nm" | "acq" | "v" | "cl" | "desc">> &
 
 // Names the 1st pass may emit when it couldn't pin down a party from the
 // headline alone. The 2nd pass is allowed to overwrite ONLY these values.
+// Includes the various "I don't know" placeholders models sometimes use
+// instead of the canonical "TBD" — n/a, none, null, etc.
 export function isUselessName(n: string | null | undefined): boolean {
   const t = (n ?? "").trim().toLowerCase();
-  return t === "" || t === "tbd" || t === "unknown" || t === "unknown target";
+  return (
+    t === "" ||
+    t === "tbd" ||
+    t === "unknown" ||
+    t === "unknown target" ||
+    t === "unknown acquirer" ||
+    t === "n/a" ||
+    t === "na" ||
+    t === "not available" ||
+    t === "not disclosed" ||
+    t === "none" ||
+    t === "null" ||
+    t === "undisclosed"
+  );
+}
+
+// True when target name and acquirer name normalise to the same entity —
+// almost always indicates the 1st-pass parsed a self-disclosure (buyback,
+// share-repurchase, AGM circular, structural notice) as if it were an
+// outside M&A transaction. Caller should treat as NOT_DEAL.
+export function nmEqualsAcq(nm: string | null | undefined, acq: string | null | undefined): boolean {
+  const a = (nm ?? "").trim().toLowerCase().replace(/[.,()]/g, "").replace(/\s+(inc|corp|ltd|plc|holdings|group|hd|co)\.?$/, "").trim();
+  const b = (acq ?? "").trim().toLowerCase().replace(/[.,()]/g, "").replace(/\s+(inc|corp|ltd|plc|holdings|group|hd|co)\.?$/, "").trim();
+  if (!a || !b) return false;
+  if (isUselessName(a) || isUselessName(b)) return false;
+  return a === b;
 }
 
 // Call Claude with the disclosure document and merge the returned patch

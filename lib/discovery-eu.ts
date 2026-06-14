@@ -4,7 +4,7 @@ import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic
 import { fetchCmaCases, fetchCmaCaseText, findCmaCasePdf, type CmaCase } from "@/lib/sources/cma";
 import { fetchDgCompCases, fetchDgCompCaseText, type DgCompCase } from "@/lib/sources/dg-comp";
 import { fetchPdfText } from "@/lib/pdf";
-import { enrichDealFromDocument, type DealLike } from "@/lib/enrich";
+import { enrichDealFromDocument, nmEqualsAcq, type DealLike } from "@/lib/enrich";
 
 // ════════════════════════════════════════════════════════════════════
 // European discovery — UK CMA + EU Commission DG COMP.
@@ -275,6 +275,14 @@ export async function discoverEuDeals(opts: { daysBack?: number; maxCases?: numb
       }
     } else {
       console.log(`[discovery-eu] no decision pdf found :: ${c.source} :: ${d.nm}`);
+    }
+
+    // Self-disclosure check: same entity as target and acquirer = not a
+    // real M&A, drop it.
+    if (nmEqualsAcq(d.nm, d.acq)) {
+      console.log(`[discovery-eu] SELF_NAME :: ${d.nm} == ${d.acq}`);
+      notDeal++;
+      continue;
     }
 
     const { error: insErr } = await admin.from("review_queue").insert({

@@ -6,7 +6,7 @@ import { fetchHkexDisclosures, type HkexDisclosure } from "@/lib/sources/hkex";
 import { fetchAsxDisclosures, type AsxDisclosure } from "@/lib/sources/asx";
 import { fetchSgxDisclosures, type SgxDisclosure } from "@/lib/sources/sgx";
 import { fetchPdfText } from "@/lib/pdf";
-import { enrichDealFromDocument, isUselessName, type DealLike } from "@/lib/enrich";
+import { enrichDealFromDocument, isUselessName, nmEqualsAcq, type DealLike } from "@/lib/enrich";
 
 type ApacDisclosure = TdnetDisclosure | HkexDisclosure | AsxDisclosure | SgxDisclosure;
 
@@ -362,6 +362,15 @@ export async function discoverApacDeals(
     if (!nameWasUseful && !isUselessName(d.nm) && existingNames.has(normalize(d.nm))) {
       console.log(`[discovery-apac] DUP_NAME (post-enrich) :: ${d.nm} -> "${normalize(d.nm)}"`);
       duplicates++;
+      continue;
+    }
+
+    // Self-disclosure check: if the target and acquirer normalise to the
+    // same entity, the 1st pass parsed a buyback / AGM / restructuring
+    // notice as an M&A. Drop it — these are never real deals.
+    if (nmEqualsAcq(d.nm, d.acq)) {
+      console.log(`[discovery-apac] SELF_NAME :: ${d.nm} == ${d.acq}`);
+      notDeal++;
       continue;
     }
 

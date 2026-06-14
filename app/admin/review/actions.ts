@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { createAdminClient } from "@/lib/supabase/server";
+import { isUselessName, nmEqualsAcq } from "@/lib/enrich";
 
 // Module-level locks: prevent concurrent runs of the same long-running action.
 // In Next dev (single process) this is enough — clicking the button twice
@@ -405,12 +406,6 @@ export async function reEnrichQueueItems(): Promise<void> {
     let skippedNoName = 0;
     let skippedDupUrl = 0;
 
-    // Skip deals whose name carries no useful signal — saves a Claude call
-    // and avoids polluting the audit log with "TBD → TBD" no-ops.
-    const isUselessName = (n: string | null | undefined): boolean => {
-      const t = (n ?? "").trim().toLowerCase();
-      return t === "" || t === "tbd" || t === "unknown" || t === "unknown target";
-    };
 
     // Dedup within the deals pass: if two deal rows share the same
     // _creation source_url (same M&A approved twice into the DB), only
@@ -586,17 +581,13 @@ export async function rejectAllTbd(): Promise<void> {
       console.error("[rejectAllTbd] query failed:", error.message);
       return;
     }
-    const isUseless = (n: string | null | undefined): boolean => {
-      const t = (n ?? "").trim().toLowerCase();
-      return t === "" || t === "tbd" || t === "unknown" || t === "unknown target";
-    };
     const toReject: string[] = [];
     for (const item of (items ?? []) as Array<{ id: string; proposition: unknown }>) {
       const prop = item.proposition as
         | { kind?: string; deal?: { nm?: string } }
         | null;
       if (prop?.kind !== "new_deal") continue;
-      if (isUseless(prop.deal?.nm)) toReject.push(item.id);
+      if (isUselessName(prop.deal?.nm)) toReject.push(item.id);
     }
     if (toReject.length === 0) {
       console.log("[rejectAllTbd] no TBD items to reject");
@@ -638,11 +629,6 @@ export async function approveAllClean(): Promise<void> {
       return;
     }
 
-    const isUseless = (n: string | null | undefined): boolean => {
-      const t = (n ?? "").trim().toLowerCase();
-      return t === "" || t === "tbd" || t === "unknown" || t === "unknown target";
-    };
-
     type CleanDeal = {
       nm: string;
       acq?: string;
@@ -669,6 +655,7 @@ export async function approveAllClean(): Promise<void> {
     let skippedNoName = 0;
     let skippedNoValue = 0;
     let skippedLowConf = 0;
+    let skippedSelfName = 0;
     let skippedUpdates = 0;
 
     for (const item of items as Array<{
@@ -686,12 +673,19 @@ export async function approveAllClean(): Promise<void> {
         continue;
       }
       const d = prop.deal;
-      if (isUseless(d.nm)) {
+      if (isUselessName(d.nm)) {
         skippedNoName++;
         continue;
       }
       if (!d.v || d.v.trim().toUpperCase() === "TBD" || d.v.trim() === "") {
         skippedNoValue++;
+        continue;
+      }
+      // Self-disclosure check: target == acquirer means the 1st-pass
+      // parsed a buyback / AGM / restructuring notice as if it were an
+      // M&A. Don't ship these into deals.
+      if (nmEqualsAcq(d.nm, d.acq)) {
+        skippedSelfName++;
         continue;
       }
       const conf = item.confiance ?? 0;
@@ -775,7 +769,7 @@ export async function approveAllClean(): Promise<void> {
     console.log(
       `[approveAllClean] DONE :: inserted=${inserted} errors=${errors} ` +
         `(skipped: noName=${skippedNoName} noValue=${skippedNoValue} ` +
-        `lowConf=${skippedLowConf} updates=${skippedUpdates})`,
+        `lowConf=${skippedLowConf} selfName=${skippedSelfName} updates=${skippedUpdates})`,
     );
     revalidatePath("/admin/review");
     revalidatePath("/admin");
