@@ -1,5 +1,5 @@
 import "server-only";
-import { DEALS, bucketSourceFromUrl, type Deal, type Price, type TimelineEntry } from "@/app/data/deals";
+import { DEALS, bucketSourceFromUrl, deriveSourceFromDeal, type Deal, type Price, type TimelineEntry } from "@/app/data/deals";
 
 export type Tier = "free" | "analyst" | "institutional" | "enterprise";
 
@@ -78,8 +78,20 @@ function rowToDeal(r: DealRow): Deal {
   };
 }
 
+// Pick the best source label for a deal: prefer a real bucketed URL from
+// deal_updates._creation, fall back to the flag/region heuristic for the
+// seeded 213 fixtures so every deal shows a meaningful badge.
+function pickSource(deal: Deal, urlBucket: string | undefined): string {
+  if (urlBucket && urlBucket !== "Seeded" && urlBucket !== "Other") return urlBucket;
+  return deriveSourceFromDeal(deal);
+}
+
 async function fetchAllRawDeals(): Promise<Deal[]> {
-  if (!hasSupabase) return DEALS;
+  if (!hasSupabase) {
+    // Local fixture mode: no Supabase, derive each deal's source from
+    // its flag/region so the dealtable badge still works.
+    return DEALS.map((d) => ({ ...d, source: deriveSourceFromDeal(d) }));
+  }
   const { createAdminClient } = await import("./supabase/server");
   const supabase = createAdminClient();
   const [dealsRes, creationsRes] = await Promise.all([
@@ -91,18 +103,21 @@ async function fetchAllRawDeals(): Promise<Deal[]> {
   ]);
   if (dealsRes.error) {
     console.error("[deals] Supabase read failed, falling back to local:", dealsRes.error.message);
-    return DEALS;
+    return DEALS.map((d) => ({ ...d, source: deriveSourceFromDeal(d) }));
   }
-  // Map deal_id → source_url so each deal gets a "Seeded" / "SEC" / "CMA"
-  // / "DG COMP" / "TDnet" / "HKEX" / "ASX" badge label. Missing creation
-  // row = the deal was seeded (213 fixtures) and has no traceable source.
+  // Map deal_id → source_url so each deal gets a badge label. Missing
+  // creation row = the deal was seeded (213 fixtures) and has no
+  // traceable source, so we fall back to the flag heuristic.
   const sourceUrlByDealId = new Map<number, string>();
   for (const row of (creationsRes.data ?? []) as Array<{ deal_id: number; source_url: string | null }>) {
     if (row.source_url) sourceUrlByDealId.set(row.deal_id, row.source_url);
   }
   return (dealsRes.data as DealRow[]).map((r) => {
     const deal = rowToDeal(r);
-    deal.source = bucketSourceFromUrl(sourceUrlByDealId.get(r.id));
+    const urlBucket = sourceUrlByDealId.has(r.id)
+      ? bucketSourceFromUrl(sourceUrlByDealId.get(r.id))
+      : undefined;
+    deal.source = pickSource(deal, urlBucket);
     return deal;
   });
 }

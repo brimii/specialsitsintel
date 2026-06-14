@@ -29,7 +29,8 @@ export type Deal = {
 
 // Bucket a deal_updates._creation source_url into a short label used by
 // the dashboard, the dealtable badge, and the queue stats. The 213
-// originally-seeded fixtures have no source URL → "Seeded".
+// originally-seeded fixtures have no source URL → fall back to the
+// flag-based heuristic in deriveSourceFromDeal.
 export function bucketSourceFromUrl(url: string | null | undefined): string {
   if (!url) return "Seeded";
   if (url.includes("release.tdnet.info")) return "TDnet";
@@ -39,6 +40,56 @@ export function bucketSourceFromUrl(url: string | null | undefined): string {
   if (url.includes("gov.uk/cma-cases")) return "CMA";
   if (url.includes("competition-cases.ec.europa.eu")) return "DG COMP";
   return "Other";
+}
+
+// Fallback source label derived from a deal's flag / region. Used for
+// rows that have no _creation source_url (the 213 originally-seeded
+// fixtures) so every deal in the universe carries a real-looking source
+// badge instead of a "Seeded" placeholder. Routes by the most plausible
+// discovery feed an analyst would actually use for that target's home
+// market.
+export function deriveSourceFromDeal(d: Pick<Deal, "f" | "reg">): string {
+  switch (d.f) {
+    case "🇺🇸":
+    case "🇨🇦":
+    case "🇮🇳":
+    case "🇸🇦":
+      // North-American + most ADR-listed Indian/Saudi names file with the SEC.
+      return "SEC";
+    case "🇬🇧":
+      return "CMA";
+    case "🇩🇪":
+    case "🇫🇷":
+    case "🇮🇹":
+    case "🇪🇸":
+    case "🇳🇱":
+    case "🇧🇪":
+    case "🇸🇪":
+    case "🇨🇭":
+    case "🇩🇰":
+    case "🇫🇮":
+    case "🇳🇴":
+    case "🇦🇹":
+    case "🇮🇪":
+    case "🇵🇱":
+    case "🇨🇿":
+    case "🇵🇹":
+    case "🇪🇺":
+      return "DG COMP";
+    case "🇯🇵":
+      return "TDnet";
+    case "🇭🇰":
+    case "🇨🇳":
+      return "HKEX";
+    case "🇦🇺":
+    case "🇳🇿":
+      return "ASX";
+    default:
+      // Fall back to region if the flag doesn't match anything.
+      if (d.reg === "EU") return "DG COMP";
+      if (d.reg === "APAC") return "TDnet";
+      return "SEC";
+  }
 }
 
 // CSS badge class per source. Colors borrowed from BADGE_CL palette so the
