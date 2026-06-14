@@ -112,7 +112,7 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - **Montrer avant d’enregistrer** les fichiers de configuration sensibles (SQL, env, webhooks).
 - Après chaque étape qui marche : proposer un **commit** et signaler s’il faut mettre à jour ce `CLAUDE.md`.
 - En cas d’erreur : demander l’erreur brute complète, donner la cause probable en langage simple, la correction minimale, et comment vérifier.
-- **Au début de chaque nouvelle session côté humain** : rappeler en premier message les commandes PowerShell pour lancer le projet localement + l'URL locale à ouvrir dans le navigateur. Le **dossier de travail confirmé** côté humain est :
+- **À CHAQUE début de session côté humain — RÈGLE STRICTE** : le PREMIER message doit OBLIGATOIREMENT contenir les commandes PowerShell pour lancer le projet localement + l'URL locale à ouvrir dans le navigateur. Si l'utilisateur dit "nouvelle session", "on reprend", "on continue", ou ouvre une fenêtre PowerShell, donner immédiatement le bloc complet — sans attendre qu'il demande. Le **dossier de travail confirmé** côté humain est :
   ```
   C:\Users\loren\Documents\specialsitsintel
   ```
