@@ -24,6 +24,34 @@ export type Deal = {
   ai: string;
   tl: TimelineEntry[];
   min_tier?: string; // palier minimum requis (défaut: analyst)
+  source?: string; // discovery source label (SEC / CMA / DG COMP / TDnet / HKEX / ASX / Seeded)
+};
+
+// Bucket a deal_updates._creation source_url into a short label used by
+// the dashboard, the dealtable badge, and the queue stats. The 213
+// originally-seeded fixtures have no source URL → "Seeded".
+export function bucketSourceFromUrl(url: string | null | undefined): string {
+  if (!url) return "Seeded";
+  if (url.includes("release.tdnet.info")) return "TDnet";
+  if (url.includes("hkexnews.hk")) return "HKEX";
+  if (url.includes("asx.com.au")) return "ASX";
+  if (url.includes("sec.gov")) return "SEC";
+  if (url.includes("gov.uk/cma-cases")) return "CMA";
+  if (url.includes("competition-cases.ec.europa.eu")) return "DG COMP";
+  return "Other";
+}
+
+// CSS badge class per source. Colors borrowed from BADGE_CL palette so the
+// dealtable badge feels consistent with the category badge.
+export const SOURCE_BADGE_CL: Record<string, string> = {
+  SEC: "badge-cobalt",
+  CMA: "badge-crimson",
+  "DG COMP": "badge-navy",
+  TDnet: "badge-amber",
+  HKEX: "badge-violet",
+  ASX: "badge-cobalt",
+  Seeded: "badge-gray",
+  Other: "badge-gray",
 };
 
 export const BADGE_CL: Record<string, string> = {

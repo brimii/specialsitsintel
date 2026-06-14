@@ -1,20 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { bucketSourceFromUrl } from "@/app/data/deals";
 
 const PRICE: Record<string, number> = { analyst: 150, institutional: 600, enterprise: 2500 };
 
-// Map a source URL to a short label. Used to bucket deals + queue items by
-// the regulator / exchange they came from. URLs not in this list (typically
-// the 213 originally-seeded fixtures) get bucketed as "Seeded".
-function sourceLabel(url: string | null | undefined): string {
-  if (!url) return "Seeded";
-  if (url.includes("release.tdnet.info")) return "TDnet";
-  if (url.includes("hkexnews.hk")) return "HKEX";
-  if (url.includes("asx.com.au")) return "ASX";
-  if (url.includes("sec.gov")) return "SEC";
-  if (url.includes("gov.uk/cma-cases")) return "CMA";
-  if (url.includes("competition-cases.ec.europa.eu")) return "DG COMP";
-  return "Other";
-}
+// Re-export the shared source bucketer under the local name the rest of
+// this file used to call. Same behaviour, dedupes the helper.
+const sourceLabel = bucketSourceFromUrl;
 
 function fmtRelative(iso: string | null | undefined): string {
   if (!iso) return "—";

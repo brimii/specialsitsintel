@@ -1,5 +1,5 @@
 import "server-only";
-import { DEALS, type Deal, type Price, type TimelineEntry } from "@/app/data/deals";
+import { DEALS, bucketSourceFromUrl, type Deal, type Price, type TimelineEntry } from "@/app/data/deals";
 
 export type Tier = "free" | "analyst" | "institutional" | "enterprise";
 
@@ -82,15 +82,29 @@ async function fetchAllRawDeals(): Promise<Deal[]> {
   if (!hasSupabase) return DEALS;
   const { createAdminClient } = await import("./supabase/server");
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("deals")
-    .select("*")
-    .order("spread", { ascending: false });
-  if (error) {
-    console.error("[deals] Supabase read failed, falling back to local:", error.message);
+  const [dealsRes, creationsRes] = await Promise.all([
+    supabase.from("deals").select("*").order("spread", { ascending: false }),
+    supabase
+      .from("deal_updates")
+      .select("deal_id, source_url")
+      .eq("champ_modifie", "_creation"),
+  ]);
+  if (dealsRes.error) {
+    console.error("[deals] Supabase read failed, falling back to local:", dealsRes.error.message);
     return DEALS;
   }
-  return (data as DealRow[]).map(rowToDeal);
+  // Map deal_id → source_url so each deal gets a "Seeded" / "SEC" / "CMA"
+  // / "DG COMP" / "TDnet" / "HKEX" / "ASX" badge label. Missing creation
+  // row = the deal was seeded (213 fixtures) and has no traceable source.
+  const sourceUrlByDealId = new Map<number, string>();
+  for (const row of (creationsRes.data ?? []) as Array<{ deal_id: number; source_url: string | null }>) {
+    if (row.source_url) sourceUrlByDealId.set(row.deal_id, row.source_url);
+  }
+  return (dealsRes.data as DealRow[]).map((r) => {
+    const deal = rowToDeal(r);
+    deal.source = bucketSourceFromUrl(sourceUrlByDealId.get(r.id));
+    return deal;
+  });
 }
 
 // All ACTIVE deals (aggregated stats — used by the KPI bar).

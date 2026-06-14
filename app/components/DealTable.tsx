@@ -1,4 +1,4 @@
-import { type Deal, pcol, ecol, dealCapUSD, fmtCap, BADGE_CL, CLS } from "../data/deals";
+import { type Deal, pcol, ecol, dealCapUSD, fmtCap, BADGE_CL, CLS, SOURCE_BADGE_CL } from "../data/deals";
 
 export type SortField = "name" | "size" | "spread" | "prob" | "ev" | "date";
 
@@ -77,8 +77,17 @@ export default function DealTable({
                 onClick={() => onSelect(deal.id)}
               >
                 <div>
-                  <div className="deal-name">
-                    {deal.f} {deal.nm}
+                  <div className="deal-name" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span>{deal.f} {deal.nm}</span>
+                    {deal.source ? (
+                      <span
+                        className={`badge ${SOURCE_BADGE_CL[deal.source] ?? "badge-gray"}`}
+                        style={{ fontSize: 7.5, padding: "1px 5px", letterSpacing: ".06em" }}
+                        title={`Discovery source: ${deal.source}`}
+                      >
+                        {deal.source}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="deal-sub">{sub}</div>
                 </div>
