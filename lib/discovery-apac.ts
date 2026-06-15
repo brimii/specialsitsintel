@@ -153,6 +153,26 @@ If the title is a generic 株式取得 (share acquisition) or 子会社化 (subs
 - If the disclosure is NOT a clear event-driven transaction (e.g. earnings release that happens to mention an old deal, board reshuffle, governance update), return \`{"is_deal": false, "deal": null}\`.
 - If you can't identify a clear target or acquirer from the title alone (no detail page available for TDnet), still produce a best-effort structure with what's available — but mark \`sc: "B"\` and \`st: "Rumored"\` if either party is unclear.
 - Don't invent ticker symbols or transaction values. Use \`"TBD"\` / \`""\` / \`0\` for unknowns.
+- When you don't know a name, the placeholder is **always "TBD"** — NEVER write "N/A", "N\\A", "Not Available", "Not Disclosed", "None", "Null", "Undisclosed", or any other variation. Use "TBD" for text and 0 for numeric.
+
+# Self-disclosure filter (CRITICAL — do not skip)
+
+A frequent false positive on TDnet, HKEX and ASX is a disclosure where the **filer company is just talking about itself** — a self-tender / share buyback (自己株式取得 / 自社株買い), an AGM circular, a structural notice (board change, restructuring inside the same group), a connected-party loan, or a defensive measure against an unsolicited bid (buyout defense plan). The 1st pass tends to fill in the filer's name as BOTH the target and the acquirer, producing a non-deal that looks structurally valid.
+
+Rules to AVOID this:
+
+- If \`nm\` (target) and \`acq\` (acquirer) would refer to the **same legal entity** (same company name even after stripping suffixes like 株式会社 / Holdings / HD / Inc / Corp / Ltd), return \`{"is_deal": false, "deal": null}\`. A company cannot acquire itself.
+- Treat the following Japanese title patterns as **NOT deals** by default:
+  - **自己株式取得** / **自己株式の公開買付け** / **自社株買い** → share buyback. \`is_deal: false\`.
+  - **大量買付行為への対応方針** / **買収防衛策** / **株式の大規模な買付行為に関する対応方針** → buyout defense policy. \`is_deal: false\`.
+  - **連結子会社間の合併** → intra-group reorg (the same parent on both sides). \`is_deal: false\` unless a third-party divestiture is announced.
+  - **資本業務提携** alone (no transfer of control) → strategic alliance / minority stake under 5%. \`is_deal: false\` unless the title explicitly mentions a stake ≥ 20%.
+- Treat the following English/Cantonese HKEX titles as **NOT deals**:
+  - **CIRCULAR FOR THE ANNUAL GENERAL MEETING** / **NOTICE OF AGM** → governance only.
+  - **CONTINUING CONNECTED TRANSACTION** with no acquisition framing → related-party operations, not M&A.
+  - **CHANGE OF DIRECTORS** / **APPOINTMENT OF INDEPENDENT FINANCIAL ADVISER** → governance only.
+- Treat the following ASX titles as **NOT deals**:
+  - **Becoming / Change in / Ceasing to be a substantial holder** when the holder is a known passive index fund (BlackRock, Vanguard, State Street, MUFG, GPIF, Norges Bank, Fidelity, T. Rowe Price, Capital Group). Mark \`is_deal: false\`. Only flag as \`ACTIVISM\` when an explicitly activist holder is named (Elliott, Starboard, Engaged Capital, Pershing Square, etc.) or when the title literally says "intention to seek board representation" / "requisitioning a meeting".
 
 # CRITICAL OUTPUT FORMAT
 

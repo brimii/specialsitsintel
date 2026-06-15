@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { type Deal, pcol, ecol, SC, SC_HEX } from "../data/deals";
+import { type Deal, pcol, ecol, SC, SC_HEX, SOURCE_BADGE_CL } from "../data/deals";
 import { STRATS } from "../data/content";
 import PriceChart from "./PriceChart";
 
@@ -38,14 +38,50 @@ export default function DealDetail({ deal, locked = false }: { deal: Deal | null
         ? deal.acq
         : deal.v;
 
+  // Build a small "ticker · announced" suffix that doesn't leak the
+  // discovery URL but still gives the analyst the public listing reference
+  // (ticker symbol + announcement month) — same kind of metadata Bloomberg
+  // surfaces in its security header.
+  const tickerBits: string[] = [];
+  if (deal.pr?.sym) tickerBits.push(deal.pr.sym);
+  if (deal.pr?.ad) tickerBits.push(`announced ${deal.pr.ad}`);
+  const tickerLine = tickerBits.length > 0 ? tickerBits.join(" · ") : "";
+
   return (
     <div className="deal-detail">
-      <div className="deal-detail-name">
-        {deal.f} {deal.nm}
+      <div
+        className="deal-detail-name"
+        style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+      >
+        <span>
+          {deal.f} {deal.nm}
+        </span>
+        {deal.source ? (
+          <span
+            className={`badge ${SOURCE_BADGE_CL[deal.source] ?? "badge-gray"}`}
+            style={{ fontSize: 8, padding: "2px 6px", letterSpacing: ".06em" }}
+            title={`Discovery source: ${deal.source}`}
+          >
+            {deal.source}
+          </span>
+        ) : null}
       </div>
       <div className="deal-detail-meta">
         {meta} · {deal.cl}
       </div>
+      {tickerLine ? (
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 9.5,
+            color: "var(--text-3)",
+            marginTop: 2,
+            marginBottom: "var(--sp-3)",
+          }}
+        >
+          {tickerLine}
+        </div>
+      ) : null}
 
       <div className="kpi-mini-grid">
         <div className="kpi-mini">
@@ -140,6 +176,15 @@ export default function DealDetail({ deal, locked = false }: { deal: Deal | null
       <div className="section-title">Regulatory</div>
       <div className="reg-row">
         <span className="reg-name">{deal.r}</span>
+        {deal.source ? (
+          <span
+            className={`badge ${SOURCE_BADGE_CL[deal.source] ?? "badge-gray"}`}
+            style={{ fontSize: 8, padding: "2px 6px", letterSpacing: ".06em", marginLeft: 6 }}
+            title={`Discovery source: ${deal.source}`}
+          >
+            {deal.source}
+          </span>
+        ) : null}
         <span
           className="reg-status"
           style={{ background: `${sHex}1f`, color: sHex, border: `1px solid ${sHex}3d` }}
