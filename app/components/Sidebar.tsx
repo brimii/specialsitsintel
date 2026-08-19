@@ -25,6 +25,22 @@ export default function Sidebar() {
   const { open } = useModal();
   const [mobOpen, setMobOpen] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
+  // Live date shown in the header pill. Initialised empty to avoid an SSR /
+  // client hydration mismatch (server clock may drift from the browser's),
+  // then filled in on mount + refreshed at the next midnight so the pill
+  // always reads today's date without a hard reload.
+  const [today, setToday] = useState<string>("");
+
+  useEffect(() => {
+    const fmt = (d: Date) =>
+      d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    setToday(fmt(new Date()));
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 0, 0);
+    const t = setTimeout(() => setToday(fmt(new Date())), nextMidnight.getTime() - now.getTime());
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -73,7 +89,7 @@ export default function Sidebar() {
             </span>
             <div className="live-pill">
               <span className="live-dot" />
-              LIVE · May 23, 2026
+              <span suppressHydrationWarning>LIVE{today ? ` · ${today}` : ""}</span>
             </div>
           </div>
         </div>
