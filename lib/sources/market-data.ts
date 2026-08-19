@@ -79,16 +79,34 @@ export function guessExchange(
   return "UNKNOWN";
 }
 
+// Normalise a raw ticker string before applying an exchange suffix.
+// Handles composite entries ("CRBG / EQH" → "CRBG") we sometimes see
+// on multi-party deals + strips whitespace / any stray suffix.
+function cleanTickerBase(ticker: string): string {
+  const first = ticker.split(/[\/,;]/)[0]?.trim() ?? "";
+  return first.toUpperCase().replace(/\s+/g, "");
+}
+
 function toYahooSymbol(ticker: string, exchange: ExchangeHint): string {
-  const t = ticker.trim().toUpperCase();
+  const t = cleanTickerBase(ticker);
   switch (exchange) {
     case "LSE":
       return t.endsWith(".L") ? t : `${t}.L`;
     case "TSE":
       return t.match(/\.T$/i) ? t : `${t}.T`;
-    case "HKEX":
-      // Yahoo HKEX = 4-digit code + ".HK" (strip leading zeros of 5-digit)
-      return `${t.replace(/^0+/, "")}.HK`;
+    case "HKEX": {
+      // Shanghai A-share (6-digit code starting with 6) ends up here when
+      // classified as "HKEX" by our flag heuristic — actually needs .SS.
+      // Shenzhen A-share (6-digit starting with 0/3) needs .SZ.
+      if (/^\d{6}$/.test(t)) {
+        if (t.startsWith("6")) return `${t}.SS`;
+        return `${t}.SZ`;
+      }
+      // Genuine HKEX: pad to 4 digits, not strip. "00513" → "0513", not "513".
+      const digits = t.replace(/\D/g, "");
+      const padded = digits.padStart(4, "0").slice(-4);
+      return `${padded}.HK`;
+    }
     case "ASX":
       return t.endsWith(".AX") ? t : `${t}.AX`;
     case "SGX":
@@ -264,6 +282,29 @@ async function fetchYahooBatch(
     );
     for (const p of results) if (p) out.set(p.ticker, p);
   }
+
+  // Retry pass: for tickers that failed with a SUFFIXED symbol, retry
+  // with the naked ticker. This catches the common "wrong exchange"
+  // case where a deal flagged 🇬🇧 (guessed LSE) actually targets a US
+  // company (McCormick MKC, Getty GETY, Prologis PLD, etc.) and needs
+  // the plain ticker without .L / .PA / .DE.
+  const nakedRetry = entries.filter(([ticker, symbol]) => {
+    if (out.has(ticker)) return false;
+    const base = cleanTickerBase(ticker);
+    // Only retry if we actually applied a suffix (naked ticker already tried).
+    return symbol !== base;
+  });
+  if (nakedRetry.length > 0) {
+    console.log(`[market-data] yahoo retry naked: ${nakedRetry.length} tickers`);
+    for (let i = 0; i < nakedRetry.length; i += YAHOO_CONCURRENCY) {
+      const wave = nakedRetry.slice(i, i + YAHOO_CONCURRENCY);
+      const results = await Promise.all(
+        wave.map(([ticker]) => fetchYahooOne(ticker, cleanTickerBase(ticker))),
+      );
+      for (const p of results) if (p) out.set(p.ticker, p);
+    }
+  }
+
   console.log(`[market-data] yahoo returned ${out.size}/${entries.length} prices`);
   return out;
 }
