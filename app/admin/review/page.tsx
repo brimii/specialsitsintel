@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems, rejectAllTbd, approveAllClean, runDgCompHistoricalBatch } from "./actions";
+import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems, rejectAllTbd, approveAllClean, runDgCompHistoricalBatch, refreshMarketPricesNow } from "./actions";
 import { SubmitButton } from "./SubmitButton";
 import { PendingBar } from "../PendingBar";
 
@@ -104,7 +104,7 @@ export default async function AdminReview() {
 
         <ToolbarGroup
           label="QUEUE MAINTENANCE"
-          hint="Workflow: enrich missing prices → bulk-approve clean items (nm valid + v ≠ TBD + confiance ≥ 75) → reject the leftover TBD junk."
+          hint="Workflow: enrich missing prices → bulk-approve clean items (nm valid + v ≠ TBD + confiance ≥ 75) → reject the leftover TBD junk. Refresh market prices pulls live pr.u for T1/T2 deals via the Yahoo → Finnhub → Twelve Data → Alpha Vantage waterfall (15-min cache, batch endpoints, daily quota hard-stops)."
         >
           <form action={reEnrichQueueItems}>
             <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Enriching prices… (~1-3 min)">
@@ -121,6 +121,12 @@ export default async function AdminReview() {
           <form action={rejectAllTbd}>
             <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Rejecting…">
               🗑 Reject TBD items
+            </SubmitButton>
+            <PendingBar />
+          </form>
+          <form action={refreshMarketPricesNow}>
+            <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Refreshing prices… (~30s)">
+              📊 Refresh market prices
             </SubmitButton>
             <PendingBar />
           </form>

@@ -20,6 +20,7 @@ const locks: Record<string, Promise<void> | null> = {
   rejectAllTbd: null,
   approveAllClean: null,
   dgCompBackfill: null,
+  refreshMarketPrices: null,
 };
 
 async function withLock(key: keyof typeof locks, fn: () => Promise<void>): Promise<void> {
@@ -1055,6 +1056,22 @@ ${pdfText}`;
       `[dgCompBackfill] DONE :: inserted=${inserted} dup=${skippedDup} notDeal=${skippedNotDeal} ` +
         `noPdf=${skippedNoPdf} errors=${errors} remaining≈${todo.length - batch.length}`,
     );
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath("/archive");
+  });
+}
+
+// Market price refresh — tiered by deal urgency, waterfall through
+// providers. Full logic lives in lib/sources/market-data.ts so both this
+// server-action (admin-gated) and the Vercel cron (CRON_SECRET-gated)
+// share the same code path.
+export async function refreshMarketPricesNow(): Promise<void> {
+  await withLock("refreshMarketPrices", async () => {
+    await requireAdmin();
+    const { runMarketPriceRefresh } = await import("@/lib/sources/market-data");
+    await runMarketPriceRefresh();
     revalidatePath("/admin/review");
     revalidatePath("/admin");
     revalidatePath("/");
