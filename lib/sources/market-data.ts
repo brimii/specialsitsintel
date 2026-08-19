@@ -283,15 +283,12 @@ async function fetchYahooBatch(
     for (const p of results) if (p) out.set(p.ticker, p);
   }
 
-  // Retry pass: for tickers that failed with a SUFFIXED symbol, retry
-  // with the naked ticker. This catches the common "wrong exchange"
-  // case where a deal flagged 🇬🇧 (guessed LSE) actually targets a US
-  // company (McCormick MKC, Getty GETY, Prologis PLD, etc.) and needs
-  // the plain ticker without .L / .PA / .DE.
+  // Retry pass 1: naked ticker for suffix-guessed tickers that failed.
+  // Catches the "wrong exchange" case where a deal flagged 🇬🇧 (guessed
+  // LSE) actually targets a US company (MKC, GETY, PLD, LEG on NYSE).
   const nakedRetry = entries.filter(([ticker, symbol]) => {
     if (out.has(ticker)) return false;
     const base = cleanTickerBase(ticker);
-    // Only retry if we actually applied a suffix (naked ticker already tried).
     return symbol !== base;
   });
   if (nakedRetry.length > 0) {
@@ -300,6 +297,24 @@ async function fetchYahooBatch(
       const wave = nakedRetry.slice(i, i + YAHOO_CONCURRENCY);
       const results = await Promise.all(
         wave.map(([ticker]) => fetchYahooOne(ticker, cleanTickerBase(ticker))),
+      );
+      for (const p of results) if (p) out.set(p.ticker, p);
+    }
+  }
+
+  // Retry pass 2: LSE suffix for EURONEXT-guessed tickers still missing.
+  // Many "European" deals surfaced by DG COMP actually target UK-listed
+  // targets (Schroders SDR = SDR.L, not SDR / SDR.PA).
+  const lseRetry = entries.filter(([ticker, symbol]) => {
+    if (out.has(ticker)) return false;
+    return /\.PA$|\.AS$/.test(symbol); // was tried as Euronext
+  });
+  if (lseRetry.length > 0) {
+    console.log(`[market-data] yahoo retry LSE: ${lseRetry.length} tickers`);
+    for (let i = 0; i < lseRetry.length; i += YAHOO_CONCURRENCY) {
+      const wave = lseRetry.slice(i, i + YAHOO_CONCURRENCY);
+      const results = await Promise.all(
+        wave.map(([ticker]) => fetchYahooOne(ticker, `${cleanTickerBase(ticker)}.L`)),
       );
       for (const p of results) if (p) out.set(p.ticker, p);
     }
@@ -640,22 +655,27 @@ export async function runMarketPriceRefresh(opts?: {
 
   // Diagnostic: which tickers didn't resolve on ANY provider? Group by
   // exchange so we spot patterns (e.g. all 🇨🇳 tickers → HKEX suffix
-  // wrong, all 🇸🇦 → provider doesn't cover Tadawul, etc.).
+  // wrong, all 🇸🇦 → provider doesn't cover Tadawul, etc.). Dedup by
+  // (exchange, ticker) so N deals sharing one ticker only print once.
   const unresolved = requests.filter((r) => !prices.has(r.ticker));
   if (unresolved.length > 0) {
-    const byExchange = new Map<string, string[]>();
+    const byExchange = new Map<string, Set<string>>();
     for (const r of unresolved) {
-      const bucket = byExchange.get(r.exchange) ?? [];
-      bucket.push(r.ticker);
+      const bucket = byExchange.get(r.exchange) ?? new Set<string>();
+      bucket.add(r.ticker);
       byExchange.set(r.exchange, bucket);
     }
-    console.log(`[refreshMarketPrices] unresolved=${unresolved.length} — by exchange:`);
+    const totalUnique = Array.from(byExchange.values()).reduce((n, s) => n + s.size, 0);
+    console.log(
+      `[refreshMarketPrices] unresolved=${unresolved.length} rows (${totalUnique} unique tickers) — by exchange:`,
+    );
     for (const [ex, tickers] of Array.from(byExchange.entries()).sort(
-      (a, b) => b[1].length - a[1].length,
+      (a, b) => b[1].size - a[1].size,
     )) {
-      const sample = tickers.slice(0, 15).join(", ");
-      const more = tickers.length > 15 ? ` … +${tickers.length - 15} more` : "";
-      console.log(`  ${ex} (${tickers.length}): ${sample}${more}`);
+      const arr = Array.from(tickers);
+      const sample = arr.slice(0, 15).join(", ");
+      const more = arr.length > 15 ? ` … +${arr.length - 15} more` : "";
+      console.log(`  ${ex} (${arr.length}): ${sample}${more}`);
     }
   }
 
