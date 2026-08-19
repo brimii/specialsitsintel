@@ -229,14 +229,22 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - Cache TTL 15 min protège les quotas
 - LIVE pill affiche la vraie date du jour
 
-**À faire à la prochaine session (ordre suggéré) :**
-1. **Setup Twelve Data + Finnhub** (5-10 min côté user) → push la coverage à ~97%
-2. **Sources deal price** — PR Newswire / Business Wire / RNS / SEDAR+ / AMF / BaFin / EDINET pour compléter `v` et `pr.o` sur les nouveaux deals (~2-3h de code, gratuit, gros gain).
-3. **Phase 4** — auto-publication des changements MINEUR à haute confiance.
-4. **Prépa production** — Stripe live + Vercel deploy + tests E2E.
-5. **Backfill historique** — TOUT À LA FIN.
+**⚠️ Bug UX découvert en fin de session (le user l'a remarqué) — 3 fixes courts à faire EN PRIORITÉ demain :**
 
-**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (`917b7a9`) = "Yahoo: 3rd retry pass (LSE for failed EURONEXT) + dedup unresolved log".
+- **`pr.u` (prix marché) n'est affiché nulle part** dans l'UI. On le fetch (138/148 deals ont un vrai `pr.u`), on l'écrit en base, mais aucun composant ne le rend visible. Il n'est utilisé qu'en interne pour le calcul du spread + le chart. → Ajouter un cell "Current Px" (mono, format `$X.XX`) dans la KPI mini grid de `DealDetail.tsx` — c'est là que ça a du sens (side panel quand on click un deal). Optionnellement une colonne "Px" dans `DealTable.tsx` (mais risque de charger visuellement le tableau — à voir).
+- **`pr.c` (prix close) n'est jamais peuplé**. Yahoo `/v8/finance/chart` retourne `chartPreviousClose` et `previousClose` dans le meta — les ajouter dans `fetchYahooOne()` + les persister dans market_prices (ajouter colonne `price_prev` si besoin) + les propager dans `deal.price.c` via `runMarketPriceRefresh`. Sans ça le PriceChart est plat (le seed déterministe multiplie `pr.c` mais si `c=0`, tout retombe à 0).
+- **Chart plat sur les nouveaux deals** — conséquence directe des 2 points ci-dessus. Une fois `pr.c` peuplé le chart devrait s'afficher normalement. Fallback défensif dans `PriceChart.tsx` : si `pr.c === 0`, utiliser `pr.u` comme approximation.
+
+**À faire à la prochaine session (ordre suggéré) :**
+1. **Coller la migration `0004_market_prices.sql` dans SQL Editor Supabase** (obligatoire pour le cache + api_usage).
+2. **Fixer les 3 bugs UX ci-dessus** (~15-20 min) — sans ça la valeur ajoutée du refresh market prices est invisible pour l'utilisateur final.
+3. **Setup Twelve Data + Finnhub** (5-10 min côté user, env vars) → push la coverage à ~97% (catch les 5 TSE modernes + tickers délistés).
+4. **Sources deal price** — PR Newswire / Business Wire / RNS / SEDAR+ / AMF / BaFin / EDINET pour compléter `v` et `pr.o` sur les nouveaux deals (~2-3h de code, gratuit, gros gain sur les 45 `skippedNoTicker`).
+5. **Phase 4** — auto-publication des changements MINEUR à haute confiance.
+6. **Prépa production** — Stripe live + Vercel deploy + tests E2E.
+7. **Backfill historique** — TOUT À LA FIN.
+
+**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (`cd1880b`) = "CLAUDE.md: snapshot session 2026-06-15 (market data infra + LIVE date + purge seeded)".
 
 ---
 
