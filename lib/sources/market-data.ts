@@ -204,46 +204,67 @@ async function bumpUsage(provider: string, delta: number): Promise<void> {
 
 // ── Provider fetchers ────────────────────────────────────────────────
 
-// Yahoo Finance unofficial batch quote endpoint. No auth, no daily cap,
-// but rate-limits at ~60 QPS. Returns all tickers in one call.
-async function fetchYahooBatch(
-  tickerToSymbol: Map<string, string>,
-): Promise<Map<string, MarketPrice>> {
-  const symbols = Array.from(tickerToSymbol.values());
-  if (symbols.length === 0) return new Map();
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols.join(","))}`;
-  const out = new Map<string, MarketPrice>();
+// Yahoo Finance chart endpoint — per-symbol, no auth needed. Yahoo
+// hardened its /v7/finance/quote batch endpoint in 2024 (crumb + cookie
+// dance now required), but /v8/finance/chart/{symbol} still returns
+// quote data unauthenticated. We parallelise with Promise.all in chunks
+// to keep total wall-clock reasonable for 100-200 tickers (~2-4s at 15
+// concurrent).
+const YAHOO_CONCURRENCY = 15;
+
+async function fetchYahooOne(
+  ticker: string,
+  symbol: string,
+): Promise<MarketPrice | null> {
+  const url =
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` +
+    `?interval=1d&range=1d`;
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": BROWSER_UA, Accept: "application/json" },
       cache: "no-store",
     });
-    if (!res.ok) {
-      console.log(`[market-data] yahoo ${res.status}`);
-      return out;
-    }
+    if (!res.ok) return null;
     const body = (await res.json()) as {
-      quoteResponse?: { result?: Array<{ symbol: string; regularMarketPrice?: number; currency?: string }> };
+      chart?: {
+        result?: Array<{
+          meta?: {
+            regularMarketPrice?: number;
+            currency?: string;
+            symbol?: string;
+          };
+        }>;
+      };
     };
-    const now = new Date().toISOString();
-    const symbolToTicker = new Map<string, string>();
-    for (const [t, s] of tickerToSymbol) symbolToTicker.set(s, t);
-    for (const q of body.quoteResponse?.result ?? []) {
-      if (typeof q.regularMarketPrice !== "number") continue;
-      const ticker = symbolToTicker.get(q.symbol);
-      if (!ticker) continue;
-      out.set(ticker, {
-        ticker,
-        price: q.regularMarketPrice,
-        currency: q.currency ?? "USD",
-        provider: "yahoo",
-        fetchedAt: now,
-      });
-    }
-    console.log(`[market-data] yahoo returned ${out.size}/${symbols.length} prices`);
-  } catch (e) {
-    console.log(`[market-data] yahoo failed: ${(e as Error).message}`);
+    const meta = body.chart?.result?.[0]?.meta;
+    if (!meta || typeof meta.regularMarketPrice !== "number") return null;
+    return {
+      ticker,
+      price: meta.regularMarketPrice,
+      currency: meta.currency ?? "USD",
+      provider: "yahoo",
+      fetchedAt: new Date().toISOString(),
+    };
+  } catch {
+    return null;
   }
+}
+
+async function fetchYahooBatch(
+  tickerToSymbol: Map<string, string>,
+): Promise<Map<string, MarketPrice>> {
+  const entries = Array.from(tickerToSymbol.entries());
+  if (entries.length === 0) return new Map();
+  const out = new Map<string, MarketPrice>();
+  // Chunked Promise.all — 15 concurrent per wave, ~1-2s per wave.
+  for (let i = 0; i < entries.length; i += YAHOO_CONCURRENCY) {
+    const wave = entries.slice(i, i + YAHOO_CONCURRENCY);
+    const results = await Promise.all(
+      wave.map(([ticker, symbol]) => fetchYahooOne(ticker, symbol)),
+    );
+    for (const p of results) if (p) out.set(p.ticker, p);
+  }
+  console.log(`[market-data] yahoo returned ${out.size}/${entries.length} prices`);
   return out;
 }
 
