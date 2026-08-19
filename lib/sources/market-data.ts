@@ -597,6 +597,27 @@ export async function runMarketPriceRefresh(opts?: {
   );
   console.log(`[refreshMarketPrices] got ${prices.size}/${requests.length} prices back`);
 
+  // Diagnostic: which tickers didn't resolve on ANY provider? Group by
+  // exchange so we spot patterns (e.g. all 🇨🇳 tickers → HKEX suffix
+  // wrong, all 🇸🇦 → provider doesn't cover Tadawul, etc.).
+  const unresolved = requests.filter((r) => !prices.has(r.ticker));
+  if (unresolved.length > 0) {
+    const byExchange = new Map<string, string[]>();
+    for (const r of unresolved) {
+      const bucket = byExchange.get(r.exchange) ?? [];
+      bucket.push(r.ticker);
+      byExchange.set(r.exchange, bucket);
+    }
+    console.log(`[refreshMarketPrices] unresolved=${unresolved.length} — by exchange:`);
+    for (const [ex, tickers] of Array.from(byExchange.entries()).sort(
+      (a, b) => b[1].length - a[1].length,
+    )) {
+      const sample = tickers.slice(0, 15).join(", ");
+      const more = tickers.length > 15 ? ` … +${tickers.length - 15} more` : "";
+      console.log(`  ${ex} (${tickers.length}): ${sample}${more}`);
+    }
+  }
+
   let updated = 0;
   let errors = 0;
   for (const req of requests) {
