@@ -180,6 +180,66 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - [ ] Phase 4 — Automatisation étendue (publication auto des changements mineurs)
 - [ ] Phase 5 — Backfill historique (voir feuille de route)
 
+**Session 2026-06-15 — DealDetail polish + prompt 1ère passe APAC + purge seeded + LIVE date auto + market data infra** :
+
+- ✅ **DealDetail panel** (`app/components/DealDetail.tsx`) — badge source à côté du nom, sub-line mono `ticker · announced MMM YYYY`, badge source aussi dans la section Regulatory. Sans exposer d'URL (règle 2 bis respectée).
+
+- ✅ **Prompt 1ère passe APAC durci** (`lib/discovery-apac.ts`) — nouvelle section `Self-disclosure filter (CRITICAL)` qui coupe dès la 1ère passe : `nm == acq` (self-deal), 自己株式取得 (buyback), 大量買付行為への対応方針 (buyout defense), 連結子会社間の合併 (intra-group reorg), HKEX AGM circulars / IFA appointments, ASX substantial-holder notices des passive funds (BlackRock/Vanguard/State Street/MUFG/GPIF/etc.). Interdiction explicite de `N/A` — toujours `TBD`.
+
+- ✅ **Purge des 213 seeded** (côté humain via SQL Editor) — user a supprimé toutes les fixtures d'origine, gardé uniquement les deals traçables via `deal_updates._creation`. Base propre : ~113 deals, tous sourcés par le pipeline. Backup CSV export fait avant.
+
+- ✅ **LIVE date auto** (`app/components/Sidebar.tsx`) — le pill LIVE affiche `Jun 15, 2026` (`toLocaleDateString en-US`), refresh auto au midnight suivant via setTimeout, `suppressHydrationWarning` sur le span pour éviter mismatch SSR/CSR.
+
+- ✅ **MARKET DATA INFRA — le gros morceau** (`lib/sources/market-data.ts` + `supabase/migrations/0004_market_prices.sql` + cron + bouton admin) :
+  - **Migration SQL 0004** : tables `market_prices` (cache TTL 15min) + `api_usage` (compteur quotidien par provider). Le user doit la coller dans SQL Editor Supabase pour activer.
+  - **Waterfall 4 providers** : Yahoo → Finnhub (US) → Twelve Data → Alpha Vantage. Route par géo (US/LSE/APAC/XETRA/EURONEXT/TSX). Fallback progressif.
+  - **Yahoo endpoint `/v8/finance/chart/{symbol}`** (le `/v7/finance/quote` batch demande crumb+cookie depuis 2024). Per-symbol mais parallélisé Promise.all en vagues de 15 → 150 tickers en ~2-4s.
+  - **Symbol normalisation robuste** : HKEX pad à 4 digits (`00513 → 0513.HK`, pas `513.HK`), Shanghai `.SS` pour codes 6-digits commençant par 6, Shenzhen `.SZ` pour 0/3, split composite tickers `"CRBG / EQH" → "CRBG"`.
+  - **3 passes de retry Yahoo** : (1) suffixé normal, (2) naked ticker pour catch US mis-classifiés (MKC/GETY/PLD/LEG), (3) `.L` LSE pour EURONEXT-guessed qui échouent (Schroders SDR).
+  - **Cache 15 min** : divise l'usage par 10-50× ; 122 hits sur re-run = 0 call.
+  - **Compteur quotidien hard-stop à 90%** : `api_usage(provider, day, count)`. Twelve Data 800/j → stop à 720. Alpha Vantage 25/j → stop à 22.
+  - **Tiering T1/T2/T3** : Hot = spread>0 + Closing/Litigation, Active = Review/Phase II/etc., Cold = Closed/Blocked/Dead (skip). En pratique, T3 skip ~15 deals/run.
+  - **Server action `refreshMarketPricesNow`** (admin-gated) + bouton **📊 Refresh market prices** dans QUEUE MAINTENANCE. Résultat live : **137/148 = 93% coverage** en 7s.
+  - **Cron Vercel** : nouveau `/api/cron/refresh-prices` (Bearer CRON_SECRET), scheduled `0 22 * * *` (22:00 UTC = post-close NYSE). Vercel Hobby limite à 2 crons daily → on est au max. Sur Pro tu peux passer hourly.
+
+- ⚠️ **11 tickers restent unresolved** (`unresolved=11 rows by exchange:`) après tous les fix Yahoo :
+  - **TSE (5)** : `217A0, 136A0, 14450, 6225, 8190` — codes modernes 5-alphanumériques Tokyo (2024+), Yahoo n'a pas encore. Twelve Data si.
+  - **US (2 uniques)** : `XTND, ALGR` — probablement délistés post-M&A.
+  - **ASX (2)** : `HHR, HCD` — délistés ou tickers incorrects.
+  - **EURONEXT (0 après fix LSE)** : SDR maintenant résolu via `.L` retry.
+
+- 🔑 **À faire par le user demain** :
+  - **(obligatoire)** Coller `supabase/migrations/0004_market_prices.sql` dans SQL Editor Supabase.
+  - **(recommandé)** Register sur https://twelvedata.com/register (gratuit, 800/j) + ajouter `TWELVEDATA_API_KEY=xxx` dans `.env.local` → catch les ~7-8 tickers TSE modernes restants (93% → ~97% coverage).
+  - **(optionnel)** Idem pour https://finnhub.io/register (US real-time free) et https://www.alphavantage.co/support/#api-key (25/j historical only).
+
+**Commits de la session (10 total) :**
+- `1866dc6` — DealDetail polish + APAC 1st-pass prompt hardening
+- `ef10bcb` — Sidebar: live date auto-updates
+- `59e46f2` — Market data infra (cache + waterfall + tiering + cron)
+- `3294a0b` — Yahoo /v8/chart endpoint (crumb bypass)
+- `2d915ef` — Unresolved tickers diagnostic log
+- `60aedc4` — Symbol normalisation + naked-ticker retry
+- `917b7a9` — LSE retry pass + dedup unresolved log
+- (+ SQL delete de 200+ seeded deals côté SQL Editor, non versionné)
+
+**Résultats concrets côté prod locale :**
+- Base propre : **113 deals** tous sourcés, plus aucun "Seeded"
+- Market prices : **137 deals ont maintenant un `pr.u` réel** (spreads / EV corrects sur `/`)
+- Cache TTL 15 min protège les quotas
+- LIVE pill affiche la vraie date du jour
+
+**À faire à la prochaine session (ordre suggéré) :**
+1. **Setup Twelve Data + Finnhub** (5-10 min côté user) → push la coverage à ~97%
+2. **Sources deal price** — PR Newswire / Business Wire / RNS / SEDAR+ / AMF / BaFin / EDINET pour compléter `v` et `pr.o` sur les nouveaux deals (~2-3h de code, gratuit, gros gain).
+3. **Phase 4** — auto-publication des changements MINEUR à haute confiance.
+4. **Prépa production** — Stripe live + Vercel deploy + tests E2E.
+5. **Backfill historique** — TOUT À LA FIN.
+
+**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (`917b7a9`) = "Yahoo: 3rd retry pass (LSE for failed EURONEXT) + dedup unresolved log".
+
+---
+
 **Session 2026-06-14 — Source badges + filtre source + fixes qualité enrich + règle produit "ne pas exposer les URLs"** :
 
 - ✅ **Per-deal source badge** dans `DealTable` (`app/data/deals.ts` + `lib/deals.ts` + `app/components/DealTable.tsx`) — petite pastille colorée à côté du nom du deal qui indique d'où il vient. Couleurs : SEC=cobalt, CMA=crimson, DG COMP=navy, TDnet=amber, HKEX=violet, ASX=cobalt. Bucketage via URL pattern depuis `deal_updates._creation` (cohérent avec le dashboard `/admin`).
