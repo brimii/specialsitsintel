@@ -176,9 +176,73 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - [x] Phase 0 — Socle (migration vers Next.js + base) ✅
 - [x] Phase 1 — Auth + Stripe + restriction par palier ✅
 - [x] Phase 2 — Gestion / admin ✅
-- [x] Phase 3 — Pipeline de données semi-automatique ✅ (US/EU/APAC live + 2nd-pass enrichment opérationnels)
+- [x] Phase 3 — Pipeline de données semi-automatique ✅ (US/EU/APAC live + 2nd-pass PDF enrichment + 3rd-pass press-release enrichment)
 - [ ] Phase 4 — Automatisation étendue (publication auto des changements mineurs)
 - [ ] Phase 5 — Backfill historique (voir feuille de route)
+
+---
+
+**Session 2026-08-20 — Twelve Data cascade + 3rd-pass press-release finder (PRN/BW/RNS/EDINET)** :
+
+- ✅ **Twelve Data ceiling atteint à 93.7%** (`lib/sources/market-data.ts`) :
+  - Cascade `toTwelveDataSymbolCandidates(ticker, exchange)` → renvoie 3 formats à essayer par ticker : MIC (`XTKS`), Yahoo suffix (`.T`), naked. `fetchTwelveDataBatch` boucle sur les candidats jusqu'au 1er quote valide.
+  - **Throttling 7.6s** entre chaque call (free tier = 8 req/min). Abort du batch au 1er 429. `bumpUsage` skip sur 429 (les rate-limits ne consomment pas de quota).
+  - **Verdict final** : les 10 tickers unresolved (5 TSE modernes 5-char alphanumérique post-2024 : `217A0` `8190` `14450` `136A0` `6225` ; 2 US délistés post-M&A : `XTND` `ALGR` ; 2 ASX délistés : `HHR` `HCD`) ne sont **dans aucun free provider**. TD retourne des 404 propres sur les 3 formats. Coverage plafond structurel = **148/158 = 93.7%** des deals avec ticker.
+
+- ✅ **3rd-pass press-release finder** (`lib/sources/press-release.ts` + extension `lib/enrich.ts`) — nouvelle passe d'enrichissement après la 2e passe PDF, quand `v = TBD` OU `pr.o = 0` :
+  - **4 sources en parallèle** via `Promise.allSettled` : PR Newswire, Business Wire, LSE RNS (via Investegate.co.uk), EDINET.
+  - **Timeout 8s par source**, first non-null match wins, priorité PRN > BW > RNS > EDINET.
+  - `enrichDealFromPressRelease(deal)` chaîne finder → réutilise `ENRICH_SYSTEM_PROMPT` de la 2e passe (aucun nouveau prompt).
+  - **Câblage live** dans les 3 pipelines discovery (`discovery.ts`, `discovery-eu.ts`, `discovery-apac.ts`) — logs `PR-ENRICHED SOURCE :: nm :: before → after`.
+  - **Nouveau bouton admin** `📰 Enrich from press releases` dans QUEUE MAINTENANCE (`app/admin/review/actions.ts` :: `enrichFromPressReleases`) — rétro-actif sur queue + deals approuvés, audit row `_enrich_press`.
+  - **Diagnostics** : `resetPrStats()` + `logPrStats()` + `sampleOnce()` per source pour identifier rapidement quel endpoint est cassé sans polluer les logs.
+
+- 📊 **Résultat honnête après 3 itérations de fix** :
+
+| Source | Status final | Diagnostic |
+|--------|--------------|------------|
+| **PRN** | 165/165 réponses, 4/165 matches | Endpoint OK, mais faible pour notre mix de deals (PRN = US-centric, nos deals US arrivent déjà complets via SEC) |
+| **BW** | 403 sur tous — WAF TLS-fingerprint | Pas fixable sans vrai browser (Playwright), pas juste des headers |
+| **RNS** | Endpoint OK (Investegate), matches ≈ 0 | Nos deals UK arrivent déjà complets via CMA |
+| **EDINET** | Skipped propre — nécessite `EDINET_API_KEY` | Register gratuit sur https://disclosure2.edinet-fsa.go.jp/weee0020.aspx pour l'activer |
+
+- 🎯 **Plafond structurel** : PRN/BW/RNS = wires occidentaux ⇒ couvrent US/UK, redondant avec nos sources filings existantes. Notre vrai gap (~45 deals HKEX/ASX/TDnet sans prix) est **peu couvert par ces 4 wires**. Les vrais wires APAC (Nikkei, Kyodo, SCMP, AAStocks) sont payants.
+
+- ✅ **DealDetail markup polish** (early in session) : nouveau bloc price mono top-left (`CURRENT $X.XX  →  OFFER $Y.YY`) sourcé de `pr.c` et `pr.o`, avec fallback `—` si absent. `runMarketPriceRefresh` écrit maintenant `pr.c` (current) au lieu de `pr.u` (undisturbed) — semantic fix critique + seed `pr.u = pr.c` si `pr.u = 0` pour que PriceChart ait un baseline à afficher.
+
+**Commits de la session (8 total) :**
+- `f1938fc` — Twelve Data cascade MIC → Yahoo suffix → naked
+- `c4d227c` — Twelve Data throttle 7.6s + abort on 429 + no bump on rate limit
+- `fef8c12` — Enrich 3rd-pass press-release finder (PRN + BW + RNS + EDINET)
+- `0a0e350` — Press-release per-source sample-log + aggregate stats
+- `a077df4` — Press-release 4 targeted fixes (PRN bodyMatches / BW URL / RNS Investegate / EDINET api key)
+- `1622a94` — Press-release fix RNS regex → /Article.aspx not /announcement
+
+**⚠️ À faire à la prochaine session — EDINET en priorité** :
+
+1. **Register EDINET API key** (obligatoire depuis Nov 2023) :
+   - Portail : https://disclosure2.edinet-fsa.go.jp/weee0020.aspx
+   - Créer un compte, générer une Subscription-Key gratuite
+   - Ajouter `EDINET_API_KEY=xxx` dans `.env.local` (côté humain) + dans les Environment Variables Vercel (pour prod)
+   - Le code est déjà prêt : `lib/sources/press-release.ts` :: `searchEdinet()` détecte l'env var et honore le header `Subscription-Key`
+   - **Bonus optionnel** : pousser plus loin l'intégration EDINET — au lieu de juste lire le `docDescription`, télécharger le ZIP du filing (`api.edinet-fsa.go.jp/api/v2/documents/{docID}?type=1`), extraire les XBRL/PDF joints, en faire un texte enrichissement complet (le description seul n'a souvent pas les chiffres).
+
+2. **Nettoyage PRN / BW / RNS** (à décider) — options :
+   - **Garder** : coût = 4 calls × ~3s en parallèle par deal, minimal si on ne trigge que via bouton rétro-actif
+   - **Désactiver BW** proprement (403 permanent, gaspille temps) et laisser PRN + RNS + EDINET actifs
+   - **Tout désactiver** sauf EDINET si le rendement APAC est celui qu'on cherche
+
+3. **Phase 4 — publication auto MINEUR** :
+   - Toute update dont `type_changement = MINEUR` ET `confiance >= 90` ET ≥2 sources concordantes → publie directement (skip `review_queue`)
+   - Ajouter un compteur au funnel discovery : `autoApproved` vs `queued`
+   - Log audit row `_auto_publish` dans `deal_updates`
+   - Le humain garde la validation manuelle sur MAJEUR uniquement
+
+4. **Prépa production** — Stripe live + Vercel deploy + tests E2E (voir CLAUDE.md section 10 phase suivante).
+
+5. **Backfill historique** — TOUT À LA FIN comme convenu (règle section 9).
+
+**Branche en cours** : `claude/create-claude-md-memory-o4d1u`. Dernier commit (`1622a94`) = "Press-release: fix RNS regex — Investegate uses /Article.aspx not /announcement".
 
 **Session 2026-06-15 — DealDetail polish + prompt 1ère passe APAC + purge seeded + LIVE date auto + market data infra** :
 
