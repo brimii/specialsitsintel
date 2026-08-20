@@ -358,20 +358,36 @@ async function fetchTwelveDataBatch(
   const now = new Date().toISOString();
   let sampleLogged = false;
 
-  for (const [ticker, candidates] of entries) {
+  // Free tier is 8 credits/min. Space calls at 7.6s to stay comfortably
+  // under the ceiling instead of eating 429 storms mid-batch.
+  const MIN_MS_BETWEEN_CALLS = 7600;
+  let lastCallAt = 0;
+  let rateLimited = false;
+
+  outer: for (const [ticker, candidates] of entries) {
     let resolved = false;
     for (const symbol of candidates) {
       if (resolved) break;
       if (!(await checkQuota("twelvedata", 1))) {
         console.log(`[market-data] twelvedata quota exhausted, stopping`);
-        return out;
+        break outer;
       }
+      const wait = MIN_MS_BETWEEN_CALLS - (Date.now() - lastCallAt);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      lastCallAt = Date.now();
       const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
       try {
         const res = await fetch(url, {
           headers: { Accept: "application/json" },
           cache: "no-store",
         });
+        // Rate-limit response doesn't consume daily quota — don't bump.
+        // Also abort the whole batch: further calls will just 429 too.
+        if (res.status === 429) {
+          console.log(`[market-data] twelvedata 429 ${symbol} — aborting batch (rate limit)`);
+          rateLimited = true;
+          break outer;
+        }
         await bumpUsage("twelvedata", 1);
         if (!res.ok) {
           console.log(`[market-data] twelvedata ${res.status} ${symbol}`);
@@ -409,7 +425,8 @@ async function fetchTwelveDataBatch(
       }
     }
   }
-  console.log(`[market-data] twelvedata returned ${out.size}/${entries.length} prices`);
+  const suffix = rateLimited ? " (rate-limited mid-batch)" : "";
+  console.log(`[market-data] twelvedata returned ${out.size}/${entries.length} prices${suffix}`);
   return out;
 }
 
