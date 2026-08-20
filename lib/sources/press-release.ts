@@ -260,20 +260,21 @@ async function searchLseRns(
   acqName: string,
 ): Promise<PressRelease | null> {
   prStats.RNS.called++;
-  // Investegate mirrors RNS in publicly-accessible HTML (LSE's own API
-  // requires SSO now; the /api/gw/lse/news path 404s). Their search
-  // returns a list of headline links with the RNS body inline.
+  // Investegate mirrors RNS in publicly-accessible HTML. Their release
+  // pages sit at /Article.aspx?id=X or /AnnouncePopup.aspx?id=X — not
+  // /announcement/... as first tried. Their search endpoint is
+  // /Search.aspx which returns HTML anchor tags to those article URLs.
   const q = encodeURIComponent(`${acqName} ${dealName}`.trim());
-  const url = `https://www.investegate.co.uk/search?q=${q}`;
+  const url = `https://www.investegate.co.uk/Search.aspx?keywords=${q}`;
   const res = await fetchWithTimeout(url);
   sampleOnce("RNS", `url=${url} status=${res?.status ?? "null"}`);
   if (!res || !res.ok) return null;
   prStats.RNS.response++;
   const html = await res.text();
-  // Anchor to /announcement/YYYYMMDD/... — Investegate's canonical URL
-  // for individual RNS releases.
+  // Match either Article.aspx?id=X or AnnouncePopup.aspx?id=X (case-
+  // insensitive because Investegate mixes case in link paths).
   const hrefs = Array.from(
-    html.matchAll(/href="(\/announcement\/[^"]+)"/gi),
+    html.matchAll(/href="([^"]*(?:Article|AnnouncePopup)\.aspx\?[^"]+)"/gi),
   )
     .map((m) => m[1])
     .filter((h, i, arr) => arr.indexOf(h) === i)
@@ -281,7 +282,9 @@ async function searchLseRns(
   if (hrefs.length > 0) prStats.RNS.candidates++;
   sampleOnce("RNS", `hrefs=${hrefs.length} htmlLen=${html.length} first="${hrefs[0]?.slice(0, 100) ?? ""}"`);
   for (const rawHref of hrefs) {
-    const articleUrl = `https://www.investegate.co.uk${rawHref}`;
+    const articleUrl = rawHref.startsWith("http")
+      ? rawHref
+      : `https://www.investegate.co.uk${rawHref.startsWith("/") ? "" : "/"}${rawHref}`;
     const article = await fetchWithTimeout(articleUrl);
     if (!article || !article.ok) continue;
     const body = stripHtml(await article.text()).slice(0, MAX_TEXT_CHARS);
