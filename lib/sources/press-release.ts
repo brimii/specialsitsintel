@@ -124,24 +124,38 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-// Best-effort keyword match: given a deal's target + acquirer, does
-// the press-release body contain both names (or an obvious variant)?
-// The wires often title the release with acquirer + target so a very
-// loose contains-check is enough to reject unrelated hits.
+// Keyword match: does the press release actually name BOTH the target
+// AND the acquirer? Previous version only required the target, which
+// meant a broad wire search on "Fox Corporation Roku" would happily
+// return unrelated Fox press releases and pass the check just because
+// "roku" appeared somewhere. Requiring both eliminates that whole class
+// of false positive at the cost of missing single-mention releases —
+// but a real M&A release always names both parties.
+//
+// `norm` strips common corporate suffixes and takes the first
+// significant word of each name so "Fox Corporation" and "Fox Corp"
+// both reduce to "fox". Acquirer being missing (SC 13D activists
+// sometimes are unknown) or a placeholder → skip the acq check.
 function bodyMatches(body: string, dealName: string, acqName: string): boolean {
   const lc = body.toLowerCase();
-  const norm = (n: string) =>
-    n
+  const firstSignificantWord = (n: string): string => {
+    const cleaned = n
       .toLowerCase()
       .replace(/[.,()]/g, "")
       .replace(/\b(inc|corp|corporation|ltd|plc|holdings|group|co|kk)\b/g, "")
-      .trim()
-      .split(/\s+/)
-      .filter((w) => w.length >= 3)
-      .slice(0, 3)
-      .join(" ");
-  const dn = norm(dealName);
-  return dn.length >= 3 && lc.includes(dn);
+      .trim();
+    const w = cleaned.split(/\s+/).filter((w) => w.length >= 3)[0] ?? "";
+    return w;
+  };
+  const dn = firstSignificantWord(dealName);
+  if (dn.length < 3 || !lc.includes(dn)) return false;
+  const acqPlaceholder = /^(tbd|unknown|n\/a|na|undisclosed|none|null)$/i;
+  if (!acqName || acqPlaceholder.test(acqName.trim())) {
+    return true; // target-only match acceptable when no acquirer to check
+  }
+  const an = firstSignificantWord(acqName);
+  if (an.length < 3) return true; // acq name too short to match usefully
+  return lc.includes(an);
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -195,9 +209,20 @@ async function searchBusinessWire(
   acqName: string,
 ): Promise<PressRelease | null> {
   prStats.BW.called++;
+  // Portal/site/home path 403s. The current public search page is at
+  // /news/home?searchtype=news_release&<terms>. Also send a fuller
+  // browser header set — BW's WAF is header-strict.
   const q = encodeURIComponent(`${acqName} ${dealName}`.trim());
-  const searchUrl = `https://www.businesswire.com/portal/site/home/news/?ndmViewId=news_view&searchType=news&searchTerm=${q}`;
-  const res = await fetchWithTimeout(searchUrl);
+  const searchUrl = `https://www.businesswire.com/news/home/search?searchTerm=${q}&searchType=news`;
+  const res = await fetchWithTimeout(searchUrl, {
+    headers: {
+      "Accept-Language": "en-US,en;q=0.9",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Upgrade-Insecure-Requests": "1",
+    },
+  });
   sampleOnce("BW", `url=${searchUrl} status=${res?.status ?? "null"}`);
   if (!res || !res.ok) return null;
   prStats.BW.response++;
@@ -235,42 +260,35 @@ async function searchLseRns(
   acqName: string,
 ): Promise<PressRelease | null> {
   prStats.RNS.called++;
+  // Investegate mirrors RNS in publicly-accessible HTML (LSE's own API
+  // requires SSO now; the /api/gw/lse/news path 404s). Their search
+  // returns a list of headline links with the RNS body inline.
   const q = encodeURIComponent(`${acqName} ${dealName}`.trim());
-  const url =
-    `https://api.londonstockexchange.com/api/gw/lse/news?tab=news-explorer` +
-    `&headlinesOnly=false&text=${q}&size=10`;
-  const res = await fetchWithTimeout(url, {
-    headers: { Accept: "application/json" },
-  });
+  const url = `https://www.investegate.co.uk/search?q=${q}`;
+  const res = await fetchWithTimeout(url);
   sampleOnce("RNS", `url=${url} status=${res?.status ?? "null"}`);
   if (!res || !res.ok) return null;
   prStats.RNS.response++;
-  try {
-    const json = (await res.json()) as {
-      content?: Array<{
-        headline?: string;
-        content?: string;
-        newsSource?: string;
-        urlToHtml?: string;
-      }>;
-    };
-    const items = json.content ?? [];
-    if (items.length > 0) prStats.RNS.candidates++;
-    sampleOnce("RNS", `items=${items.length} firstHeadline="${items[0]?.headline?.slice(0, 100) ?? ""}"`);
-    for (const it of items) {
-      const bodyRaw = (it.content ?? "") + " " + (it.headline ?? "");
-      const body = stripHtml(bodyRaw).slice(0, MAX_TEXT_CHARS);
-      if (bodyMatches(body, dealName, acqName)) {
-        prStats.RNS.matches++;
-        return {
-          source: "RNS",
-          url: it.urlToHtml ?? url,
-          text: body,
-        };
-      }
+  const html = await res.text();
+  // Anchor to /announcement/YYYYMMDD/... — Investegate's canonical URL
+  // for individual RNS releases.
+  const hrefs = Array.from(
+    html.matchAll(/href="(\/announcement\/[^"]+)"/gi),
+  )
+    .map((m) => m[1])
+    .filter((h, i, arr) => arr.indexOf(h) === i)
+    .slice(0, 5);
+  if (hrefs.length > 0) prStats.RNS.candidates++;
+  sampleOnce("RNS", `hrefs=${hrefs.length} htmlLen=${html.length} first="${hrefs[0]?.slice(0, 100) ?? ""}"`);
+  for (const rawHref of hrefs) {
+    const articleUrl = `https://www.investegate.co.uk${rawHref}`;
+    const article = await fetchWithTimeout(articleUrl);
+    if (!article || !article.ok) continue;
+    const body = stripHtml(await article.text()).slice(0, MAX_TEXT_CHARS);
+    if (bodyMatches(body, dealName, acqName)) {
+      prStats.RNS.matches++;
+      return { source: "RNS", url: articleUrl, text: body };
     }
-  } catch {
-    return null;
   }
   return null;
 }
@@ -288,6 +306,15 @@ async function searchEdinet(
   acqName: string,
 ): Promise<PressRelease | null> {
   prStats.EDINET.called++;
+  // EDINET API v2 requires a Subscription-Key since Nov 2023 — without
+  // it, /documents.json returns 200 but with results=[] every day.
+  // Skip fast when no key is configured so we don't burn 14 requests
+  // per deal on empty responses.
+  const apiKey = process.env.EDINET_API_KEY;
+  if (!apiKey) {
+    sampleOnce("EDINET", `skipped — EDINET_API_KEY not set`);
+    return null;
+  }
   const today = new Date();
   // Scan the last 14 days — the deal's press release, if any, should
   // land within a couple days of the TDnet notice.
@@ -300,12 +327,12 @@ async function searchEdinet(
     const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
     const dd = String(d.getUTCDate()).padStart(2, "0");
     const listUrl =
-      `https://api.edinet-fsa.go.jp/api/v2/documents.json?date=${yyyy}-${mm}-${dd}&type=2`;
+      `https://api.edinet-fsa.go.jp/api/v2/documents.json?date=${yyyy}-${mm}-${dd}&type=2&Subscription-Key=${apiKey}`;
     const res = await fetchWithTimeout(listUrl, {
       headers: { Accept: "application/json" },
     });
     if (daysAgo === 0) {
-      sampleOnce("EDINET", `url=${listUrl} status=${res?.status ?? "null"}`);
+      sampleOnce("EDINET", `url=${listUrl.replace(apiKey, "***")} status=${res?.status ?? "null"}`);
     }
     if (!res || !res.ok) continue;
     anyResponse = true;
