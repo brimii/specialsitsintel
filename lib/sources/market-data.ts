@@ -122,10 +122,10 @@ function toYahooSymbol(ticker: string, exchange: ExchangeHint): string {
   }
 }
 
-// Twelve Data accepts symbols in the form TICKER:MIC where MIC is the
-// ISO 10383 Market Identifier Code. Their common exchange strings
-// ("Tokyo", "TSE", ":ASX") often 404 silently — MIC codes are reliable.
-function toTwelveDataSymbol(ticker: string, exchange: ExchangeHint): string {
+// Twelve Data accepts several symbol formats. We cascade through them
+// per ticker (first one that returns a valid quote wins) because the
+// free-tier index has gaps that vary by exchange.
+function toTwelveDataSymbolCandidates(ticker: string, exchange: ExchangeHint): string[] {
   const t = cleanTickerBase(ticker);
   const micMap: Partial<Record<ExchangeHint, string>> = {
     LSE: "XLON",
@@ -137,8 +137,23 @@ function toTwelveDataSymbol(ticker: string, exchange: ExchangeHint): string {
     EURONEXT: "XPAR",
     TSX: "XTSE",
   };
+  const yahooSuffixMap: Partial<Record<ExchangeHint, string>> = {
+    LSE: ".L",
+    TSE: ".T",
+    HKEX: ".HK",
+    ASX: ".AX",
+    SGX: ".SI",
+    XETRA: ".DE",
+    EURONEXT: ".PA",
+    TSX: ".TO",
+  };
+  const candidates: string[] = [];
   const mic = micMap[exchange];
-  return mic ? `${t}:${mic}` : t;
+  const yahoo = yahooSuffixMap[exchange];
+  if (mic) candidates.push(`${t}:${mic}`);
+  if (yahoo) candidates.push(`${t}${yahoo}`);
+  candidates.push(t); // naked
+  return candidates;
 }
 
 // ── Cache layer ───────────────────────────────────────────────────────
@@ -327,65 +342,71 @@ async function fetchYahooBatch(
   return out;
 }
 
-// Twelve Data batch quote — up to 8 tickers per call on free tier.
+// Twelve Data per-ticker quote with symbol-format cascade. For each ticker
+// we try the candidate formats in order (MIC → Yahoo suffix → naked) and
+// stop at the first that returns a real quote. Free-tier index has gaps
+// that vary by exchange (some listings only under MIC, some only under
+// Yahoo suffix), so the cascade is what unlocks TSE/ASX modern tickers.
 async function fetchTwelveDataBatch(
-  tickerToSymbol: Map<string, string>,
+  tickerToCandidates: Map<string, string[]>,
 ): Promise<Map<string, MarketPrice>> {
   const out = new Map<string, MarketPrice>();
   const apiKey = process.env.TWELVEDATA_API_KEY;
   if (!apiKey) return out;
-  const entries = Array.from(tickerToSymbol.entries());
+  const entries = Array.from(tickerToCandidates.entries());
   if (entries.length === 0) return out;
   const now = new Date().toISOString();
   let sampleLogged = false;
 
-  // Per-ticker calls — Twelve Data's batch endpoint on the free tier is
-  // fussy about mixed-exchange lists and error reporting is opaque.
-  // Per-ticker keeps error visibility clean at ~1 call/ticker × 800/day.
-  for (const [ticker, symbol] of entries) {
-    if (!(await checkQuota("twelvedata", 1))) {
-      console.log(`[market-data] twelvedata quota exhausted, stopping`);
-      break;
-    }
-    const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
-    try {
-      const res = await fetch(url, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
-      await bumpUsage("twelvedata", 1);
-      if (!res.ok) {
-        console.log(`[market-data] twelvedata ${res.status} ${symbol}`);
-        continue;
+  for (const [ticker, candidates] of entries) {
+    let resolved = false;
+    for (const symbol of candidates) {
+      if (resolved) break;
+      if (!(await checkQuota("twelvedata", 1))) {
+        console.log(`[market-data] twelvedata quota exhausted, stopping`);
+        return out;
       }
-      const body = (await res.json()) as {
-        close?: string | number;
-        currency?: string;
-        code?: number;
-        status?: string;
-        message?: string;
-      };
-      // Twelve Data returns {code, message, status} on errors even with HTTP 200.
-      if (body.code || body.status === "error") {
-        if (!sampleLogged) {
-          console.log(`[market-data] twelvedata error sample: ${symbol} → ${JSON.stringify(body).slice(0, 200)}`);
-          sampleLogged = true;
+      const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
+      try {
+        const res = await fetch(url, {
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        });
+        await bumpUsage("twelvedata", 1);
+        if (!res.ok) {
+          console.log(`[market-data] twelvedata ${res.status} ${symbol}`);
+          continue;
         }
-        continue;
+        const body = (await res.json()) as {
+          close?: string | number;
+          currency?: string;
+          code?: number;
+          status?: string;
+          message?: string;
+        };
+        // Twelve Data returns {code, message, status} on errors even with HTTP 200.
+        if (body.code || body.status === "error") {
+          if (!sampleLogged) {
+            console.log(`[market-data] twelvedata error sample: ${symbol} → ${JSON.stringify(body).slice(0, 200)}`);
+            sampleLogged = true;
+          }
+          continue;
+        }
+        const raw = body.close;
+        if (typeof raw === "undefined") continue;
+        const price = typeof raw === "string" ? Number.parseFloat(raw) : raw;
+        if (!Number.isFinite(price)) continue;
+        out.set(ticker, {
+          ticker,
+          price,
+          currency: body.currency ?? "USD",
+          provider: "twelvedata",
+          fetchedAt: now,
+        });
+        resolved = true;
+      } catch (e) {
+        console.log(`[market-data] twelvedata ${symbol} failed: ${(e as Error).message}`);
       }
-      const raw = body.close;
-      if (typeof raw === "undefined") continue;
-      const price = typeof raw === "string" ? Number.parseFloat(raw) : raw;
-      if (!Number.isFinite(price)) continue;
-      out.set(ticker, {
-        ticker,
-        price,
-        currency: body.currency ?? "USD",
-        provider: "twelvedata",
-        fetchedAt: now,
-      });
-    } catch (e) {
-      console.log(`[market-data] twelvedata ${symbol} failed: ${(e as Error).message}`);
     }
   }
   console.log(`[market-data] twelvedata returned ${out.size}/${entries.length} prices`);
@@ -504,8 +525,8 @@ export async function refreshMarketPrices(
   // Step 3: Twelve Data for non-US misses Yahoo didn't cover
   const tdTodo = nonUsMisses.filter((r) => !results.has(r.ticker));
   if (tdTodo.length > 0 && process.env.TWELVEDATA_API_KEY) {
-    const tdMap = new Map<string, string>();
-    for (const r of tdTodo) tdMap.set(r.ticker, toTwelveDataSymbol(r.ticker, r.exchange));
+    const tdMap = new Map<string, string[]>();
+    for (const r of tdTodo) tdMap.set(r.ticker, toTwelveDataSymbolCandidates(r.ticker, r.exchange));
     const tdResults = await fetchTwelveDataBatch(tdMap);
     for (const [t, p] of tdResults) results.set(t, p);
   }
