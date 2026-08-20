@@ -687,10 +687,16 @@ export async function runMarketPriceRefresh(opts?: {
     const row = dealRows.find((r) => r.id === req.id);
     if (!row) continue;
     const existingPrice = row.price ?? { u: 0, c: 0, o: 0, sym: "", cur: "$", ad: "" };
+    // Data model: pr.u = undisturbed (pre-announce baseline, stays as-is),
+    // pr.c = current market price (updated every refresh), pr.o = offer.
+    // For newly-discovered deals u might be 0 — seed it from c so the
+    // PriceChart has a baseline to draw from until a proper historical
+    // pre-announce price is backfilled.
     const newPrice = {
       ...existingPrice,
-      u: price.price,
-      cur: existingPrice.cur ?? price.currency,
+      c: price.price,
+      u: (existingPrice.u ?? 0) > 0 ? existingPrice.u : price.price,
+      cur: existingPrice.cur && existingPrice.cur !== "$" ? existingPrice.cur : price.currency,
     };
     const { error: upErr } = await admin
       .from("deals")

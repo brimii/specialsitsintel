@@ -33,8 +33,16 @@ function genPrices(deal: Deal, N = 100) {
 
 export default function PriceChart({ deal }: { deal: Deal }) {
   if (!deal.pr) return null;
-  const { u, c, o, sym, cur, ad } = deal.pr;
+  const { u: rawU, c: rawC, o, sym, cur, ad } = deal.pr;
+
+  // Defensive fallback for freshly discovered deals: we may have current
+  // price (pr.c) but no undisturbed baseline (pr.u), or the reverse. If
+  // one side is missing, mirror it from the other so the chart still
+  // renders with a flat baseline instead of returning null.
+  const u = rawU > 0 ? rawU : rawC;
+  const c = rawC > 0 ? rawC : rawU;
   if (!u || !c) return null;
+  const patchedDeal = { ...deal, pr: { ...deal.pr, u, c } };
 
   const hasOffer = o > 0;
   const W = 280,
@@ -45,7 +53,7 @@ export default function PriceChart({ deal }: { deal: Deal }) {
     padB = 18;
   const innerW = W - padL - padR,
     innerH = H - padT - padB;
-  const { prices, annIdx, annPx } = genPrices(deal, 100);
+  const { prices, annIdx, annPx } = genPrices(patchedDeal, 100);
   const N = prices.length;
   let minP = Math.min(...prices, hasOffer ? o : c, u);
   let maxP = Math.max(...prices, hasOffer ? o : c, u);

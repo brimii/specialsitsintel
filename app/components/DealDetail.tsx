@@ -47,6 +47,20 @@ export default function DealDetail({ deal, locked = false }: { deal: Deal | null
   if (deal.pr?.ad) tickerBits.push(`announced ${deal.pr.ad}`);
   const tickerLine = tickerBits.length > 0 ? tickerBits.join(" · ") : "";
 
+  // Bloomberg-style price line: "$Current  →  $Offer" — surfaces the two
+  // numbers an arb analyst reads first. Hidden when there's nothing real
+  // to show (pr.c === 0 && pr.o === 0). Currency prefix from pr.cur.
+  const cur = deal.pr?.cur || "$";
+  const fmtPx = (n: number): string => {
+    if (!n) return "—";
+    if (n >= 1000) return `${cur}${(n / 1000).toFixed(2)}k`;
+    if (n >= 100) return `${cur}${n.toFixed(0)}`;
+    return `${cur}${n.toFixed(2)}`;
+  };
+  const curPx = deal.pr?.c ?? 0;
+  const offPx = deal.pr?.o ?? 0;
+  const showPrices = curPx > 0 || offPx > 0;
+
   return (
     <div className="deal-detail">
       <div
@@ -76,12 +90,51 @@ export default function DealDetail({ deal, locked = false }: { deal: Deal | null
             fontSize: 9.5,
             color: "var(--text-3)",
             marginTop: 2,
-            marginBottom: "var(--sp-3)",
           }}
         >
           {tickerLine}
         </div>
       ) : null}
+      {showPrices ? (
+        <div
+          style={{
+            display: "flex",
+            gap: "var(--sp-3)",
+            alignItems: "baseline",
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            marginTop: 4,
+            marginBottom: "var(--sp-3)",
+          }}
+        >
+          <span>
+            <span style={{ color: "var(--text-3)", fontSize: 8.5, letterSpacing: ".08em", marginRight: 4 }}>
+              CURRENT
+            </span>
+            <span style={{ color: "var(--text)", fontWeight: 600 }}>{fmtPx(curPx)}</span>
+          </span>
+          {offPx > 0 ? (
+            <>
+              <span style={{ color: "var(--text-3)" }}>→</span>
+              <span>
+                <span
+                  style={{
+                    color: "var(--text-3)",
+                    fontSize: 8.5,
+                    letterSpacing: ".08em",
+                    marginRight: 4,
+                  }}
+                >
+                  OFFER
+                </span>
+                <span style={{ color: "var(--navy)", fontWeight: 600 }}>{fmtPx(offPx)}</span>
+              </span>
+            </>
+          ) : null}
+        </div>
+      ) : (
+        <div style={{ marginBottom: "var(--sp-3)" }} />
+      )}
 
       <div className="kpi-mini-grid">
         <div className="kpi-mini">
