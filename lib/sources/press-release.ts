@@ -32,6 +32,54 @@ export type PressRelease = {
   text: string;
 };
 
+// Per-source diagnostic sampling. We log the URL, HTTP status, byte
+// count, and first candidate href/result — but only ONCE per source
+// per session. That way a 100-deal reEnrichPress run gives us 4 log
+// lines telling us which endpoints are healthy without spamming.
+const sampled: Record<PressReleaseSource, boolean> = {
+  PRN: false,
+  BW: false,
+  RNS: false,
+  EDINET: false,
+};
+
+function sampleOnce(
+  source: PressReleaseSource,
+  msg: string,
+): void {
+  if (sampled[source]) return;
+  sampled[source] = true;
+  console.log(`[press-release] ${source} SAMPLE :: ${msg}`);
+}
+
+// Aggregate counters across all findPressRelease() calls this session.
+// Zero-out at module-load; reader is meant to eyeball them after a batch
+// to see the win-rate per source.
+export const prStats: Record<
+  PressReleaseSource,
+  { called: number; response: number; candidates: number; matches: number }
+> = {
+  PRN: { called: 0, response: 0, candidates: 0, matches: 0 },
+  BW: { called: 0, response: 0, candidates: 0, matches: 0 },
+  RNS: { called: 0, response: 0, candidates: 0, matches: 0 },
+  EDINET: { called: 0, response: 0, candidates: 0, matches: 0 },
+};
+
+export function resetPrStats(): void {
+  for (const s of Object.keys(prStats) as PressReleaseSource[]) {
+    prStats[s] = { called: 0, response: 0, candidates: 0, matches: 0 };
+    sampled[s] = false;
+  }
+}
+
+export function logPrStats(): void {
+  const rows = (Object.keys(prStats) as PressReleaseSource[]).map((s) => {
+    const c = prStats[s];
+    return `  ${s.padEnd(7)} called=${c.called} response=${c.response} candidates=${c.candidates} matches=${c.matches}`;
+  });
+  console.log(`[press-release] aggregate stats:\n${rows.join("\n")}`);
+}
+
 // Timeout wrapper — press-release sources sometimes hang. We never
 // want the finder to block the discovery pipeline for more than a
 // few seconds per source; failures are logged and treated as "no
@@ -106,10 +154,13 @@ async function searchPrNewswire(
   dealName: string,
   acqName: string,
 ): Promise<PressRelease | null> {
+  prStats.PRN.called++;
   const q = encodeURIComponent(`${acqName} ${dealName}`.trim());
   const searchUrl = `https://www.prnewswire.com/search/news/?keyword=${q}&pageSize=25`;
   const res = await fetchWithTimeout(searchUrl);
+  sampleOnce("PRN", `url=${searchUrl} status=${res?.status ?? "null"}`);
   if (!res || !res.ok) return null;
+  prStats.PRN.response++;
   const html = await res.text();
   // Match either /news-releases/... or absolute prnewswire.com/news-releases URLs.
   const hrefs = Array.from(
@@ -118,12 +169,15 @@ async function searchPrNewswire(
     .map((m) => m[1])
     .filter((h, i, arr) => arr.indexOf(h) === i)
     .slice(0, 5);
+  if (hrefs.length > 0) prStats.PRN.candidates++;
+  sampleOnce("PRN", `hrefs=${hrefs.length} htmlLen=${html.length} first="${hrefs[0]?.slice(0, 100) ?? ""}"`);
   for (const rawHref of hrefs) {
     const url = rawHref.startsWith("http") ? rawHref : `https://www.prnewswire.com${rawHref}`;
     const article = await fetchWithTimeout(url);
     if (!article || !article.ok) continue;
     const body = stripHtml(await article.text()).slice(0, MAX_TEXT_CHARS);
     if (bodyMatches(body, dealName, acqName)) {
+      prStats.PRN.matches++;
       return { source: "PRN", url, text: body };
     }
   }
@@ -140,10 +194,13 @@ async function searchBusinessWire(
   dealName: string,
   acqName: string,
 ): Promise<PressRelease | null> {
+  prStats.BW.called++;
   const q = encodeURIComponent(`${acqName} ${dealName}`.trim());
   const searchUrl = `https://www.businesswire.com/portal/site/home/news/?ndmViewId=news_view&searchType=news&searchTerm=${q}`;
   const res = await fetchWithTimeout(searchUrl);
+  sampleOnce("BW", `url=${searchUrl} status=${res?.status ?? "null"}`);
   if (!res || !res.ok) return null;
+  prStats.BW.response++;
   const html = await res.text();
   const hrefs = Array.from(
     html.matchAll(/href="((?:https?:\/\/www\.businesswire\.com)?\/news\/home\/\d+\/[^"]+)"/gi),
@@ -151,12 +208,15 @@ async function searchBusinessWire(
     .map((m) => m[1])
     .filter((h, i, arr) => arr.indexOf(h) === i)
     .slice(0, 5);
+  if (hrefs.length > 0) prStats.BW.candidates++;
+  sampleOnce("BW", `hrefs=${hrefs.length} htmlLen=${html.length} first="${hrefs[0]?.slice(0, 100) ?? ""}"`);
   for (const rawHref of hrefs) {
     const url = rawHref.startsWith("http") ? rawHref : `https://www.businesswire.com${rawHref}`;
     const article = await fetchWithTimeout(url);
     if (!article || !article.ok) continue;
     const body = stripHtml(await article.text()).slice(0, MAX_TEXT_CHARS);
     if (bodyMatches(body, dealName, acqName)) {
+      prStats.BW.matches++;
       return { source: "BW", url, text: body };
     }
   }
@@ -174,6 +234,7 @@ async function searchLseRns(
   dealName: string,
   acqName: string,
 ): Promise<PressRelease | null> {
+  prStats.RNS.called++;
   const q = encodeURIComponent(`${acqName} ${dealName}`.trim());
   const url =
     `https://api.londonstockexchange.com/api/gw/lse/news?tab=news-explorer` +
@@ -181,7 +242,9 @@ async function searchLseRns(
   const res = await fetchWithTimeout(url, {
     headers: { Accept: "application/json" },
   });
+  sampleOnce("RNS", `url=${url} status=${res?.status ?? "null"}`);
   if (!res || !res.ok) return null;
+  prStats.RNS.response++;
   try {
     const json = (await res.json()) as {
       content?: Array<{
@@ -192,10 +255,13 @@ async function searchLseRns(
       }>;
     };
     const items = json.content ?? [];
+    if (items.length > 0) prStats.RNS.candidates++;
+    sampleOnce("RNS", `items=${items.length} firstHeadline="${items[0]?.headline?.slice(0, 100) ?? ""}"`);
     for (const it of items) {
       const bodyRaw = (it.content ?? "") + " " + (it.headline ?? "");
       const body = stripHtml(bodyRaw).slice(0, MAX_TEXT_CHARS);
       if (bodyMatches(body, dealName, acqName)) {
+        prStats.RNS.matches++;
         return {
           source: "RNS",
           url: it.urlToHtml ?? url,
@@ -219,12 +285,15 @@ async function searchLseRns(
 // ────────────────────────────────────────────────────────────────────
 async function searchEdinet(
   dealName: string,
-  _acqName: string,
+  acqName: string,
 ): Promise<PressRelease | null> {
+  prStats.EDINET.called++;
   const today = new Date();
   // Scan the last 14 days — the deal's press release, if any, should
   // land within a couple days of the TDnet notice.
   const dayMs = 24 * 60 * 60 * 1000;
+  let anyResponse = false;
+  let totalResults = 0;
   for (let daysAgo = 0; daysAgo < 14; daysAgo++) {
     const d = new Date(today.getTime() - daysAgo * dayMs);
     const yyyy = d.getUTCFullYear();
@@ -235,7 +304,11 @@ async function searchEdinet(
     const res = await fetchWithTimeout(listUrl, {
       headers: { Accept: "application/json" },
     });
+    if (daysAgo === 0) {
+      sampleOnce("EDINET", `url=${listUrl} status=${res?.status ?? "null"}`);
+    }
     if (!res || !res.ok) continue;
+    anyResponse = true;
     try {
       const json = (await res.json()) as {
         results?: Array<{
@@ -246,12 +319,21 @@ async function searchEdinet(
         }>;
       };
       const results = json.results ?? [];
+      totalResults += results.length;
+      // Try matching against BOTH target and acquirer — western PE
+      // acquirers of Japanese targets show up under the acquirer name
+      // in English, while Japanese-listed targets show under their
+      // Japanese kanji filerName that won't match our English `nm`.
       const targetKey = dealName.toLowerCase().split(/\s+/)[0];
-      const match = results.find(
-        (r) =>
-          (r.filerName?.toLowerCase().includes(targetKey) ?? false) ||
-          (r.docDescription?.toLowerCase().includes(targetKey) ?? false),
-      );
+      const acqKey = (acqName || "").toLowerCase().split(/\s+/)[0];
+      const match = results.find((r) => {
+        const fn = r.filerName?.toLowerCase() ?? "";
+        const dd2 = r.docDescription?.toLowerCase() ?? "";
+        return (
+          (targetKey.length >= 3 && (fn.includes(targetKey) || dd2.includes(targetKey))) ||
+          (acqKey.length >= 3 && (fn.includes(acqKey) || dd2.includes(acqKey)))
+        );
+      });
       if (!match?.docID) continue;
       // The description alone often has the deal value — fetching the
       // ZIP + parsing XBRL is heavier than it's worth for our use case.
@@ -259,6 +341,7 @@ async function searchEdinet(
         `Description: ${match.docDescription ?? ""}. ` +
         `Form: ${match.formCode ?? ""}.`;
       if (text.length < 40) continue;
+      prStats.EDINET.matches++;
       return {
         source: "EDINET",
         url: `https://api.edinet-fsa.go.jp/api/v2/documents/${match.docID}?type=2`,
@@ -268,6 +351,8 @@ async function searchEdinet(
       continue;
     }
   }
+  if (anyResponse) prStats.EDINET.response++;
+  if (totalResults > 0) prStats.EDINET.candidates++;
   return null;
 }
 

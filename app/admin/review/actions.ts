@@ -580,6 +580,8 @@ export async function enrichFromPressReleases(): Promise<void> {
 
     const { enrichDealFromPressRelease, isUselessName: isUseless } =
       await import("@/lib/enrich");
+    const { resetPrStats, logPrStats } = await import("@/lib/sources/press-release");
+    resetPrStats();
 
     // ── Queue side: pending propositions that still lack v or pr.o ─────
     const { data: queueItems } = await admin
@@ -731,6 +733,7 @@ export async function enrichFromPressReleases(): Promise<void> {
       `[reEnrichPress] DONE :: enriched=${enriched} unchanged=${unchanged} ` +
         `noRelease=${noRelease} skippedNoName=${skippedNoName}`,
     );
+    logPrStats();
     revalidatePath("/admin/review");
     revalidatePath("/admin");
     revalidatePath("/");
