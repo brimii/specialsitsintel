@@ -6,7 +6,13 @@ import { fetchHkexDisclosures, type HkexDisclosure } from "@/lib/sources/hkex";
 import { fetchAsxDisclosures, type AsxDisclosure } from "@/lib/sources/asx";
 import { fetchSgxDisclosures, type SgxDisclosure } from "@/lib/sources/sgx";
 import { fetchPdfText } from "@/lib/pdf";
-import { enrichDealFromDocument, isUselessName, nmEqualsAcq, type DealLike } from "@/lib/enrich";
+import {
+  enrichDealFromDocument,
+  enrichDealFromPressRelease,
+  isUselessName,
+  nmEqualsAcq,
+  type DealLike,
+} from "@/lib/enrich";
 
 type ApacDisclosure = TdnetDisclosure | HkexDisclosure | AsxDisclosure | SgxDisclosure;
 
@@ -375,6 +381,26 @@ export async function discoverApacDeals(
       console.log(`[discovery-apac] ENRICHED ${c.source} :: ${before} → ${after}`);
     } else {
       console.log(`[discovery-apac] enrich skipped (no pdf text) :: ${d.nm}`);
+    }
+
+    // 3rd pass: if v / pr.o are still empty after the PDF, try the
+    // press-release wires. Asian exchange PDFs often disclose the
+    // structure but not the financials — the acquirer's PRN / BW / RNS
+    // release usually names the number.
+    const stillNeedsValue = !d.v || d.v === "TBD" || d.v === "";
+    const stillNeedsPrice = !d.pr || !d.pr.o || d.pr.o === 0;
+    if ((stillNeedsValue || stillNeedsPrice) && !isUselessName(d.nm)) {
+      const before = `v=${d.v} pr.o=${d.pr?.o ?? 0}`;
+      const { deal: enriched, pressRelease } = await enrichDealFromPressRelease(
+        d as DealLike,
+      );
+      if (pressRelease) {
+        d = enriched;
+        const after = `v=${d.v} pr.o=${d.pr?.o ?? 0}`;
+        console.log(
+          `[discovery-apac] PR-ENRICHED ${pressRelease.source} :: ${d.nm} :: ${before} → ${after}`,
+        );
+      }
     }
 
     // Post-enrich dedup: if we held off because the name was useless and

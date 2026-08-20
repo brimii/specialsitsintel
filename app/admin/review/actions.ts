@@ -17,6 +17,7 @@ const locks: Record<string, Promise<void> | null> = {
   discoveryEu: null,
   discoveryApac: null,
   reEnrich: null,
+  reEnrichPress: null,
   rejectAllTbd: null,
   approveAllClean: null,
   dgCompBackfill: null,
@@ -562,6 +563,177 @@ export async function reEnrichQueueItems(): Promise<void> {
     revalidatePath("/admin");
     revalidatePath("/");
     revalidatePath("/archive");
+  });
+}
+
+// 3rd-pass rétro-actif: for queue items + already-approved deals that
+// still have v = TBD or pr.o = 0 after the PDF enrichment, search the
+// press-release wires (PR Newswire, Business Wire, LSE RNS, EDINET)
+// for a release naming the deal and feed it through the enrich prompt.
+// Sits alongside 💰 Enrich missing prices: PDF-source first, then this
+// button for the leftovers where the source filing didn't disclose the
+// financials.
+export async function enrichFromPressReleases(): Promise<void> {
+  await withLock("reEnrichPress", async () => {
+    await requireAdmin();
+    const admin = createAdminClient();
+
+    const { enrichDealFromPressRelease, isUselessName: isUseless } =
+      await import("@/lib/enrich");
+
+    // ── Queue side: pending propositions that still lack v or pr.o ─────
+    const { data: queueItems } = await admin
+      .from("review_queue")
+      .select("id, proposition")
+      .eq("statut", "en_attente");
+    // ── Deals side: already-approved rows that are still incomplete ───
+    const { data: dealRows } = await admin
+      .from("deals")
+      .select("id, nom, acquereur, valeur, price, categorie, regulateur, statut, score, region, close_estimate, description, ai_commentary, flag, timeline");
+
+    let enriched = 0;
+    let unchanged = 0;
+    let skippedNoName = 0;
+    let noRelease = 0;
+
+    type QueueRow = { id: string; proposition: unknown };
+    for (const raw of (queueItems ?? []) as QueueRow[]) {
+      const prop = raw.proposition as
+        | { kind?: string; deal?: EnrichableDeal }
+        | null;
+      if (!prop || prop.kind !== "new_deal" || !prop.deal) continue;
+      const deal = prop.deal;
+      if (isUseless(deal.nm)) {
+        skippedNoName++;
+        continue;
+      }
+      const needsValue = !deal.v || deal.v === "TBD" || deal.v === "";
+      const needsPrice = !deal.pr || !deal.pr.o || deal.pr.o === 0;
+      if (!needsValue && !needsPrice) continue;
+
+      const before = `v=${deal.v} pr.o=${deal.pr?.o ?? 0}`;
+      const { deal: enrichedDeal, pressRelease } = await enrichDealFromPressRelease(
+        deal as Parameters<typeof enrichDealFromPressRelease>[0],
+      );
+      if (!pressRelease) {
+        noRelease++;
+        continue;
+      }
+      const after = `v=${enrichedDeal.v} pr.o=${enrichedDeal.pr?.o ?? 0}`;
+      if (before === after) {
+        unchanged++;
+        continue;
+      }
+      const { error } = await admin
+        .from("review_queue")
+        .update({ proposition: { kind: "new_deal", deal: enrichedDeal } })
+        .eq("id", raw.id);
+      if (error) {
+        console.error(`[reEnrichPress][queue] update failed ${raw.id}: ${error.message}`);
+        continue;
+      }
+      enriched++;
+      console.log(
+        `[reEnrichPress][queue] ENRICHED ${pressRelease.source} :: ${deal.nm} :: ${before} → ${after}`,
+      );
+    }
+
+    type DealRow = {
+      id: number;
+      nom: string;
+      acquereur: string | null;
+      valeur: string | null;
+      price: { u?: number; c?: number; o?: number; sym?: string; cur?: string; ad?: string } | null;
+      categorie: string | null;
+      regulateur: string | null;
+      statut: string | null;
+      score: string | null;
+      region: string | null;
+      close_estimate: string | null;
+      description: string | null;
+      ai_commentary: string | null;
+      flag: string | null;
+      timeline: unknown;
+    };
+    for (const row of (dealRows ?? []) as DealRow[]) {
+      const needsValue = !row.valeur || row.valeur === "TBD" || row.valeur === "";
+      const needsPrice = !row.price?.o || row.price.o === 0;
+      if (!needsValue && !needsPrice) continue;
+      if (isUseless(row.nom)) {
+        skippedNoName++;
+        continue;
+      }
+
+      const dealLike = {
+        nm: row.nom,
+        acq: row.acquereur ?? "",
+        v: row.valeur ?? "",
+        c: row.categorie ?? "",
+        r: row.regulateur ?? "",
+        st: row.statut ?? "",
+        sc: row.score ?? "G",
+        reg: row.region ?? "",
+        cl: row.close_estimate ?? "",
+        desc: row.description ?? "",
+        ai: row.ai_commentary ?? "",
+        f: row.flag ?? "",
+        pr: {
+          u: row.price?.u ?? 0,
+          c: row.price?.c ?? 0,
+          o: row.price?.o ?? 0,
+          sym: row.price?.sym ?? "",
+          cur: row.price?.cur ?? "$",
+          ad: row.price?.ad ?? "",
+        },
+        tl: Array.isArray(row.timeline) ? (row.timeline as Array<{ d: string; t: string; x: string }>) : [],
+      };
+      const before = `v=${dealLike.v} pr.o=${dealLike.pr.o}`;
+      const { deal: enrichedDeal, pressRelease } = await enrichDealFromPressRelease(dealLike);
+      if (!pressRelease) {
+        noRelease++;
+        continue;
+      }
+      const after = `v=${enrichedDeal.v} pr.o=${enrichedDeal.pr.o}`;
+      if (before === after) {
+        unchanged++;
+        continue;
+      }
+      const { error } = await admin
+        .from("deals")
+        .update({
+          valeur: enrichedDeal.v,
+          price: enrichedDeal.pr,
+          close_estimate: enrichedDeal.cl,
+          description: enrichedDeal.desc,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id);
+      if (error) {
+        console.error(`[reEnrichPress][deals] update failed ${row.id}: ${error.message}`);
+        continue;
+      }
+      await admin.from("deal_updates").insert({
+        deal_id: row.id,
+        champ_modifie: "_enrich_press",
+        ancienne_valeur: before,
+        nouvelle_valeur: after,
+        source_url: pressRelease.url,
+        confiance: 75,
+        auteur: "ia",
+      });
+      enriched++;
+      console.log(
+        `[reEnrichPress][deals] ENRICHED ${pressRelease.source} :: ${row.nom} :: ${before} → ${after}`,
+      );
+    }
+
+    console.log(
+      `[reEnrichPress] DONE :: enriched=${enriched} unchanged=${unchanged} ` +
+        `noRelease=${noRelease} skippedNoName=${skippedNoName}`,
+    );
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+    revalidatePath("/");
   });
 }
 

@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic";
 import { listMaterialFilings, fetchFilingText, type SecFiling } from "@/lib/sources/sec-edgar";
+import { enrichDealFromPressRelease, type DealLike } from "@/lib/enrich";
 
 // ════════════════════════════════════════════════════════════════════
 // Mode Découverte (Phase 3, bis)
@@ -237,12 +238,31 @@ export async function discoverNewDeals(opts: { daysBack?: number; maxFilings?: n
     if (!resp || !resp.is_deal || !resp.deal) continue;
     candidates++;
 
-    const d = resp.deal;
+    let d = resp.deal;
     const targetKey = normalize(d.nm);
     const symKey = normalize(d.pr?.sym);
     if (existingNames.has(targetKey) || (symKey && existingSyms.has(symKey))) {
       duplicates++;
       continue;
+    }
+
+    // Press-release 3rd pass: SEC S-4 / DEFM14A usually name the deal
+    // value, but SC 13D activism filings and some SC TO-T don't. Fall
+    // back to the press-release wires when v / pr.o are still empty.
+    const needsValue = !d.v || d.v === "TBD" || d.v === "";
+    const needsPrice = !d.pr || !d.pr.o || d.pr.o === 0;
+    if (needsValue || needsPrice) {
+      const before = `v=${d.v} pr.o=${d.pr?.o ?? 0}`;
+      const { deal: enriched, pressRelease } = await enrichDealFromPressRelease(
+        d as DealLike,
+      );
+      if (pressRelease) {
+        d = enriched as typeof d;
+        const after = `v=${d.v} pr.o=${d.pr?.o ?? 0}`;
+        console.log(
+          `[discovery] PR-ENRICHED ${pressRelease.source} :: ${d.nm} :: ${before} → ${after}`,
+        );
+      }
     }
 
     // En file de revue (kind: new_deal) — l'admin valide.

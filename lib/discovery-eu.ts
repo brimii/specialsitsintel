@@ -4,7 +4,12 @@ import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic
 import { fetchCmaCases, fetchCmaCaseText, findCmaCasePdf, type CmaCase } from "@/lib/sources/cma";
 import { fetchDgCompCases, fetchDgCompCaseText, type DgCompCase } from "@/lib/sources/dg-comp";
 import { fetchPdfText } from "@/lib/pdf";
-import { enrichDealFromDocument, nmEqualsAcq, type DealLike } from "@/lib/enrich";
+import {
+  enrichDealFromDocument,
+  enrichDealFromPressRelease,
+  nmEqualsAcq,
+  type DealLike,
+} from "@/lib/enrich";
 
 // ════════════════════════════════════════════════════════════════════
 // European discovery — UK CMA + EU Commission DG COMP.
@@ -275,6 +280,25 @@ export async function discoverEuDeals(opts: { daysBack?: number; maxCases?: numb
       }
     } else {
       console.log(`[discovery-eu] no decision pdf found :: ${c.source} :: ${d.nm}`);
+    }
+
+    // 3rd pass: still missing financials → try the press-release wires.
+    // CMA cases especially name the transaction but not the value;
+    // DG COMP decisions in early phases lie behind the same gap.
+    const stillNeedsValue = !d.v || d.v === "TBD" || d.v === "";
+    const stillNeedsPrice = !d.pr || !d.pr.o || d.pr.o === 0;
+    if (stillNeedsValue || stillNeedsPrice) {
+      const before = `v=${d.v} pr.o=${d.pr?.o ?? 0}`;
+      const { deal: enriched, pressRelease } = await enrichDealFromPressRelease(
+        d as DealLike,
+      );
+      if (pressRelease) {
+        d = enriched;
+        const after = `v=${d.v} pr.o=${d.pr?.o ?? 0}`;
+        console.log(
+          `[discovery-eu] PR-ENRICHED ${pressRelease.source} :: ${d.nm} :: ${before} → ${after}`,
+        );
+      }
     }
 
     // Self-disclosure check: same entity as target and acquirer = not a

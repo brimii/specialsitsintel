@@ -1,5 +1,6 @@
 import "server-only";
 import { getAnthropic, EXTRACTION_MODEL, parseClaudeJson } from "@/lib/anthropic";
+import { findPressRelease, type PressRelease } from "@/lib/sources/press-release";
 
 // ════════════════════════════════════════════════════════════════════
 // 2nd-pass enrichment — focused price/value extraction.
@@ -163,6 +164,25 @@ ${documentText}`;
     console.log(`[enrich] failed: ${(e as Error).message}`);
     return deal;
   }
+}
+
+// 3rd-pass enrichment: search the deal's press-release wires (PR
+// Newswire, Business Wire, LSE RNS, EDINET) for a release matching
+// the deal, then feed it through the same enrich prompt. Returns
+// { deal, pressRelease } — the pressRelease is null when no matching
+// release was found on any wire (caller can log/count that case).
+//
+// Called from discovery pipelines and reEnrich after the PDF 2nd pass
+// hasn't recovered v / pr.o — press-release wires are where issuers
+// state deal values that exchange filings often leave out.
+export async function enrichDealFromPressRelease(
+  deal: DealLike,
+): Promise<{ deal: DealLike; pressRelease: PressRelease | null }> {
+  if (isUselessName(deal.nm)) return { deal, pressRelease: null };
+  const pr = await findPressRelease(deal.nm, deal.acq).catch(() => null);
+  if (!pr) return { deal, pressRelease: null };
+  const enriched = await enrichDealFromDocument(deal, pr.text);
+  return { deal: enriched, pressRelease: pr };
 }
 
 // Merge an enrich patch onto a deal, preserving any 1st-pass value the
