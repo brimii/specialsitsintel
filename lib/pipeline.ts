@@ -236,10 +236,14 @@ export async function runPipeline(
   const errors: string[] = [];
   const admin = createAdminClient();
 
+  // SEC EDGAR full-text search 500s on non-Latin company names
+  // (Japanese/Chinese/etc.), and even Latin-named non-US targets won't
+  // have SEC filings anyway. Restrict the UPDATE pipeline to US deals.
   const { data: dealsData, error: dealsErr } = await admin
     .from("deals")
-    .select("id, nom, acquereur, statut, spread, proba_close, regulateur, close_estimate, description")
-    .not("statut", "in", '("Closed","Dead","Liquidated")');
+    .select("id, nom, acquereur, statut, spread, proba_close, regulateur, close_estimate, description, region")
+    .not("statut", "in", '("Closed","Dead","Liquidated")')
+    .eq("region", "US");
   if (dealsErr) {
     errors.push(`load deals: ${dealsErr.message}`);
     return { dealsScanned: 0, filingsScanned: 0, proposalsExtracted: 0, autoApplied: 0, queued: 0, errors };

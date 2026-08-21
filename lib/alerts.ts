@@ -50,7 +50,10 @@ export type LiveAlertsResult = { live: Alert[]; fetchedAt: string };
 
 export async function getLiveAlerts(limit = 12): Promise<LiveAlertsResult> {
   const admin = createAdminClient();
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  // 30-day window (was 7d) so the banner has enough live events to
+  // scroll on quieter weeks — discoveries + Phase 4 auto-pubs still
+  // trickle in over the month.
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const [autoRes, creationRes] = await Promise.all([
     admin
