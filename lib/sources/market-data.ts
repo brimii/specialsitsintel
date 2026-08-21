@@ -723,14 +723,52 @@ export async function runMarketPriceRefresh(opts?: {
     }
   }
 
+  // Currency mismatch guard: if the deal's offer was extracted in ¥
+  // (JP), £ (UK), €, HK$, A$, etc. but Yahoo returns USD, our ticker
+  // matched the wrong instrument (typically a similarly-named US
+  // penny stock). Writing that price pollutes pr.c and drops the deal
+  // out of the spread average. Guard here at write time.
+  const CUR_SYMBOL_TO_ISO: Record<string, string> = {
+    "$": "USD",
+    "€": "EUR",
+    "£": "GBP",
+    "¥": "JPY",
+    "HK$": "HKD",
+    "A$": "AUD",
+    "S$": "SGD",
+    "CHF": "CHF",
+    "CA$": "CAD",
+    "SAR": "SAR",
+    "AED": "AED",
+    "₹": "INR",
+    "₩": "KRW",
+    "R$": "BRL",
+    "$MX": "MXN",
+    "R": "ZAR",
+  };
   let updated = 0;
   let errors = 0;
+  let skippedCurrency = 0;
   for (const req of requests) {
     const price = prices.get(req.ticker);
     if (!price) continue;
     const row = dealRows.find((r) => r.id === req.id);
     if (!row) continue;
     const existingPrice = row.price ?? { u: 0, c: 0, o: 0, sym: "", cur: "$", ad: "" };
+    const existingCurSym = existingPrice.cur ?? "$";
+    const existingCurIso = CUR_SYMBOL_TO_ISO[existingCurSym] ?? existingCurSym;
+    const yahooCurIso = (price.currency ?? "USD").toUpperCase();
+    // Only enforce the guard when the deal already carries a non-default
+    // currency (i.e. the extractor knew the deal's real currency). A
+    // default "$" means we haven't confirmed the currency yet — trust
+    // Yahoo. This lets US deals still populate on the first refresh.
+    if (existingCurSym !== "$" && existingCurIso !== yahooCurIso) {
+      console.log(
+        `[refreshMarketPrices] currency mismatch skip :: id=${req.id} sym=${req.ticker} expected=${existingCurIso} got=${yahooCurIso} — likely wrong-ticker match`,
+      );
+      skippedCurrency++;
+      continue;
+    }
     // Data model: pr.u = undisturbed (pre-announce baseline, stays as-is),
     // pr.c = current market price (updated every refresh), pr.o = offer.
     // For newly-discovered deals u might be 0 — seed it from c so the
@@ -755,7 +793,7 @@ export async function runMarketPriceRefresh(opts?: {
   }
 
   console.log(
-    `[refreshMarketPrices] DONE :: updated=${updated} errors=${errors} (of ${requests.length})`,
+    `[refreshMarketPrices] DONE :: updated=${updated} errors=${errors} skippedCurrency=${skippedCurrency} (of ${requests.length})`,
   );
   return {
     scanned: dealRows.length,

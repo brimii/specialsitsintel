@@ -96,16 +96,58 @@ function monthsToClose(close: string | null | undefined): number | null {
 // proba_close at 0 by design (Claude is told not to speculate); these
 // helpers fill in downstream so the KPI bar / DealTable aren't a sea
 // of zeros. Called from rowToDeal only when the DB row is at 0.
-function computeSpread(price: Price, closeEstimate: string | null): number {
-  const o = price?.o ?? 0;
+// Magnitude sanity per currency — real per-share prices sit in these
+// bands. A price outside its expected band signals a wrong-ticker
+// match (typically a similarly-named US penny stock hijacking a JP/HK
+// deal's ticker slot) and should be treated as invalid.
+function priceLooksSaneForCurrency(price: number, currencySym: string): boolean {
+  if (price <= 0) return false;
+  const bands: Record<string, [number, number]> = {
+    "$": [0.5, 100000],
+    "€": [0.5, 100000],
+    "£": [0.5, 100000],
+    "CHF": [0.5, 100000],
+    "CA$": [0.5, 100000],
+    "A$": [0.05, 10000],
+    "HK$": [0.05, 10000],
+    "S$": [0.05, 10000],
+    "¥": [10, 1000000],
+    "₹": [1, 100000],
+    "₩": [50, 10000000],
+    "SAR": [0.5, 100000],
+    "AED": [0.5, 100000],
+    "R$": [0.5, 100000],
+    "R": [0.5, 100000],
+  };
+  const band = bands[currencySym] ?? [0, Infinity];
+  return price >= band[0] && price <= band[1];
+}
+
+// Pick the market anchor for a spread calc: prefer pr.c (current),
+// fall back to pr.u (undisturbed pre-announce) when pr.c is missing
+// or fails the magnitude check — pr.u is a stable snapshot from the
+// pipeline and often survives when live-refresh got a wrong ticker.
+export function pickMarketAnchor(price: Price): number {
+  const cur = price?.cur ?? "$";
   const c = price?.c ?? 0;
-  if (o <= 0 || c <= 0) return 0;
-  const grossPremium = ((o - c) / c) * 100;
+  if (c > 0 && priceLooksSaneForCurrency(c, cur)) return c;
+  const u = price?.u ?? 0;
+  if (u > 0 && priceLooksSaneForCurrency(u, cur)) return u;
+  return 0;
+}
+
+export function computeSpread(price: Price, closeEstimate: string | null): number {
+  const o = price?.o ?? 0;
+  if (o <= 0) return 0;
+  const cur = price?.cur ?? "$";
+  if (!priceLooksSaneForCurrency(o, cur)) return 0;
+  const market = pickMarketAnchor(price);
+  if (market <= 0) return 0;
+  const grossPremium = ((o - market) / market) * 100;
   if (!Number.isFinite(grossPremium) || grossPremium <= 0) return 0;
   // Sanity clamp on gross premium. Real M&A premiums are almost always
   // 5-50%; anything above 80% means one of the two inputs is broken
-  // (wrong-ticker market price, unit mismatch — JP yen per share vs
-  // US dollar penny stock, etc.). Discard rather than pollute the KPI.
+  // even after the currency-band check. Discard.
   if (grossPremium > 80) return 0;
   // Annualise: default to 12 months if we can't parse close_estimate.
   // Clamp between 1 and 24 months so a stale/vague date doesn't explode
@@ -113,7 +155,6 @@ function computeSpread(price: Price, closeEstimate: string | null): number {
   const raw = monthsToClose(closeEstimate);
   const months = raw === null ? 12 : Math.max(1, Math.min(24, raw));
   const annualised = grossPremium * (12 / months);
-  // Second guard on the final annualised number.
   if (!Number.isFinite(annualised) || annualised > 200) return 0;
   return Math.round(annualised * 10) / 10;
 }

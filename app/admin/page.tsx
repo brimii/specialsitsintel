@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { bucketSourceFromUrl } from "@/app/data/deals";
+import { computeSpread, pickMarketAnchor } from "@/lib/deals";
 
 const PRICE: Record<string, number> = { analyst: 150, institutional: 600, enterprise: 2500 };
 
@@ -30,7 +31,7 @@ export default async function AdminOverview() {
     admin.from("subscriptions").select("tier,status"),
     admin
       .from("deals")
-      .select("id, region, statut, valeur, price"),
+      .select("id, region, statut, valeur, price, close_estimate"),
     admin
       .from("review_queue")
       .select("id, statut, source_url"),
@@ -53,7 +54,8 @@ export default async function AdminOverview() {
     region: string | null;
     statut: string | null;
     valeur: string | null;
-    price: { o?: number } | null;
+    price: { u?: number; c?: number; o?: number; sym?: string; cur?: string; ad?: string } | null;
+    close_estimate?: string | null;
   };
   const deals = (dealsRes.data ?? []) as DealRow[];
   type QueueRow = { id: string; statut: string; source_url: string | null };
@@ -122,6 +124,32 @@ export default async function AdminOverview() {
   const withPriceCount = deals.filter(hasPrice).length;
   const pct = (n: number) => (deals.length === 0 ? "—" : `${Math.round((n / deals.length) * 100)}%`);
 
+  // ── Spread coverage funnel — where do we lose deals? ─────────────────
+  // Walk the same gate as rowToDeal(): pr.o present → market anchor OK
+  // → sane premium. Records the reason each deal drops out so admin
+  // can see exactly where coverage bleeds.
+  type DealFull = DealRow & { close_estimate?: string | null };
+  const activeDeals = deals.filter((d) => !isClosed(d.statut)) as DealFull[];
+  let noOffer = 0;
+  let noMarket = 0;
+  let broken = 0;
+  let withSpread = 0;
+  for (const d of activeDeals) {
+    const price = d.price ?? { u: 0, c: 0, o: 0, sym: "", cur: "$", ad: "" };
+    if ((price.o ?? 0) <= 0) {
+      noOffer++;
+      continue;
+    }
+    if (pickMarketAnchor(price as never) <= 0) {
+      noMarket++;
+      continue;
+    }
+    const s = computeSpread(price as never, d.close_estimate ?? null);
+    if (s > 0) withSpread++;
+    else broken++;
+  }
+  const spreadPct = activeDeals.length === 0 ? "—" : `${Math.round((withSpread / activeDeals.length) * 100)}%`;
+
   // ── Pipeline activity (review queue) ────────────────────────────────
   const queuePending = queue.filter((q) => q.statut === "en_attente").length;
   const queueApproved = queue.filter((q) => q.statut === "approuve").length;
@@ -179,12 +207,17 @@ export default async function AdminOverview() {
 
       <DashSection
         label="Data quality"
-        hint="What share of deals carries a transaction value or per-share offer price, and how many are settled vs still active."
+        hint="Share of deals with real values and per-share prices, active vs settled split, and the spread-computation funnel showing exactly where deals drop out (no offer, no market anchor, broken data)."
       >
         <DashCell label="With value" value={pct(withValueCount)} hint={`${withValueCount} of ${deals.length} have v ≠ TBD`} />
         <DashCell label="With offer price" value={pct(withPriceCount)} hint={`${withPriceCount} of ${deals.length} have pr.o > 0`} />
         <DashCell label="Active" value={String(activeCount)} hint={`${pct(activeCount)} of total`} />
         <DashCell label="Closed / Blocked" value={String(closedCount)} hint={`${pct(closedCount)} of total`} />
+        <DashCell
+          label="With spread"
+          value={spreadPct}
+          hint={`${withSpread} of ${activeDeals.length} active · lost: ${noOffer} no-offer, ${noMarket} no-market, ${broken} broken`}
+        />
       </DashSection>
 
       <DashSection
