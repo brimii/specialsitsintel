@@ -218,19 +218,9 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - `a077df4` — Press-release 4 targeted fixes (PRN bodyMatches / BW URL / RNS Investegate / EDINET api key)
 - `1622a94` — Press-release fix RNS regex → /Article.aspx not /announcement
 
-**⚠️ À faire à la prochaine session — EDINET en priorité** :
-
-1. **Register EDINET API key** (obligatoire depuis Nov 2023) :
-   - Portail : https://disclosure2.edinet-fsa.go.jp/weee0020.aspx
-   - Créer un compte, générer une Subscription-Key gratuite
-   - Ajouter `EDINET_API_KEY=xxx` dans `.env.local` (côté humain) + dans les Environment Variables Vercel (pour prod)
-   - Le code est déjà prêt : `lib/sources/press-release.ts` :: `searchEdinet()` détecte l'env var et honore le header `Subscription-Key`
-   - **Bonus optionnel** : pousser plus loin l'intégration EDINET — au lieu de juste lire le `docDescription`, télécharger le ZIP du filing (`api.edinet-fsa.go.jp/api/v2/documents/{docID}?type=1`), extraire les XBRL/PDF joints, en faire un texte enrichissement complet (le description seul n'a souvent pas les chiffres).
-
-2. **Nettoyage PRN / BW / RNS** (à décider) — options :
-   - **Garder** : coût = 4 calls × ~3s en parallèle par deal, minimal si on ne trigge que via bouton rétro-actif
-   - **Désactiver BW** proprement (403 permanent, gaspille temps) et laisser PRN + RNS + EDINET actifs
-   - **Tout désactiver** sauf EDINET si le rendement APAC est celui qu'on cherche
+**⚠️ Décisions figées côté user** :
+- **EDINET → PAS de registration** pour l'instant (barrière d'inscription). Reste flagué "à améliorer" — si un jour on veut vraiment fermer le gap APAC, register + pousser l'intégration jusqu'à télécharger le ZIP XBRL/PDF (`api.edinet-fsa.go.jp/api/v2/documents/{docID}?type=1`).
+- **PRN / BW / RNS gardés en l'état** — le rendement est modeste mais le coût est faible (4 calls parallèles avec timeout 8s). À améliorer plus tard : query optimisation, BW alternative sans WAF, RNS matching plus permissif.
 
 3. **Phase 4 — publication auto MINEUR** :
    - Toute update dont `type_changement = MINEUR` ET `confiance >= 90` ET ≥2 sources concordantes → publie directement (skip `review_queue`)

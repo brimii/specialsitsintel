@@ -24,7 +24,8 @@ function fmtRelative(iso: string | null | undefined): string {
 
 export default async function AdminOverview() {
   const admin = createAdminClient();
-  const [profilesRes, subsRes, dealsRes, queueRes, creationsRes] = await Promise.all([
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const [profilesRes, subsRes, dealsRes, queueRes, creationsRes, autoPubRes] = await Promise.all([
     admin.from("profiles").select("tier"),
     admin.from("subscriptions").select("tier,status"),
     admin
@@ -37,6 +38,12 @@ export default async function AdminOverview() {
       .from("deal_updates")
       .select("deal_id, source_url, created_at")
       .eq("champ_modifie", "_creation"),
+    admin
+      .from("deal_updates")
+      .select("deal_id, nouvelle_valeur, created_at")
+      .eq("champ_modifie", "_auto_publish")
+      .gte("created_at", thirtyDaysAgo)
+      .order("created_at", { ascending: false }),
   ]);
 
   const profiles = profilesRes.data ?? [];
@@ -53,6 +60,8 @@ export default async function AdminOverview() {
   const queue = (queueRes.data ?? []) as QueueRow[];
   type Creation = { deal_id: number; source_url: string | null; created_at: string };
   const creations = (creationsRes.data ?? []) as Creation[];
+  type AutoPub = { deal_id: number; nouvelle_valeur: string | null; created_at: string };
+  const autoPubs = (autoPubRes.data ?? []) as AutoPub[];
 
   // ── Headline KPIs ───────────────────────────────────────────────────
   const byTier = profiles.reduce<Record<string, number>>((acc, p) => {
@@ -127,6 +136,19 @@ export default async function AdminOverview() {
     .map(([k, v]) => `${k} ${v}`)
     .join(" · ") || "—";
 
+  // Break down auto-publications by the field that was updated
+  // (statut / spread / close_estimate / ...). nouvelle_valeur is stored
+  // as "champ=value" in the marker row so we split on the first "=".
+  const autoPubByField: Record<string, number> = {};
+  for (const a of autoPubs) {
+    const field = (a.nouvelle_valeur ?? "").split("=")[0] || "?";
+    autoPubByField[field] = (autoPubByField[field] ?? 0) + 1;
+  }
+  const autoPubFieldBreakdown = Object.entries(autoPubByField)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${k} ${v}`)
+    .join(" · ") || "—";
+
   return (
     <>
       <div className="port-kpis" style={{ marginBottom: "var(--sp-5)" }}>
@@ -167,7 +189,7 @@ export default async function AdminOverview() {
 
       <DashSection
         label="Pipeline activity"
-        hint="What's sitting in the review queue right now, and when each source last produced an approved deal."
+        hint="What's sitting in the review queue right now, when each source last produced an approved deal, and how many minor high-confidence updates the pipeline auto-published (Phase 4)."
       >
         <DashCell label="Pending review" value={String(queuePending)} hint={pendingSourceBreakdown} />
         <DashCell label="Approved" value={String(queueApproved)} hint="cumulative" />
@@ -184,6 +206,15 @@ export default async function AdminOverview() {
               .slice(0, 4)
               .map(([k, v]) => `${k} ${fmtRelative(v)}`)
               .join(" · ") || "—"
+          }
+        />
+        <DashCell
+          label="Auto-published (30d)"
+          value={String(autoPubs.length)}
+          hint={
+            autoPubs.length > 0
+              ? `last ${fmtRelative(autoPubs[0]?.created_at)} · ${autoPubFieldBreakdown}`
+              : "no auto-publications yet — MINEUR + conf≥90 + ≥2 sources needed"
           }
         />
       </DashSection>

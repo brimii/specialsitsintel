@@ -191,7 +191,10 @@ function getOldVal(deal: DealRecord, field: string): string | null {
   return v == null ? null : String(v);
 }
 
-const CONFIDENCE_THRESHOLD = 85;
+// Phase 4 auto-publication gate. Bumped from 85 → 90 to align with the
+// CLAUDE.md rule and give an extra margin of safety: at 90 the model is
+// essentially quoting a specific fact from the filing, not synthesising.
+const CONFIDENCE_THRESHOLD = 90;
 
 // shouldAutoApply : vrai uniquement si MINEUR + confiance haute + ≥2 sources concordantes.
 function shouldAutoApply(u: ProposedUpdate, sourceCount: number): boolean {
@@ -200,6 +203,14 @@ function shouldAutoApply(u: ProposedUpdate, sourceCount: number): boolean {
   if (sourceCount < 2) return false;
   return true;
 }
+
+// Marker champ_modifie value written alongside every auto-applied
+// update. The real update writes its normal row (statut/spread/...)
+// and this second row lets the admin dashboard count auto-publications
+// with a simple `WHERE champ_modifie = '_auto_publish'` — same
+// convention as the `_creation` marker used for discovery inserts.
+// No schema change required.
+const AUTO_MARKER = "_auto_publish";
 
 function parseValueForField(field: string, v: string): string | number {
   if (field === "spread") return Number.parseFloat(v) || 0;
@@ -280,7 +291,9 @@ export async function runPipeline(
 
     // Décision : appliquer ou mettre en file de revue
     for (const u of allProposals) {
-      const concordant = allProposals.filter((p) => p.champ_modifie === u.champ_modifie && p.nouvelle_valeur === u.nouvelle_valeur).length;
+      const concordant = allProposals.filter(
+        (p) => p.champ_modifie === u.champ_modifie && p.nouvelle_valeur === u.nouvelle_valeur,
+      ).length;
       if (shouldAutoApply(u, concordant)) {
         const updatePayload: Record<string, unknown> = {
           [u.champ_modifie]: parseValueForField(u.champ_modifie, u.nouvelle_valeur),
@@ -291,16 +304,33 @@ export async function runPipeline(
           errors.push(`update deal ${u.deal_id}: ${upErr.message}`);
           continue;
         }
-        await admin.from("deal_updates").insert({
-          deal_id: u.deal_id,
-          champ_modifie: u.champ_modifie,
-          ancienne_valeur: u.ancienne_valeur,
-          nouvelle_valeur: u.nouvelle_valeur,
-          source_url: u.source_url,
-          confiance: u.confiance,
-          auteur: "ia",
-        });
+        // Two audit rows: the real update + a marker row so the admin
+        // dashboard can count Phase 4 auto-publications separately from
+        // human-approved review-queue items.
+        await admin.from("deal_updates").insert([
+          {
+            deal_id: u.deal_id,
+            champ_modifie: u.champ_modifie,
+            ancienne_valeur: u.ancienne_valeur,
+            nouvelle_valeur: u.nouvelle_valeur,
+            source_url: u.source_url,
+            confiance: u.confiance,
+            auteur: "ia",
+          },
+          {
+            deal_id: u.deal_id,
+            champ_modifie: AUTO_MARKER,
+            ancienne_valeur: null,
+            nouvelle_valeur: `${u.champ_modifie}=${u.nouvelle_valeur}`,
+            source_url: u.source_url,
+            confiance: u.confiance,
+            auteur: "ia",
+          },
+        ]);
         autoApplied++;
+        console.log(
+          `[pipeline] AUTO :: deal=${u.deal_id} ${u.champ_modifie}: ${u.ancienne_valeur ?? "∅"} → ${u.nouvelle_valeur} (conf=${u.confiance}, sources=${concordant})`,
+        );
       } else {
         await admin.from("review_queue").insert({
           proposition: u as unknown as Record<string, unknown>,
@@ -309,9 +339,22 @@ export async function runPipeline(
           statut: "en_attente",
         });
         queued++;
+        const reason =
+          u.type_changement === "MAJEUR"
+            ? "MAJEUR"
+            : u.confiance < CONFIDENCE_THRESHOLD
+              ? `conf<${CONFIDENCE_THRESHOLD}`
+              : "1-source";
+        console.log(
+          `[pipeline] QUEUED :: deal=${u.deal_id} ${u.champ_modifie}: ${u.ancienne_valeur ?? "∅"} → ${u.nouvelle_valeur} (${reason})`,
+        );
       }
     }
   }
 
+  console.log(
+    `[pipeline] DONE :: dealsScanned=${Math.min(deals.length, maxDeals)} filingsScanned=${filingsScanned} ` +
+      `proposals=${proposalsExtracted} autoApplied=${autoApplied} queued=${queued}`,
+  );
   return { dealsScanned: Math.min(deals.length, maxDeals), filingsScanned, proposalsExtracted, autoApplied, queued, errors };
 }
