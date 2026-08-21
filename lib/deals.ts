@@ -102,12 +102,19 @@ function computeSpread(price: Price, closeEstimate: string | null): number {
   if (o <= 0 || c <= 0) return 0;
   const grossPremium = ((o - c) / c) * 100;
   if (!Number.isFinite(grossPremium) || grossPremium <= 0) return 0;
+  // Sanity clamp on gross premium. Real M&A premiums are almost always
+  // 5-50%; anything above 80% means one of the two inputs is broken
+  // (wrong-ticker market price, unit mismatch — JP yen per share vs
+  // US dollar penny stock, etc.). Discard rather than pollute the KPI.
+  if (grossPremium > 80) return 0;
   // Annualise: default to 12 months if we can't parse close_estimate.
   // Clamp between 1 and 24 months so a stale/vague date doesn't explode
   // (annualised premium at 0.5 months = 2400% is meaningless).
   const raw = monthsToClose(closeEstimate);
   const months = raw === null ? 12 : Math.max(1, Math.min(24, raw));
   const annualised = grossPremium * (12 / months);
+  // Second guard on the final annualised number.
+  if (!Number.isFinite(annualised) || annualised > 200) return 0;
   return Math.round(annualised * 10) / 10;
 }
 
