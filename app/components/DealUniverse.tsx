@@ -3,6 +3,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { type Deal, dealCapUSD, fmtCap } from "../data/deals";
+import { type Alert } from "../data/content";
 import DealTable, { type SortField } from "./DealTable";
 import DealDetail from "./DealDetail";
 import AlertStrip from "./AlertStrip";
@@ -111,10 +112,12 @@ export default function DealUniverse({
   deals,
   tier,
   archiveMode = false,
+  alerts,
 }: {
   deals: Deal[];
   tier: string;
   archiveMode?: boolean;
+  alerts?: Alert[];
 }) {
   const locked = tier === "free";
   const [cat, setCat] = useState("ALL");
@@ -167,7 +170,7 @@ export default function DealUniverse({
     <div className="page active" id="page-u">
       <div className="universe-shell">
         <div className="universe-main">
-          <AlertStrip />
+          <AlertStrip alerts={alerts} />
           {archiveMode && (
             <div
               style={{

@@ -1,4 +1,4 @@
-import { ALERTS } from "@/app/data/content";
+import { ALERTS, type Alert } from "@/app/data/content";
 
 const colHex: Record<string, string> = {
   G: "#162f68",
@@ -9,8 +9,12 @@ const colHex: Record<string, string> = {
 };
 
 // Bandeau "LIVE INTEL" défilant. Items dupliqués pour la boucle (scroll-x).
-export default function AlertStrip() {
-  const items = [...ALERTS, ...ALERTS];
+// `alerts` prop is a server-fetched blend of Phase 4 auto-publications +
+// discovery events + static fallback (see lib/alerts.ts). Falls back to
+// the pure-static list when nothing was passed in (older callers, tests).
+export default function AlertStrip({ alerts }: { alerts?: Alert[] }) {
+  const feed = alerts && alerts.length > 0 ? alerts : ALERTS;
+  const items = [...feed, ...feed];
   return (
     <div className="alert-strip">
       <div className="alert-label">
