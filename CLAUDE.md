@@ -136,17 +136,7 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - **Montrer avant d’enregistrer** les fichiers de configuration sensibles (SQL, env, webhooks).
 - Après chaque étape qui marche : proposer un **commit** et signaler s’il faut mettre à jour ce `CLAUDE.md`.
 - En cas d’erreur : demander l’erreur brute complète, donner la cause probable en langage simple, la correction minimale, et comment vérifier.
-- **À CHAQUE début de session côté humain — RÈGLE STRICTE** : le PREMIER message doit OBLIGATOIREMENT contenir les commandes PowerShell pour lancer le projet localement + l'URL locale à ouvrir dans le navigateur. Si l'utilisateur dit "nouvelle session", "on reprend", "on continue", ou ouvre une fenêtre PowerShell, donner immédiatement le bloc complet — sans attendre qu'il demande. Le **dossier de travail confirmé** côté humain est :
-  ```
-  C:\Users\loren\Documents\specialsitsintel
-  ```
-  (il existe aussi un `C:\Users\loren\specialsitsintel` orphelin sur `main` à ignorer / supprimer un jour). Donc le bloc à donner systématiquement en début de session :
-  ```
-  cd "C:\Users\loren\Documents\specialsitsintel"
-  git pull
-  npm run dev
-  ```
-  Puis : `http://localhost:3000/admin/review` (ou `/` selon ce qu'on travaille). La branche active est `claude/create-claude-md-memory-o4d1u`.
+- **À CHAQUE début de session côté humain — RÈGLE SUPERSÉDÉE le 2026-10-23** : plus de dev local. Le projet tourne 100% cloud (Vercel prod + Vercel preview URLs + Supabase + Stripe live). Workflow dev : https://claude.ai/code → cloud session → PR → preview URL Vercel pour test. Zéro Node sur le poste humain, zéro `.env.local` à maintenir. Les secrets vivent dans Vercel Environment Variables + Supabase dashboard + Stripe dashboard. Runbook complet : `docs/DEPLOY.md`. Health check en prod : `GET /api/health?key=<CRON_SECRET>`.
 - **Backfill historique (Phase 5) = à faire À LA TOUTE FIN.** Tant que des features live / UX ne sont pas finalisées, ne JAMAIS proposer le backfill DG COMP / SEC EDGAR comme prochaine étape principale. Le scaffold est ready (bouton 📚 dans `/admin/review`) — on attend la consigne explicite "on attaque le backfill" avant de lancer.
 
 -----
