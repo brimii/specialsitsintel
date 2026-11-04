@@ -1,19 +1,13 @@
 import { ImageResponse } from "next/og";
 
-// Next.js auto-wires this as /icon.png and uses it as the browser-tab
-// favicon. Rendered server-side at request time, cached by Next.
-// Design: the "Bar" mark — bold sans-serif S transected by a
-// horizontal rule. Matches the sidebar mark pixel-for-concept.
+// Browser-tab favicon. Transparent background so the mark sits on top
+// of whatever chrome the browser paints (light tabs in Safari/Chrome,
+// dark tabs in Firefox's dark mode). Navy mark is legible on both.
 
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
-// Navy on cream, matching the app's light-mode terminal palette.
-// Browsers render favicons in both light and dark contexts without
-// theme awareness, so we commit to the light-mode look here — it
-// stays legible on both light and dark browser chrome.
 const NAVY = "#162f68";
-const CREAM = "#ece8de";
 
 export default function Icon() {
   return new ImageResponse(
@@ -22,13 +16,13 @@ export default function Icon() {
         style={{
           width: "100%",
           height: "100%",
-          background: CREAM,
           color: NAVY,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           position: "relative",
           fontFamily: "system-ui",
+          // NO background — transparent PNG so the host surface shows through.
         }}
       >
         <span
@@ -38,6 +32,7 @@ export default function Icon() {
             lineHeight: 1,
             letterSpacing: -1,
             paddingTop: 2,
+            color: NAVY,
           }}
         >
           S
