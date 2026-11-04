@@ -25,6 +25,10 @@ export default function Sidebar() {
   const { open } = useModal();
   const [mobOpen, setMobOpen] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
+  // Role gates the Admin nav item. Only rendered when the connected
+  // profile has role='admin' in Supabase. Also re-checked on auth
+  // state changes so signing out hides the entry immediately.
+  const [isAdmin, setIsAdmin] = useState(false);
   // Live date shown in the header pill. Initialised empty to avoid an SSR /
   // client hydration mismatch (server clock may drift from the browser's),
   // then filled in on mount + refreshed at the next midnight so the pill
@@ -45,9 +49,25 @@ export default function Sidebar() {
   useEffect(() => {
     const supabase = createClient();
     if (!supabase) return;
-    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+    // Pull both email and role on mount.
+    const loadProfile = async (userId: string | null, userEmail: string | null) => {
+      setEmail(userEmail);
+      if (!userId) {
+        setIsAdmin(false);
+        return;
+      }
+      const { data } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
+      setIsAdmin(data?.role === "admin");
+    };
+    supabase.auth
+      .getUser()
+      .then(({ data }) => loadProfile(data.user?.id ?? null, data.user?.email ?? null));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setEmail(session?.user?.email ?? null);
+      loadProfile(session?.user?.id ?? null, session?.user?.email ?? null);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -57,6 +77,7 @@ export default function Sidebar() {
     if (!supabase) return;
     await supabase.auth.signOut();
     setEmail(null);
+    setIsAdmin(false);
     router.refresh();
   };
 
@@ -118,6 +139,17 @@ export default function Sidebar() {
             </Link>
           );
         })}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className={`nav-item${pathname.startsWith("/admin") ? " active" : ""}`}
+            style={{ color: "var(--crimson)", marginTop: 8 }}
+            title="Admin — review queue, discovery, pipeline"
+          >
+            <span className="nav-icon">⌘</span>
+            Admin
+          </Link>
+        )}
       </div>
 
       <div className="nav-footer">
@@ -181,6 +213,17 @@ export default function Sidebar() {
             </Link>
           );
         })}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className={`mob-nav-item${pathname.startsWith("/admin") ? " active" : ""}`}
+            style={{ color: "var(--crimson)" }}
+            onClick={() => setMobOpen(false)}
+          >
+            <span>⌘</span>
+            Admin
+          </Link>
+        )}
       </div>
     </>
   );
