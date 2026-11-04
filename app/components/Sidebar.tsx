@@ -67,20 +67,33 @@ export default function Sidebar() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <div
             style={{
-              width: 28,
-              height: 28,
-              background: "var(--navy)",
-              borderRadius: 6,
+              width: 32,
+              height: 32,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
+              color: "var(--navy)",
             }}
+            aria-label="SpecialSitsIntel"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <rect x="1" y="5" width="4" height="8" rx="1" fill="white" opacity=".7" />
-              <rect x="5.5" y="2" width="4" height="11" rx="1" fill="white" opacity=".85" />
-              <rect x="10" y="7" width="3" height="6" rx="1" fill="white" />
+            {/* Bar mark — bold sans S transected by a horizontal rule.
+                Tick marks on either side of the bar are omitted at this
+                scale (they'd disappear below 2px). */}
+            <svg width="32" height="32" viewBox="0 0 100 100" aria-hidden="true">
+              <text
+                x="50"
+                y="82"
+                textAnchor="middle"
+                fontFamily="Syne, system-ui, sans-serif"
+                fontSize="100"
+                fontWeight="700"
+                letterSpacing="-4"
+                fill="currentColor"
+              >
+                S
+              </text>
+              <rect x="4" y="52" width="92" height="4.5" fill="currentColor" />
             </svg>
           </div>
           <div>
