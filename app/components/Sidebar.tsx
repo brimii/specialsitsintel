@@ -199,31 +199,94 @@ export default function Sidebar() {
       </nav>
 
       <div className={`mob-nav${mobOpen ? " open" : ""}`}>
-        {NAV.map((item) => {
-          const active = pathname === item.href;
-          return (
+        <div className="mob-nav-list">
+          {NAV.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`mob-nav-item${active ? " active" : ""}`}
+                onClick={() => setMobOpen(false)}
+              >
+                <span>{item.icon}</span>
+                {item.label}
+              </Link>
+            );
+          })}
+          {isAdmin && (
             <Link
-              key={item.href}
-              href={item.href}
-              className={`mob-nav-item${active ? " active" : ""}`}
+              href="/admin"
+              className={`mob-nav-item${pathname.startsWith("/admin") ? " active" : ""}`}
+              style={{ color: "var(--crimson)" }}
               onClick={() => setMobOpen(false)}
             >
-              <span>{item.icon}</span>
-              {item.label}
+              <span>⌘</span>
+              Admin
             </Link>
-          );
-        })}
-        {isAdmin && (
-          <Link
-            href="/admin"
-            className={`mob-nav-item${pathname.startsWith("/admin") ? " active" : ""}`}
-            style={{ color: "var(--crimson)" }}
-            onClick={() => setMobOpen(false)}
-          >
-            <span>⌘</span>
-            Admin
-          </Link>
-        )}
+          )}
+        </div>
+
+        <div className="mob-nav-footer">
+          {email ? (
+            <>
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--text-3)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  padding: "0 var(--sp-2)",
+                  marginBottom: "var(--sp-2)",
+                }}
+                title={email}
+              >
+                {email}
+              </div>
+              <PortalButton
+                className="btn btn-secondary"
+                style={{ width: "100%", marginBottom: "var(--sp-2)" }}
+              >
+                Manage subscription
+              </PortalButton>
+              <button
+                className="btn btn-secondary"
+                style={{ width: "100%" }}
+                onClick={() => {
+                  setMobOpen(false);
+                  onLogout();
+                }}
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="btn btn-primary"
+                style={{ width: "100%", marginBottom: "var(--sp-2)" }}
+                onClick={() => {
+                  setMobOpen(false);
+                  open("access");
+                }}
+              >
+                Request Access →
+              </button>
+              <button
+                className="btn btn-secondary"
+                style={{ width: "100%" }}
+                onClick={() => {
+                  setMobOpen(false);
+                  open("login");
+                }}
+              >
+                Log in
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </>
   );

@@ -171,21 +171,34 @@ body{padding-left:var(--nav-w)}
 .hamburger.open span:nth-child(2){opacity:0;transform:scaleX(0)}
 .hamburger.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
 
-/* Mobile menu */
+/* Mobile menu — slide-in panel from the left. Contains the full nav
+   list PLUS an auth footer (login / signup / account controls) so the
+   user has a single, discoverable place for identity actions on
+   phones. Flex column so the footer pins to the bottom via margin-top:auto. */
 .mob-nav{
   display:none;position:fixed;top:52px;inset-x:0;bottom:0;
   background:var(--bg-1);z-index:99;overflow-y:auto;
-  border-top:1px solid var(--border);flex-direction:column;padding:var(--sp-2) 0;
+  border-top:1px solid var(--border);flex-direction:column;padding:0;
   transform:translateX(-100%);transition:transform var(--t-slow);
 }
 .mob-nav.open{display:flex;transform:translateX(0)}
+.mob-nav-list{display:flex;flex-direction:column;padding:var(--sp-2) 0}
 .mob-nav-item{
-  padding:var(--sp-4) var(--sp-5);font-size:14px;font-weight:500;
+  padding:var(--sp-4) var(--sp-5);font-size:15px;font-weight:500;
   color:var(--text-2);cursor:pointer;border:none;background:transparent;
   font-family:var(--font-sans);text-align:left;border-bottom:1px solid var(--border);
   transition:all var(--t-base);display:flex;align-items:center;gap:12px;width:100%;
+  min-height:48px;
 }
 .mob-nav-item:hover,.mob-nav-item.active{color:var(--navy);background:var(--navy-bg)}
+.mob-nav-footer{
+  margin-top:auto;padding:var(--sp-4) var(--sp-4) calc(var(--sp-5) + env(safe-area-inset-bottom, 0px));
+  border-top:1px solid var(--border);background:var(--bg-2);
+  display:flex;flex-direction:column;gap:0;
+}
+.mob-nav-footer .btn{
+  min-height:48px;font-size:14px;padding:var(--sp-3) var(--sp-4);
+}
 
 /* ── KPI BAR ── */
 .kpi-bar{
@@ -1039,9 +1052,11 @@ select.form-input{cursor:pointer;-webkit-appearance:none;appearance:none;backgro
   .logo>div{margin-bottom:0!important}
   .logo .live-pill{display:none}
   .nav-items{display:none}
-  .nav-footer{flex-direction:row;align-items:center;gap:var(--sp-2);padding:0 var(--sp-3);border-top:none;flex-shrink:0}
-  .nav-footer .btn{width:auto!important}
-  .nav-footer .btn-secondary{display:none}
+  /* Auth controls live in the mob-nav slide-in panel on phones, not in
+     the header. Previous build wedged Request Access + Log in into a
+     52px-tall bar and the tap targets were unusable; the Log in button
+     (btn-secondary) was explicitly hidden, blocking sign-in entirely. */
+  .nav-footer{display:none}
   .hamburger{display:flex;margin-right:var(--sp-3)}
 
   .kpi-bar{grid-template-columns:repeat(3,1fr);height:auto;top:52px}
@@ -1089,6 +1104,23 @@ select.form-input{cursor:pointer;-webkit-appearance:none;appearance:none;backgro
   .deal-row{grid-template-columns:minmax(0,1fr) .55fr .85fr .9fr}
   .deal-row>span:nth-child(n+5){display:none}
   .home-stats{grid-template-columns:1fr}
+}
+
+/* Mobile input + modal hardening. 16px font-size on inputs prevents
+   iOS Safari's auto-zoom-on-focus. Enlarged padding gives 44px+ touch
+   targets (Apple's HIG minimum). Modal padding respects the iPhone's
+   bottom safe-area so content doesn't collide with the home-bar. */
+@media(max-width:768px){
+  .form-input{font-size:16px;padding:12px 14px}
+  .form-label{font-size:11px}
+  .modal-overlay{padding:var(--sp-3);align-items:flex-start;padding-top:max(var(--sp-4), env(safe-area-inset-top, 0px))}
+  .modal-box{max-height:calc(100vh - max(var(--sp-6), env(safe-area-inset-top, 0px)) - env(safe-area-inset-bottom, 0px));border-radius:var(--r-lg)}
+  .modal-hd{padding:var(--sp-5) var(--sp-4) var(--sp-3)}
+  .modal-body{padding:var(--sp-4)}
+  .modal-footer{padding:var(--sp-3) var(--sp-4) calc(var(--sp-5) + env(safe-area-inset-bottom, 0px));flex-direction:column-reverse;gap:var(--sp-2)}
+  .modal-footer .btn{width:100%;justify-content:center;min-height:48px}
+  .modal-title{font-size:20px}
+  .btn-primary,.btn-secondary{min-height:44px}
 }
 
 /* ── ANIMATIONS ── */
