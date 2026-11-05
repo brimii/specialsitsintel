@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&display=swap');
 
 /* ═══════════════════════════════════════════════
    DESIGN SYSTEM — SpecialSitsIntel · Neon Grid
@@ -20,8 +20,10 @@
   /* Backgrounds — deep navy stack */
   --bg-0:#050a1e;--bg-1:#0a0f28;--bg-2:#0e1a3e;--bg-3:#152854;--bg-4:#1a2d60;--bg-5:#2a3d6e;
 
-  /* Text — cool off-white at top, cyan-tinted grays descending */
-  --text:#e4ecfa;--text-2:#8a9bc8;--text-3:#6d7ba0;--text-4:#4a5878;
+  /* Text — brighter tier for legibility. Previously text-2 was
+     #8a9bc8 (marginal contrast on bg-1); bumped to #b0bfdc. text-3
+     similarly lifted. Keeps the cyan tint but clears body copy. */
+  --text:#edf2fc;--text-2:#b0bfdc;--text-3:#8595b8;--text-4:#5a6a8c;
 
   /* Semantic bg/border tokens — cyan-tinted rgba layers */
   --navy-bg:rgba(74,156,255,.10);--navy-bg2:rgba(74,156,255,.18);--navy-bd:rgba(74,156,255,.30);--navy-bd2:rgba(74,156,255,.50);
@@ -39,9 +41,12 @@
   /* Radius — tighter in a terminal, max 6px. Nothing rounded. */
   --r-sm:2px;--r-md:3px;--r-lg:4px;--r-xl:6px;--r-2xl:8px;--r-full:999px;
 
-  /* Typography — IBM Plex Mono is primary */
+  /* Typography — IBM Plex Sans for body (readable prose), IBM Plex
+     Mono for data / tickers / labels where alignment matters. Mono
+     everywhere was too cramped for reading. Serif retained for
+     editorial display emphasis. */
   --font-mono:'IBM Plex Mono','DM Mono',ui-monospace,Menlo,monospace;
-  --font-sans:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --font-sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
   --font-serif:'Instrument Serif',Georgia,serif;
 
   /* Shadows — minimal in a dark terminal; mostly inset glows */
@@ -88,11 +93,21 @@
 html{scroll-behavior:smooth;background:var(--bg-1)}
 body{
   background:var(--bg-1);
-  background-image:linear-gradient(var(--bg-3) 1px,transparent 1px),linear-gradient(90deg,var(--bg-3) 1px,transparent 1px);
-  background-size:24px 24px;
+  /* Subtle 40px grid. Doubled spacing from the first draft (was 24px)
+     and halved the line contrast so it reads as ambiance, not noise.
+     Only paints at >=1024px — phones + tablets go flat. */
+  background-image:linear-gradient(rgba(74,156,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(74,156,255,.04) 1px,transparent 1px);
+  background-size:40px 40px;
   background-attachment:fixed;
-  color:var(--text);font-family:var(--font-mono);overflow-x:hidden;
+  color:var(--text);
+  font-family:var(--font-sans);
+  font-size:14px;
+  line-height:1.5;
+  overflow-x:hidden;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+@media(max-width:1024px){
+  body{background-image:none}
 }
 ::selection{background:var(--navy-bg2);color:var(--navy)}
 ::-webkit-scrollbar{width:9px;height:9px}
