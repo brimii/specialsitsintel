@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems, enrichFromPressReleases, rejectAllTbd, approveAllClean, runDgCompHistoricalBatch, refreshMarketPricesNow } from "./actions";
 import { SubmitButton } from "./SubmitButton";
 import { PendingBar } from "../PendingBar";
+import BatchRunner from "./BatchRunner";
 
 type UpdateProposition = {
   kind?: undefined | "update";
@@ -59,6 +60,8 @@ export default async function AdminReview() {
         <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: "var(--sp-3)" }}>
           <b>{items.length}</b> pending proposal(s) in review queue.
         </div>
+
+        <BatchRunner />
 
         <ToolbarGroup
           label="DISCOVER NEW DEALS"
