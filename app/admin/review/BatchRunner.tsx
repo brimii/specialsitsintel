@@ -3,8 +3,6 @@
 import { useState, useTransition } from "react";
 import {
   runDiscoveryNow,
-  runEuDiscoveryNow,
-  runApacDiscoveryNow,
   reEnrichQueueItems,
   enrichFromPressReleases,
   approveAllClean,
@@ -18,6 +16,10 @@ import {
 // so a step that times out never blocks the next one — the batch still
 // makes progress. The orchestrator is client-side (sequential awaits)
 // so the user sees live progress without any special backend queue.
+//
+// US-only scope: EU + APAC discovery removed from the chain in Nov 2026
+// — the product serves US active deals only. Non-US pipeline code still
+// exists for a possible future, just not surfaced here.
 type Step = {
   id: string;
   label: string;
@@ -28,8 +30,6 @@ type Step = {
 
 const STEPS: Step[] = [
   { id: "us", icon: "🇺🇸", label: "Discover US (SEC EDGAR)", fn: runDiscoveryNow, hint: "~3-5 min" },
-  { id: "eu", icon: "🇪🇺", label: "Discover EU (CMA + DG COMP)", fn: runEuDiscoveryNow, hint: "~2-3 min" },
-  { id: "apac", icon: "🌏", label: "Discover APAC (TDnet + HKEX + ASX)", fn: runApacDiscoveryNow, hint: "~2-4 min" },
   { id: "enrich-pdf", icon: "💰", label: "Enrich missing prices (PDF)", fn: reEnrichQueueItems, hint: "~1-3 min" },
   { id: "enrich-pr", icon: "📰", label: "Enrich from press releases", fn: enrichFromPressReleases, hint: "~2-5 min" },
   { id: "approve", icon: "✅", label: "Approve all clean", fn: approveAllClean, hint: "<1 min" },

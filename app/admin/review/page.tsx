@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, runEuDiscoveryNow, runApacDiscoveryNow, reEnrichQueueItems, enrichFromPressReleases, rejectAllTbd, approveAllClean, runDgCompHistoricalBatch, refreshMarketPricesNow } from "./actions";
+import { approveItem, rejectItem, runPipelineNow, runFullScan, runDiscoveryNow, reEnrichQueueItems, enrichFromPressReleases, rejectAllTbd, approveAllClean, runDgCompHistoricalBatch, refreshMarketPricesNow } from "./actions";
 import { SubmitButton } from "./SubmitButton";
 import { PendingBar } from "../PendingBar";
 import BatchRunner from "./BatchRunner";
@@ -65,23 +65,11 @@ export default async function AdminReview() {
 
         <ToolbarGroup
           label="DISCOVER NEW DEALS"
-          hint="Scan public regulator + exchange feeds for M&A we don't yet track. Candidates land in the review queue."
+          hint="Scan SEC EDGAR for US M&A we don't yet track. Candidates land in the review queue. EU + APAC pipelines kept in code but no longer surfaced — the product is US-only."
         >
           <form action={runDiscoveryNow}>
             <SubmitButton className="btn btn-primary btn-sm" pendingLabel="US discovery… (~3-5 min)">
               🇺🇸 US (SEC EDGAR)
-            </SubmitButton>
-            <PendingBar />
-          </form>
-          <form action={runEuDiscoveryNow}>
-            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="EU discovery… (~2-3 min)">
-              🇪🇺 EU (CMA + DG COMP)
-            </SubmitButton>
-            <PendingBar />
-          </form>
-          <form action={runApacDiscoveryNow}>
-            <SubmitButton className="btn btn-primary btn-sm" pendingLabel="APAC discovery… (~2-4 min)">
-              🌏 APAC (TDnet + HKEX + ASX)
             </SubmitButton>
             <PendingBar />
           </form>

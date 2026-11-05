@@ -19,23 +19,6 @@ const CATS: { id: string; label: string; style?: CSSProperties }[] = [
   { id: "TENDER", label: "Tender" },
 ];
 
-const REGIONS = [
-  { id: "ALL", label: "All" },
-  { id: "US", label: "🇺🇸 US" },
-  { id: "EU", label: "🇪🇺 EU" },
-  { id: "APAC", label: "🌏 APAC" },
-];
-
-const SOURCES: { id: string; label: string; style?: CSSProperties }[] = [
-  { id: "ALL", label: "All" },
-  { id: "SEC", label: "SEC", style: { color: "var(--cobalt)", borderColor: "var(--cobalt-bd)" } },
-  { id: "CMA", label: "CMA", style: { color: "var(--crimson)", borderColor: "var(--crimson-bd)" } },
-  { id: "DG COMP", label: "DG COMP", style: { color: "var(--navy)", borderColor: "var(--navy-bd)" } },
-  { id: "TDnet", label: "TDnet", style: { color: "var(--amber)", borderColor: "var(--amber-bd)" } },
-  { id: "HKEX", label: "HKEX", style: { color: "var(--violet)", borderColor: "var(--violet-bd)" } },
-  { id: "ASX", label: "ASX", style: { color: "var(--cobalt)", borderColor: "var(--cobalt-bd)" } },
-];
-
 const MONTHS: Record<string, number> = {
   Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
   Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
@@ -111,18 +94,14 @@ function StatsStrip({ deals }: { deals: Deal[] }) {
 export default function DealUniverse({
   deals,
   tier,
-  archiveMode = false,
   alerts,
 }: {
   deals: Deal[];
   tier: string;
-  archiveMode?: boolean;
   alerts?: Alert[];
 }) {
   const locked = tier === "free";
   const [cat, setCat] = useState("ALL");
-  const [reg, setReg] = useState("ALL");
-  const [src, setSrc] = useState("ALL");
   const [q, setQ] = useState("");
   const [sortF, setSortF] = useState<SortField>("spread");
   const [sortD, setSortD] = useState(-1);
@@ -133,8 +112,6 @@ export default function DealUniverse({
     const ql = q.trim().toLowerCase();
     const d = deals.filter((x) => {
       if (cat !== "ALL" && x.c !== cat) return false;
-      if (reg !== "ALL" && x.reg !== reg) return false;
-      if (src !== "ALL" && (x.source ?? "Other") !== src) return false;
       if (ql && !(x.nm + x.acq + x.c + x.r).toLowerCase().includes(ql)) return false;
       return true;
     });
@@ -148,7 +125,7 @@ export default function DealUniverse({
       return 0;
     });
     return d;
-  }, [deals, cat, reg, src, q, sortF, sortD]);
+  }, [deals, cat, q, sortF, sortD]);
 
   const selDeal = selId == null ? null : deals.find((d) => d.id === selId) ?? null;
 
@@ -171,44 +148,6 @@ export default function DealUniverse({
       <div className="universe-shell">
         <div className="universe-main">
           <AlertStrip alerts={alerts} />
-          {archiveMode && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "var(--sp-3)",
-                flexWrap: "wrap",
-                padding: "var(--sp-3) var(--sp-5)",
-                background: "var(--bg-2)",
-                borderBottom: "1px solid var(--border)",
-                fontSize: 11,
-                color: "var(--text-2)",
-              }}
-            >
-              <span>📁 Historical archive — closed, settled or terminated deals.</span>
-              <Link href="/" style={{ fontWeight: 700, whiteSpace: "nowrap", color: "var(--navy)" }}>
-                ← Back to active deals
-              </Link>
-            </div>
-          )}
-          {!archiveMode && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "flex-end",
-                padding: "6px var(--sp-5)",
-                background: "var(--bg-1)",
-                borderBottom: "1px solid var(--border)",
-                fontSize: 10,
-              }}
-            >
-              <Link href="/archive" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
-                📁 View historical archive →
-              </Link>
-            </div>
-          )}
           {locked && (
             <div
               style={{
@@ -243,29 +182,6 @@ export default function DealUniverse({
                 onClick={() => setCat(c.id)}
               >
                 {c.label}
-              </button>
-            ))}
-            <div className="filter-sep" />
-            <span className="filter-label">REGION</span>
-            {REGIONS.map((r) => (
-              <button
-                key={r.id}
-                className={`filter-btn${reg === r.id ? " active" : ""}`}
-                onClick={() => setReg(r.id)}
-              >
-                {r.label}
-              </button>
-            ))}
-            <div className="filter-sep" />
-            <span className="filter-label">SOURCE</span>
-            {SOURCES.map((s) => (
-              <button
-                key={s.id}
-                className={`filter-btn${src === s.id ? " active" : ""}`}
-                style={s.style}
-                onClick={() => setSrc(s.id)}
-              >
-                {s.label}
               </button>
             ))}
             <span className="count-pill" style={{ marginLeft: "auto", marginRight: "var(--sp-2)" }}>
@@ -309,7 +225,7 @@ export default function DealUniverse({
             ) : (
               <Catalysts />
             )}
-            {archiveMode === false ? null : null}
+            {null}
           </div>
         </div>
 

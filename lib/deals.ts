@@ -247,10 +247,18 @@ async function fetchAllRawDeals(): Promise<Deal[]> {
   });
 }
 
-// All ACTIVE deals (aggregated stats — used by the KPI bar).
+// Product scope lock: the public app shows only US active situations.
+// Deals in other regions still live in the DB (migrations, pipeline code,
+// archive) but never reach the browser — the filter is server-side.
+function isUsDeal(d: Deal): boolean {
+  const r = (d.reg ?? "").toUpperCase();
+  return r === "US" || r === "" || r === "UNKNOWN";
+}
+
+// All ACTIVE US deals (aggregated stats — used by the KPI bar).
 export async function getAllDeals(): Promise<Deal[]> {
   const all = await fetchAllRawDeals();
-  return all.filter((d) => isActiveStatus(d.st));
+  return all.filter(isUsDeal).filter((d) => isActiveStatus(d.st));
 }
 
 // All deals regardless of status (used by admin views).
@@ -262,22 +270,12 @@ function stripForFree(d: Deal): Deal {
   return { ...d, ai: "", desc: "", pr: { ...d.pr, u: 0, c: 0, o: 0 } };
 }
 
-// Active deals filtered by tier — for the public Universe (/).
+// Active US deals filtered by tier — for the public Universe (/).
 export async function getDealsForTier(tier: Tier): Promise<Deal[]> {
   const all = await fetchAllRawDeals();
-  const active = all.filter((d) => isActiveStatus(d.st));
+  const active = all.filter(isUsDeal).filter((d) => isActiveStatus(d.st));
   if (tier === "free") {
     return active.slice(0, FREE_PREVIEW_COUNT).map(stripForFree);
   }
   return active.filter((d) => tierRank(tier) >= tierRank(d.min_tier ?? "analyst"));
-}
-
-// Archived deals filtered by tier — for the public Archive (/archive).
-export async function getArchivedDealsForTier(tier: Tier): Promise<Deal[]> {
-  const all = await fetchAllRawDeals();
-  const archived = all.filter((d) => !isActiveStatus(d.st));
-  if (tier === "free") {
-    return archived.slice(0, FREE_PREVIEW_COUNT).map(stripForFree);
-  }
-  return archived.filter((d) => tierRank(tier) >= tierRank(d.min_tier ?? "analyst"));
 }

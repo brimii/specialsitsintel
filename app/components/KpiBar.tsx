@@ -9,7 +9,7 @@ export default async function KpiBar() {
   const avgProb = deals.length ? (deals.reduce((s, d) => s + d.p, 0) / deals.length).toFixed(0) + "%" : "—";
 
   const cells = [
-    { label: "Active Situations", value: String(deals.length), color: "var(--text)", sub: "7 categories · 14 countries" },
+    { label: "Active Situations", value: String(deals.length), color: "var(--text)", sub: "US event-driven · 7 categories" },
     { label: "Avg Ann. Spread", value: avgSpread, color: "var(--navy)", sub: "Spread-weighted" },
     { label: "Avg Close Prob.", value: avgProb, color: "var(--cobalt)", sub: "AI multi-factor model" },
     { label: "Live Alerts", value: "12", color: "var(--crimson)", sub: "3 urgent · 9 info" },
