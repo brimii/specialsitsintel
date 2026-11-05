@@ -138,8 +138,6 @@ export default function DealUniverse({
   };
   const onReset = () => {
     setCat("ALL");
-    setReg("ALL");
-    setSrc("ALL");
     setQ("");
   };
 
