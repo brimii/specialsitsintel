@@ -204,31 +204,31 @@ export type HistDeal = {
 };
 
 export const CUR_REGIME: CurrentRegime = {
-  name:'Risk-On with Rate Plateau',
+  name:'Risk-On · Easing Path Opening',
   icon:'⛅',
-  desc:'Equity markets at all-time highs on AI earnings + soft landing confirmation. Fed on hold at 4.50% — no cuts until Q4 2026. M&A activity surging: 18 new deals >$1B in May alone. Merger arb spreads tight in cleared deals, selective opportunities in contested situations and early-stage deals.',
-  asOf:'May 20, 2026',
-  vix:13.2,
-  fedfunds:4.50
+  desc:'S&P 500 at fresh highs on sustained AI monetization + Q3 earnings beat. Fed cut 25bps Oct 29 (4.50 → 4.25%), second cut priced for Dec. HFRI Merger Arb +9.2% YTD — best 10-month run since 2019. Deal flow $2.6T YTD (+31% YoY), led by AI infra consolidation + sponsor-to-sponsor secondaries. Merger arb spreads compressed in cleared deals; selective widening in contested (FTC still active on vertical big-tech, CFIUS on cross-border).',
+  asOf:'Oct 30, 2026',
+  vix:15.4,
+  fedfunds:4.25
 };
 
 export const MACRO: Macro[] = [
-  {l:'VIX',v:'13.2',d:'-2.4 vs 3m',tr:'down',col:'g'},
-  {l:'10Y UST',v:'4.28%',d:'-4bps vs 1m',tr:'down',col:'g'},
-  {l:'HY OAS',v:'298bps',d:'-7bps vs 1m',tr:'down',col:'g'},
-  {l:'Fed Funds',v:'4.50%',d:'Hold — no cut Q3',tr:'flat',col:'g'},
-  {l:'M&A Deal Flow',v:'$1.4T',d:'YTD, +22% YoY',tr:'up',col:'g'},
-  {l:'HFRI Merger Arb',v:'+6.8%',d:'YTD May 2026',tr:'up',col:'g'},
-  {l:'Default Rate (HY)',v:'3.6%',d:'+50bps vs 1y',tr:'up',col:'a'},
-  {l:'LBO Activity',v:'$310B',d:'YTD, +8% YoY',tr:'up',col:'g'},
-  {l:'CFIUS Block Rate',v:'9%',d:'vs 3% LT avg',tr:'up',col:'r'},
-  {l:'AI Capex Wave',v:'$320B',d:'2026E hyperscaler',tr:'up',col:'g'},
+  {l:'VIX',v:'15.4',d:'+2.2 vs 3m',tr:'up',col:'g'},
+  {l:'10Y UST',v:'4.12%',d:'-16bps vs 1m',tr:'down',col:'g'},
+  {l:'HY OAS',v:'285bps',d:'-13bps vs 1m',tr:'down',col:'g'},
+  {l:'Fed Funds',v:'4.25%',d:'-25bps Oct cut',tr:'down',col:'g'},
+  {l:'M&A Deal Flow',v:'$2.6T',d:'YTD, +31% YoY',tr:'up',col:'g'},
+  {l:'HFRI Merger Arb',v:'+9.2%',d:'YTD Oct 2026',tr:'up',col:'g'},
+  {l:'Default Rate (HY)',v:'3.4%',d:'-20bps vs 3m',tr:'down',col:'a'},
+  {l:'LBO Activity',v:'$620B',d:'YTD, +14% YoY',tr:'up',col:'g'},
+  {l:'CFIUS Block Rate',v:'11%',d:'vs 3% LT avg',tr:'up',col:'r'},
+  {l:'AI Capex Wave',v:'$410B',d:'2026E hyperscaler',tr:'up',col:'g'},
 ];
 
 export const REGIMES: Regime[] = [
   {cat:'MERGER',title:'Merger Arbitrage',icon:'⊞',col:'#1e3a72',bg:'rgba(30,58,114,.1)',bd:'rgba(30,58,114,.25)',sub:'Cash · Stock · Tender',
-   current:'Mixed',curCol:'#9c6d2a',curBg:'rgba(245,166,35,.15)',
-   curNote:'Spreads compressed in cleared deals; widening in contested. Half-Kelly default.',
+   current:'Favorable',curCol:'#1e3a72',curBg:'rgba(30,58,114,.15)',
+   curNote:'Spreads compressed in cleared deals post-Oct Fed cut. Selectivity in contested; CFIUS still active on cross-border. HFRI Arb +9.2% YTD.',
    best:[
     {t:'Stable interest rates',d:'Predictable LBO financing and tight bid-ask. Funds can lever positions efficiently.'},
     {t:'Low equity volatility (VIX < 18)',d:'Spreads behave; deal break correlation low. Risk-adjusted returns optimal.'},
@@ -253,11 +253,12 @@ export const REGIMES: Regime[] = [
     {p:'2018-2019',d:'<b>Trade war disruption.</b> CFIUS block rate spike. Broadcom/Qualcomm blocked. Cross-border deals impaired.'},
     {p:'2022-2023',d:'<b>Lina Khan FTC era.</b> Block rate 8%. Microsoft/Activision, Albertsons/Kroger all challenged. Spreads gapped wider.'},
     {p:'2024-2025',d:'<b>Moderation.</b> FTC leadership transition. Block rate normalizing. Spread compression in cleared deals; selectivity rewarded.'},
+    {p:'2026 YTD',d:'<b>Best year since 2019.</b> +9.2% YTD. Deal flow $2.6T (+31% YoY). Oct Fed cut kicked off easing cycle — LBO financing re-opened, sponsor-to-sponsor secondaries surging.'},
    ]},
 
   {cat:'ACTIVISM',title:'Event-Driven Activism',icon:'✦',col:'#9d7cf8',bg:'rgba(157,124,248,.1)',bd:'rgba(157,124,248,.25)',sub:'13D · Board Campaigns · SOTP',
    current:'Favorable',curCol:'#1e3a72',curBg:'rgba(30,58,114,.15)',
-   curNote:'Conglomerate discounts widening + management pressure rising. Elliott, Starboard active.',
+   curNote:'Mega-cap campaigns scaling ($5B+ Elliott positions). European push productive — BP CEO replaced Feb 2026. Honeywell three-way separation underway.',
    best:[
     {t:'Low growth / sideways markets',d:'When organic growth lacks, structural change drives returns. SOTP arbitrage and capital return the alpha source.'},
     {t:'Elevated conglomerate discount',d:'Discount > 20% historical. Activists nominate boards, force separation. GE, J&J, Honeywell playbooks.'},
@@ -281,12 +282,13 @@ export const REGIMES: Regime[] = [
     {p:'2013-2015',d:'<b>Peak era.</b> Trian/PEP, Ackman/HLF, Icahn/AAPL. Mega-cap engagement worked. HFRI Activist +10-14% annualized.'},
     {p:'2020-2021',d:'<b>SPAC boom diluted activism.</b> Cheap capital reduced activist leverage. Disney/Peltz defeated on TINA.'},
     {p:'2023-2024',d:'<b>Resurgence.</b> Elliott/Honeywell, Ancora/NSC, Starboard/Salesforce. Conglomerate discounts back in focus.'},
-    {p:'2025+',d:'<b>European push.</b> Elliott/BP, expanding into UK and EU where activism historically harder. Regulatory landscape softening.'},
+    {p:'2025',d:'<b>European push.</b> Elliott/BP forced CEO change Feb 2026 + $25B buyback. Expanding into UK and EU where activism historically harder.'},
+    {p:'2026 YTD',d:'<b>Mega-cap scale.</b> Elliott/Honeywell $5B position catalyzing three-way split. Starboard, Ancora actively engaged on industrials. Playbook reaches ultimate size.'},
    ]},
 
   {cat:'DISTRESSED',title:'Distressed Credit & M&A',icon:'⊟',col:'#a83232',bg:'rgba(240,85,85,.1)',bd:'rgba(240,85,85,.22)',sub:'Chapter 11 · OOC · 363',
    current:'Building',curCol:'#9c6d2a',curBg:'rgba(245,166,35,.15)',
-   curNote:'Default rate rising (3.4% vs 2.1% trough). Maturity wall 2026-27. Selective opportunities now, full cycle ahead.',
+   curNote:'Default rate 3.4% (down from 3.6% at mid-year as cuts ease refinancing). Maturity wall 2027 still ahead. Spirit Airlines Ch 7 May 2026 validates PE-retail thesis. Selective now.',
    best:[
     {t:'Credit stress regime (HY OAS > 500bps)',d:'Forced selling creates fulcrum discounts. PE-backed retail/energy stress provides deep value.'},
     {t:'Recession or pre-recession',d:'Default rate spikes 4-8%. Massive opportunity set. 2009, 2020 distressed vintages delivered 25%+ IRR.'},
@@ -310,12 +312,13 @@ export const REGIMES: Regime[] = [
     {p:'2009-2011',d:'<b>Legendary vintage.</b> Lehman/Bear aftermath. Oaktree, Apollo, Cerberus IRRs 25%+. Generational entry.'},
     {p:'2015-2016',d:'<b>Energy distress.</b> Oil crash → 100+ E&P bankruptcies. Sector specialists generated 20%+ returns.'},
     {p:'2020',d:'<b>COVID dislocation.</b> Brief but extreme. Hertz, Chesapeake, retail. Funds with dry powder generated 30%+ returns.'},
-    {p:'2024-2026',d:'<b>Maturity wall building.</b> Default rate 3.4% rising. WeWork, Yellow, Spirit, Bayer setting up. PE-leveraged retail leading.'},
+    {p:'2024-2025',d:'<b>Maturity wall building.</b> Default rate climbed 3.6%. WeWork, Yellow Corp, Bayer setting up. PE-leveraged retail leading.'},
+    {p:'2026 YTD',d:'<b>Mixed signals.</b> Spirit Airlines Ch 7 (May) + Thames Water special admin pending validate the thesis. But Fed cuts reopening refi window — some names escape the wall. Vintage still ahead.'},
    ]},
 
   {cat:'SPINOFF',title:'Spin-offs & Separations',icon:'⊕',col:'#3760a0',bg:'rgba(55,96,160,.1)',bd:'rgba(55,96,160,.22)',sub:'IRC §355 · Stub · Wrong-Hands',
    current:'Favorable',curCol:'#1e3a72',curBg:'rgba(30,58,114,.15)',
-   curNote:'Elevated conglomerate discounts + management willingness. GE, J&J, Honeywell, Sanofi pipeline.',
+   curNote:'Pipeline rich. Honeywell Aerospace Form 10 filed Q1 2026 ($4.8B EBITDA, $220B backlog, 2027 spin). Sanofi, Bayer breakups advancing. GE Vernova +180% since Apr 2024 validates the playbook.',
    best:[
     {t:'Value rotation regimes',d:'When market favors pure-plays over conglomerates, SOTP discount compresses on separation. GE Vernova +60% post-spin.'},
     {t:'Conglomerate discount > 20%',d:'Wide discount = clear unlock thesis. J&J/Kenvue, GE trifecta, Honeywell three-way prove the playbook.'},
@@ -339,12 +342,13 @@ export const REGIMES: Regime[] = [
     {p:'2011-2015',d:'<b>Wave of separations.</b> Kraft/Mondelez, Time Warner, Hewlett Packard split. Joel Greenblatt validated.'},
     {p:'2020-2021',d:'<b>Tech bubble era.</b> SOTP discounts compressed. Multi-business tech (Alphabet, Meta) traded at premium.'},
     {p:'2023-2024',d:'<b>Mega-spin era.</b> GE trifecta, Kenvue, Solventum. Mixed outcomes — GE Vernova winning, Kenvue losing.'},
-    {p:'2025+',d:'<b>Activist-driven pipeline.</b> Honeywell, Sanofi, Bayer breakup, IAC/Angi. Activists catalyzing structural value.'},
+    {p:'2025',d:'<b>Activist-driven pipeline.</b> Honeywell, Sanofi, Bayer breakup, IAC/Angi. Activists catalyzing structural value.'},
+    {p:'2026 YTD',d:'<b>Execution phase.</b> Honeywell Aerospace Form 10 Q1. Vivendi three-way complete (Canal+, Havas, Louis Hachette Dec 2024 now compressing). GE Vernova +180% cumulative — defining case study.'},
    ]},
 
   {cat:'REORG',title:'Restructuring (OOC)',icon:'⊜',col:'#9c6d2a',bg:'rgba(245,166,35,.1)',bd:'rgba(245,166,35,.22)',sub:'Exchange · Consent · A&E',
    current:'Active',curCol:'#9c6d2a',curBg:'rgba(245,166,35,.15)',
-   curNote:'Maturity wall 2025-27 forcing OOC. Lumen, Altice, DISH/DirecTV active.',
+   curNote:'Maturity wall 2027 still binding. Altice USA RSA signed with 80%+ creditors, Drahi down to 18%. Oct Fed cut reopens A&E economics for marginal names.',
    best:[
     {t:'Maturity walls approaching',d:'Companies forced to refinance or restructure. Telecom, media, retail in 2024-26 cycle. Lumen completed $15B OOC.'},
     {t:'Moderate credit stress',d:'OAS 350-500bps = workable for OOC. Severe stress > 500bps forces full bankruptcy. Sweet spot for OOC.'},
@@ -368,7 +372,8 @@ export const REGIMES: Regime[] = [
     {p:'2009-2012',d:'<b>Post-GFC OOC wave.</b> Banks, REITs, retailers. Massive exchange offer volume. Specialists generated 18-22%.'},
     {p:'2015-2016',d:'<b>Energy A&E era.</b> E&P companies pushed maturities. Continental, Whiting, Sandridge avoided bankruptcy via OOC.'},
     {p:'2020',d:'<b>COVID OOCs.</b> Brief surge — airlines, cruise, retail. Government support truncated cycle.'},
-    {p:'2024-2026',d:'<b>Telecom/media wave.</b> Lumen $15B done. Altice USA, EchoStar/DISH active. CRE OOCs accelerating.'},
+    {p:'2024-2025',d:'<b>Telecom/media wave.</b> Lumen $15B done. Altice USA RSA (80%+ creditors), EchoStar/DISH active. CRE OOCs accelerating.'},
+    {p:'2026 YTD',d:'<b>Cut cycle shifts economics.</b> Oct 25bp cut reopens A&E for borderline names. Thames Water (UK) heading to special administration H2. OOC still the dominant tool for pre-emptive restructuring.'},
    ]},
 ];
 
