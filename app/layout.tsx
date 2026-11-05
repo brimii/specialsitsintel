@@ -3,6 +3,8 @@ import "./globals.css";
 import Sidebar from "./components/Sidebar";
 import KpiBar from "./components/KpiBar";
 import Ticker from "./components/Ticker";
+import TopBar from "./components/TopBar";
+import StatusBar from "./components/StatusBar";
 import { ModalProvider } from "./components/modals/ModalProvider";
 
 export const metadata: Metadata = {
@@ -36,9 +38,11 @@ export default function RootLayout({
       <body>
         <ModalProvider>
           <Sidebar />
+          <TopBar />
           <KpiBar />
           <Ticker />
           {children}
+          <StatusBar />
         </ModalProvider>
       </body>
     </html>

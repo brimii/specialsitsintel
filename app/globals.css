@@ -1,49 +1,54 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&display=swap');
 
 /* ═══════════════════════════════════════════════
-   DESIGN SYSTEM — SpecialSitsIntel Premium
+   DESIGN SYSTEM — SpecialSitsIntel · Neon Grid
+   Dark-first quant terminal aesthetic. Deep navy
+   background with a subtle grid overlay, cyan
+   accent for live data, pink for downtick, green
+   for uptick. IBM Plex Mono throughout. Variable
+   names kept so components don't need to change.
    ═══════════════════════════════════════════════ */
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  /* Color palette */
-  --navy:#162f68;--navy-2:#0f2050;--navy-3:#0b1840;
-  --cobalt:#3660a0;--cobalt-2:#2a4e8a;
-  --amber:#9c6d2a;--amber-2:#7d5520;
-  --crimson:#a83232;--crimson-2:#8a2222;
-  --violet:#6b52a0;
+  /* Primary palette — cyan replaces navy as the accent brand */
+  --navy:#4a9cff;--navy-2:#3f8ae0;--navy-3:#2c73c8;
+  --cobalt:#4a9cff;--cobalt-2:#3f8ae0;
+  --amber:#ffa94d;--amber-2:#e09040;
+  --crimson:#ff5078;--crimson-2:#e04065;
+  --violet:#a885ff;
 
-  /* Backgrounds — warm parchment system */
-  --bg-0:#f8f5ef;--bg-1:#f3f0ea;--bg-2:#ece8de;--bg-3:#e4dfd2;--bg-4:#d6cfc0;--bg-5:#c8bfac;
+  /* Backgrounds — deep navy stack */
+  --bg-0:#050a1e;--bg-1:#0a0f28;--bg-2:#0e1a3e;--bg-3:#152854;--bg-4:#1a2d60;--bg-5:#2a3d6e;
 
-  /* Text */
-  --text:#0e1e3c;--text-2:#374160;--text-3:#6e7a96;--text-4:#9ea8be;
+  /* Text — cool off-white at top, cyan-tinted grays descending */
+  --text:#e4ecfa;--text-2:#8a9bc8;--text-3:#6d7ba0;--text-4:#4a5878;
 
-  /* Semantic bg/border tokens */
-  --navy-bg:rgba(22,47,104,.08);--navy-bg2:rgba(22,47,104,.14);--navy-bd:rgba(22,47,104,.22);--navy-bd2:rgba(22,47,104,.38);
-  --cobalt-bg:rgba(54,96,160,.08);--cobalt-bd:rgba(54,96,160,.22);
-  --amber-bg:rgba(156,109,42,.08);--amber-bd:rgba(156,109,42,.22);
-  --crimson-bg:rgba(168,50,50,.08);--crimson-bd:rgba(168,50,50,.20);
-  --violet-bg:rgba(107,82,160,.08);--violet-bd:rgba(107,82,160,.20);
+  /* Semantic bg/border tokens — cyan-tinted rgba layers */
+  --navy-bg:rgba(74,156,255,.10);--navy-bg2:rgba(74,156,255,.18);--navy-bd:rgba(74,156,255,.30);--navy-bd2:rgba(74,156,255,.50);
+  --cobalt-bg:rgba(74,156,255,.10);--cobalt-bd:rgba(74,156,255,.30);
+  --amber-bg:rgba(255,169,77,.12);--amber-bd:rgba(255,169,77,.30);
+  --crimson-bg:rgba(255,80,120,.12);--crimson-bd:rgba(255,80,120,.28);
+  --violet-bg:rgba(168,133,255,.12);--violet-bd:rgba(168,133,255,.28);
 
-  /* Border */
-  --border:rgba(14,30,60,.09);--border-2:rgba(14,30,60,.18);--border-3:rgba(14,30,60,.30);
+  /* Border — subtle cyan hairlines over the dark ground */
+  --border:rgba(74,156,255,.15);--border-2:rgba(74,156,255,.25);--border-3:rgba(74,156,255,.40);
 
-  /* Spacing (4px grid) */
+  /* Spacing (4px grid, unchanged) */
   --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-7:28px;--sp-8:32px;--sp-9:36px;--sp-10:40px;--sp-12:48px;--sp-14:56px;
 
-  /* Radius */
-  --r-sm:4px;--r-md:6px;--r-lg:10px;--r-xl:14px;--r-2xl:20px;--r-full:999px;
+  /* Radius — tighter in a terminal, max 6px. Nothing rounded. */
+  --r-sm:2px;--r-md:3px;--r-lg:4px;--r-xl:6px;--r-2xl:8px;--r-full:999px;
 
-  /* Typography */
-  --font-mono:'DM Mono',monospace;
-  --font-sans:'Syne',system-ui,sans-serif;
+  /* Typography — IBM Plex Mono is primary */
+  --font-mono:'IBM Plex Mono','DM Mono',ui-monospace,Menlo,monospace;
+  --font-sans:'IBM Plex Mono',ui-monospace,Menlo,monospace;
   --font-serif:'Instrument Serif',Georgia,serif;
 
-  /* Shadows */
-  --shadow-sm:0 1px 3px rgba(14,30,60,.06),0 1px 2px rgba(14,30,60,.04);
-  --shadow-md:0 4px 14px rgba(14,30,60,.10),0 2px 6px rgba(14,30,60,.06);
-  --shadow-lg:0 12px 40px rgba(14,30,60,.14),0 4px 14px rgba(14,30,60,.08);
-  --shadow-xl:0 24px 64px rgba(14,30,60,.18),0 8px 24px rgba(14,30,60,.10);
+  /* Shadows — minimal in a dark terminal; mostly inset glows */
+  --shadow-sm:0 0 0 1px rgba(74,156,255,.08);
+  --shadow-md:0 2px 8px rgba(0,0,0,.4),0 0 0 1px rgba(74,156,255,.12);
+  --shadow-lg:0 8px 24px rgba(0,0,0,.5),0 0 0 1px rgba(74,156,255,.15);
+  --shadow-xl:0 16px 48px rgba(0,0,0,.6),0 0 0 1px rgba(74,156,255,.20);
 
   /* Easing primitives */
   --ease-out:cubic-bezier(.16,1,.3,1);
@@ -54,18 +59,22 @@
   --t-fast:110ms var(--ease-out);--t-base:200ms var(--ease-out);--t-slow:340ms var(--ease-out);
   --t-spring:460ms var(--ease-spring);
 
-  /* Focus ring */
-  --ring:0 0 0 3px rgba(22,47,104,.16);
+  /* Focus ring — cyan glow */
+  --ring:0 0 0 2px rgba(74,156,255,.5);
 
   /* Z-index scale */
-  --z-ticker:50;--z-nav:100;--z-drawer:160;--z-modal:200;--z-toast:260;
+  --z-ticker:50;--z-nav:100;--z-topbar:120;--z-drawer:160;--z-modal:200;--z-statusbar:210;--z-toast:260;
 
   /* Layout */
   --content-max:1140px;
-  --nav-w:230px;
-  --kbar-h:48px;
-  --ticker-h:30px;
-  --shell-h:calc(100vh - var(--kbar-h) - var(--ticker-h));
+  --nav-w:220px;
+  --kbar-h:40px;
+  --topbar-h:36px;
+  --statusbar-h:28px;
+  --ticker-h:26px;
+  --shell-h:calc(100vh - var(--kbar-h) - var(--ticker-h) - var(--topbar-h) - var(--statusbar-h));
+
+  color-scheme:dark;
 
   /* Legacy aliases (consumed by embedded data) */
   --g:var(--navy);--gbg:var(--navy-bg);--gbd:var(--navy-bd);
@@ -76,14 +85,21 @@
 }
 
 /* ── BASE ── */
-html{scroll-behavior:smooth}
-body{background:var(--bg-1);color:var(--text);font-family:var(--font-sans);overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+html{scroll-behavior:smooth;background:var(--bg-1)}
+body{
+  background:var(--bg-1);
+  background-image:linear-gradient(var(--bg-3) 1px,transparent 1px),linear-gradient(90deg,var(--bg-3) 1px,transparent 1px);
+  background-size:24px 24px;
+  background-attachment:fixed;
+  color:var(--text);font-family:var(--font-mono);overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
 ::selection{background:var(--navy-bg2);color:var(--navy)}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--bg-4);border-radius:var(--r-full);border:2px solid var(--bg-1);background-clip:padding-box}
-::-webkit-scrollbar-thumb:hover{background:var(--bg-5);background-clip:padding-box;border:2px solid var(--bg-1)}
-*{scrollbar-width:thin;scrollbar-color:var(--bg-4) transparent}
+::-webkit-scrollbar-thumb{background:var(--bg-3);border-radius:0;border:2px solid var(--bg-1);background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:var(--bg-4);background-clip:padding-box;border:2px solid var(--bg-1)}
+*{scrollbar-width:thin;scrollbar-color:var(--bg-3) transparent}
 /* All monospace data renders with tabular figures so columns align perfectly */
 .mono,[class*="kpi-value"],[class*="-v"],.deal-spread,.prob-label,.ticker-spread,
 input,select,textarea{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
@@ -1165,3 +1181,82 @@ select.form-input{cursor:pointer;-webkit-appearance:none;appearance:none;backgro
   background: linear-gradient(90deg, transparent, var(--navy), transparent);
   animation: pending-shimmer 1.4s infinite ease-in-out;
 }
+
+/* ═══════════════════════════════════════════════
+   Neon Grid chrome — TopBar (above KpiBar) +
+   StatusBar (fixed bottom). Both terminal-tight,
+   mono, uppercase labels, cyan live indicators.
+   ═══════════════════════════════════════════════ */
+.topbar{
+  position:sticky;top:0;z-index:var(--z-topbar);
+  display:flex;align-items:center;gap:var(--sp-3);
+  height:var(--topbar-h);padding:0 var(--sp-4);
+  background:var(--bg-0);border-bottom:1px solid var(--navy-bd);
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;
+  color:var(--text-2);
+}
+.topbar-brand{color:var(--navy);font-weight:600;letter-spacing:.14em;font-size:12px}
+.topbar-live{
+  display:inline-flex;align-items:center;gap:5px;
+  color:var(--amber);font-size:10px;letter-spacing:.12em;font-weight:500;
+}
+.topbar-dot{
+  width:7px;height:7px;border-radius:999px;background:var(--amber);
+  box-shadow:0 0 6px var(--amber);
+  animation:topbar-pulse 2s ease-in-out infinite;
+}
+@keyframes topbar-pulse{
+  0%,100%{opacity:.5;transform:scale(1)}
+  50%{opacity:1;transform:scale(1.15)}
+}
+.topbar-slash{color:var(--text-3);font-size:10px;letter-spacing:.1em}
+.topbar-cmd{
+  flex:1;max-width:280px;
+  background:var(--bg-2);border:1px solid var(--border);
+  color:var(--text);
+  padding:4px var(--sp-3);
+  font-family:inherit;font-size:11px;letter-spacing:.04em;
+  outline:none;border-radius:var(--r-sm);
+}
+.topbar-cmd:focus{border-color:var(--navy-bd2);box-shadow:var(--ring)}
+.topbar-cmd::placeholder{color:var(--text-3)}
+.topbar-clock{margin-left:auto;color:var(--text-2);font-size:10px;letter-spacing:.1em}
+.topbar-mkt{color:var(--amber);font-size:10px;letter-spacing:.12em;font-weight:500}
+
+@media(max-width:768px){
+  .topbar{display:none}
+  :root{--topbar-h:0px}
+}
+
+.statusbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:var(--z-statusbar);
+  display:flex;align-items:center;gap:var(--sp-4);
+  height:var(--statusbar-h);
+  padding:0 var(--sp-4) calc(0px + env(safe-area-inset-bottom, 0px));
+  padding-left:calc(var(--nav-w) + var(--sp-4));
+  background:var(--bg-0);border-top:1px solid var(--navy-bd);
+  font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;
+  color:var(--text-3);text-transform:uppercase;
+}
+.statusbar-k{display:inline-flex;align-items:center;gap:6px}
+.statusbar-k .k{
+  background:var(--bg-2);border:1px solid var(--border);
+  padding:1px 5px;color:var(--text-2);
+  font-size:9px;letter-spacing:.06em;border-radius:var(--r-sm);
+}
+.statusbar-right{margin-left:auto;color:var(--text-2);letter-spacing:.08em}
+
+@media(max-width:768px){
+  .statusbar{
+    padding-left:var(--sp-4);
+    height:calc(var(--statusbar-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .statusbar-k:not(:last-child){display:none}
+  .statusbar-k{color:var(--text-2);font-size:9.5px}
+  .statusbar-right{font-size:9.5px}
+}
+
+/* The body always has at least the statusbar height reserved so
+   fixed-bottom chrome doesn't cover the bottom of the deal table. */
+body{padding-bottom:var(--statusbar-h)}
