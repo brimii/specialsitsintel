@@ -6,9 +6,9 @@ export default function RegulatorsPage() {
       <div className="page-shell">
         <div className="page-hero">
           <div>
-            <div className="hero-eyebrow">Global Regulatory Intelligence</div>
+            <div className="hero-eyebrow">US Regulatory Intelligence</div>
             <h1 className="hero-h">
-              15 Regulators.
+              {REGS.length} US Regulators.
               <br />
               <em>One Dashboard.</em>
             </h1>
@@ -16,8 +16,8 @@ export default function RegulatorsPage() {
           <div>
             <p className="hero-sub">
               Historical clearance rates, current enforcement posture, process timelines, and live
-              monitoring across every major antitrust and foreign investment jurisdiction. Updated
-              daily.
+              monitoring across every US antitrust, foreign-investment and sector-specific regulator
+              that moves event-driven deal outcomes. Updated daily.
             </p>
           </div>
         </div>

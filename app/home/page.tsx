@@ -30,13 +30,13 @@ export default function HomePage() {
               </ModalButton>
             </div>
             <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
-              Currently onboarding event-driven funds · Institutional access only · as of May 23, 2026
+              Currently onboarding event-driven funds · Institutional access only · as of Nov 2026
             </div>
           </div>
           <div className="home-stats">
             <div className="hstat">
-              <div className="hstat-v">150+</div>
-              <div className="hstat-l">Live situations across 14 countries</div>
+              <div className="hstat-v">200+</div>
+              <div className="hstat-l">Active US event-driven situations</div>
             </div>
             <div className="hstat">
               <div className="hstat-v">7</div>
@@ -47,8 +47,8 @@ export default function HomePage() {
               <div className="hstat-l">Avg annualized spread (active deals)</div>
             </div>
             <div className="hstat">
-              <div className="hstat-v">15</div>
-              <div className="hstat-l">Regulators monitored + AI scored</div>
+              <div className="hstat-v">8</div>
+              <div className="hstat-l">US regulators monitored + AI scored</div>
             </div>
           </div>
         </div>
@@ -70,7 +70,7 @@ export default function HomePage() {
               { ic: "⊞", bg: "var(--navy-bg)", c: "var(--navy)", t: "AI Deal Scoring", d: "Closing probability, expected value, and optimal Kelly sizing for every situation. Updated continuously from filings and news." },
               { ic: "⊟", bg: "var(--cobalt-bg)", c: "var(--cobalt)", t: "FTC Language Scoring", d: "NLP of every FTC and DOJ filing — hawkishness signals detected 3-6 weeks before market prices them in." },
               { ic: "◷", bg: "var(--amber-bg)", c: "var(--amber)", t: "Timeline Prediction", d: "Slippage model trained on 6,000+ historical regulatory reviews. Extension probability with confidence intervals." },
-              { ic: "✦", bg: "var(--crimson-bg)", c: "var(--crimson)", t: "15 Regulators Live", d: "FTC, DOJ, DG COMP, CMA, CFIUS, JFTC, FEFTA and 8 more — posture, clearance rates, process tracking." },
+              { ic: "✦", bg: "var(--crimson-bg)", c: "var(--crimson)", t: "US Regulators Live", d: "FTC, DOJ, HSR, CFIUS, FCC, FERC, SEC, FINRA — posture, clearance rates, process tracking." },
               { ic: "⊕", bg: "var(--navy-bg)", c: "var(--navy)", t: "Portfolio Tracker", d: "Build and track your special sits book. P&L, Kelly sizing, allocation by strategy, and live spread updates." },
               { ic: "★", bg: "var(--cobalt-bg)", c: "var(--cobalt)", t: "Market Regime", d: "Each sub-strategy mapped to macro environment: rates, vol, credit, liquidity. Know when merger arb outperforms." },
             ].map((f) => (
