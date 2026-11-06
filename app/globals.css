@@ -1275,3 +1275,52 @@ select.form-input{cursor:pointer;-webkit-appearance:none;appearance:none;backgro
 /* The body always has at least the statusbar height reserved so
    fixed-bottom chrome doesn't cover the bottom of the deal table. */
 body{padding-bottom:var(--statusbar-h)}
+
+/* ═══════════════════════════════════════════════
+   Compliance footer — fixed above the StatusBar
+   on public pages. One-liner with the legal link
+   roster + "NOT INVESTMENT ADVICE" tag.
+   ═══════════════════════════════════════════════ */
+.compliance-footer{
+  position:fixed;left:0;right:0;
+  bottom:var(--statusbar-h);z-index:calc(var(--z-statusbar) - 1);
+  display:flex;align-items:center;gap:var(--sp-2);
+  padding:5px var(--sp-4);
+  padding-left:calc(var(--nav-w) + var(--sp-4));
+  background:var(--bg-1);
+  border-top:1px solid var(--border);
+  font-family:var(--font-mono);
+  font-size:9.5px;letter-spacing:.06em;
+  color:var(--text-3);
+  text-transform:uppercase;
+  height:24px;
+}
+.compliance-footer a{
+  color:var(--text-2);
+  text-decoration:none;
+  transition:color var(--t-fast);
+}
+.compliance-footer a:hover{color:var(--navy)}
+.compliance-footer .cf-tag{
+  color:var(--amber);
+  font-weight:600;
+  padding:1px 5px;
+  border:1px solid var(--amber-bd);
+  background:var(--amber-bg);
+  border-radius:var(--r-sm);
+  letter-spacing:.08em;
+}
+.compliance-footer .cf-sep{color:var(--text-4);opacity:.6}
+.compliance-footer .cf-right{margin-left:auto;color:var(--text-3);letter-spacing:.06em}
+
+@media(max-width:768px){
+  .compliance-footer{
+    padding-left:var(--sp-4);
+    font-size:9px;
+    height:22px;
+  }
+  .compliance-footer .cf-right{display:none}
+}
+
+/* Body padding reserves both the compliance footer AND status bar */
+body{padding-bottom:calc(var(--statusbar-h) + 24px)}

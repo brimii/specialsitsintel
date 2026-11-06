@@ -5,6 +5,7 @@ import KpiBar from "./components/KpiBar";
 import Ticker from "./components/Ticker";
 import TopBar from "./components/TopBar";
 import StatusBar from "./components/StatusBar";
+import ComplianceFooter from "./components/ComplianceFooter";
 import { ModalProvider } from "./components/modals/ModalProvider";
 
 export const metadata: Metadata = {
@@ -42,6 +43,7 @@ export default function RootLayout({
           <KpiBar />
           <Ticker />
           {children}
+          <ComplianceFooter />
           <StatusBar />
         </ModalProvider>
       </body>
