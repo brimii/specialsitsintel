@@ -12,19 +12,53 @@ const catCol: Record<string, string> = {
   REORG: "var(--amber)",
 };
 
-// Graphique de prix procédural (SVG déterministe, seedé par nom+année) — porté
-// fidèlement de la maquette.
+// Parse strings like "4 mo", "9 yr hold", "17 mo", "6 yr", "21 mo",
+// "3 yr post", "12 yr+", "Ongoing", "363 days". Returns duration in
+// MONTHS (float) so downstream date math is uniform. The previous
+// implementation did `parseFloat(h.dur) || 1` which read "4 mo" as 4
+// YEARS — every sub-year deal had a nonsense end date.
+function parseDurationMonths(dur: string | undefined): number {
+  if (!dur) return 12;
+  const s = dur.toLowerCase().trim();
+  if (s.includes("ongoing")) return 30; // fallback for live deals
+  const num = parseFloat(dur);
+  if (!Number.isFinite(num) || num <= 0) return 12;
+  if (/\byr|\byear/.test(s)) return num * 12;
+  if (/\bday/.test(s)) return num / 30;
+  if (/\bmo|\bmonth/.test(s)) return num;
+  // Unlabelled: short numbers are months, long are years.
+  return num < 24 ? num : num * 12;
+}
+
+// Add N months (possibly fractional) to a date.
+function addMonths(d: Date, months: number): Date {
+  const dd = new Date(d);
+  const whole = Math.floor(months);
+  const rem = months - whole;
+  dd.setMonth(dd.getMonth() + whole);
+  dd.setDate(dd.getDate() + Math.round(rem * 30));
+  return dd;
+}
+
+const fmtDateShort = (d: Date) =>
+  d.toLocaleDateString("en-US", { month: "short", year: "numeric" }).toUpperCase();
+
+// Graphique de prix procédural (SVG déterministe, seedé par nom+année).
+// Timeline X axis now reflects real calendar dates driven by h.yr and
+// h.dur, not fixed index positions.
 function HistChart({ h, idx }: { h: HistDeal; idx: number }) {
-  const W = 280,
-    H = 88,
-    pL = 4,
-    pR = 4,
-    pT = 6,
-    pB = 22;
+  const W = 320,
+    H = 118,
+    pL = 10,
+    pR = 10,
+    pT = 10,
+    pB = 30;
   const iW = W - pL - pR,
     iH = H - pT - pB;
   const retNum = parseFloat(h.ret.replace(/[^0-9.-]/g, "")) * (h.ret.includes("-") ? -1 : 1) || 0;
-  const hexCol = retNum > 0 ? "#162f68" : retNum < 0 ? "#a83232" : "#9c6d2a";
+  // Neon Grid palette: cyan for positive, crimson for negative, amber
+  // for neutral / unknown. Matches the deal-detail PriceChart rework.
+  const hexCol = retNum > 0 ? "#4a9cff" : retNum < 0 ? "#ff5078" : "#ffa94d";
   const cssCol = retNum > 0 ? "var(--navy)" : retNum < 0 ? "var(--crimson)" : "var(--amber)";
 
   let seed = h.nm.length * 17 + parseInt(h.yr) * 3;
@@ -61,56 +95,151 @@ function HistChart({ h, idx }: { h: HistDeal; idx: number }) {
   const ys = (p: number) => pT + iH - ((p - mn) / (mx - mn)) * iH;
   const xs = (i: number) => pL + (i / (N - 1)) * iW;
 
+  // Real dates — start month defaults to Jan of h.yr, event date lands
+  // at the announce index (~3-4 months in for short deals, longer for
+  // multi-year ones), end date is start + parsed duration.
+  const startYear = parseInt(h.yr) || 2015;
+  const start = new Date(startYear, 0, 15);
+  const durMonths = parseDurationMonths(h.dur);
+  const end = addMonths(start, durMonths);
+  const eventOffsetMonths = (ann / (N - 1)) * durMonths;
+  const event = addMonths(start, eventOffsetMonths);
+
   let path = `M ${xs(0)} ${ys(prices[0])}`;
   for (let i = 1; i < N; i++) path += ` L ${xs(i)} ${ys(prices[i])}`;
   const area = path + ` L ${xs(N - 1)} ${pT + iH} L ${pL} ${pT + iH} Z`;
   const annX = xs(ann),
     curX = xs(N - 1);
-  const yr = parseInt(h.yr) || 2015;
-  const durYrs = parseFloat(h.dur) || 1;
-  const endYr = yr + Math.ceil(durYrs);
-  const midYr = Math.round((yr + endYr) / 2);
-  const xlbls = [
-    { x: xs(0), t: yr.toString() },
-    { x: annX, t: "EVENT" },
-    { x: xs(Math.floor(N / 2)), t: midYr.toString() },
-    { x: curX, t: endYr.toString() },
-  ];
   const gid = `hg-${idx}`;
 
+  const durLabel = h.dur || "";
+
   return (
-    <div style={{ background: "var(--bg-2)", borderRadius: "var(--r-sm)", padding: "var(--sp-2)", marginBottom: "var(--sp-3)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 7.5, textTransform: "uppercase", letterSpacing: ".1em", color: "var(--text-3)" }}>
-          {h.sym || h.acq.split(" ")[0]} · {h.yr}
+    <div
+      style={{
+        background: "var(--bg-2)",
+        borderRadius: "var(--r-sm)",
+        padding: "var(--sp-3)",
+        marginBottom: "var(--sp-3)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: 6,
+          gap: 8,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 9,
+            textTransform: "uppercase",
+            letterSpacing: ".12em",
+            color: "var(--text-3)",
+          }}
+        >
+          {h.sym || h.acq.split(" ")[0]} · {fmtDateShort(start)} → {fmtDateShort(end)}
         </span>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color: cssCol }}>{h.ret}</span>
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 13,
+            fontWeight: 600,
+            color: cssCol,
+            letterSpacing: ".02em",
+          }}
+        >
+          {h.ret}
+        </span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: 70, display: "block" }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        style={{ width: "100%", height: 100, display: "block" }}
+      >
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={hexCol} stopOpacity=".2" />
+            <stop offset="0%" stopColor={hexCol} stopOpacity=".3" />
             <stop offset="100%" stopColor={hexCol} stopOpacity="0" />
           </linearGradient>
         </defs>
-        <line x1={annX} y1={pT} x2={annX} y2={pT + iH} stroke="rgba(54,96,160,.55)" strokeWidth=".9" strokeDasharray="2,2" />
+
+        {/* Baseline rule — bottom of the chart area */}
+        <line
+          x1={pL}
+          y1={pT + iH}
+          x2={pL + iW}
+          y2={pT + iH}
+          stroke="rgba(74,156,255,.25)"
+          strokeWidth="0.6"
+        />
+
+        {/* Announce / event marker */}
+        <line
+          x1={annX}
+          y1={pT}
+          x2={annX}
+          y2={pT + iH}
+          stroke="rgba(74,156,255,.55)"
+          strokeWidth=".9"
+          strokeDasharray="2,2"
+        />
+
         <path d={area} fill={`url(#${gid})`} />
-        <path d={path} fill="none" stroke={hexCol} strokeWidth="1.5" strokeLinejoin="round" />
-        <circle cx={curX} cy={ys(prices[N - 1])} r="3" fill={hexCol} stroke="var(--bg-2)" strokeWidth="1.2" />
-        {xlbls.map((l, i) => (
-          <text
-            key={i}
-            x={l.x}
-            y={pT + iH + 13}
-            fill={l.t === "EVENT" ? "#3660a0" : "var(--text-3)"}
-            fontFamily="DM Mono,monospace"
-            fontSize="8"
-            textAnchor="middle"
-            fontWeight={l.t === "EVENT" ? "600" : "400"}
-          >
-            {l.t}
-          </text>
-        ))}
+        <path d={path} fill="none" stroke={hexCol} strokeWidth="1.6" strokeLinejoin="round" />
+        <circle cx={curX} cy={ys(prices[N - 1])} r="3" fill={hexCol} stroke="var(--bg-2)" strokeWidth="1.3" />
+
+        {/* X-axis labels: three evenly spaced calendar anchors. Left =
+            deal start, centre = event date, right = end. */}
+        <text
+          x={pL}
+          y={pT + iH + 14}
+          fill="var(--text-3)"
+          fontFamily="IBM Plex Mono, monospace"
+          fontSize="9"
+          textAnchor="start"
+          letterSpacing=".04em"
+        >
+          {fmtDateShort(start)}
+        </text>
+        <text
+          x={annX}
+          y={pT + iH + 14}
+          fill="#4a9cff"
+          fontFamily="IBM Plex Mono, monospace"
+          fontSize="9"
+          textAnchor="middle"
+          letterSpacing=".04em"
+          fontWeight="600"
+        >
+          {fmtDateShort(event)}
+        </text>
+        <text
+          x={pL + iW}
+          y={pT + iH + 14}
+          fill="var(--text-3)"
+          fontFamily="IBM Plex Mono, monospace"
+          fontSize="9"
+          textAnchor="end"
+          letterSpacing=".04em"
+        >
+          {fmtDateShort(end)}
+        </text>
+        <text
+          x={annX}
+          y={pT + iH + 24}
+          fill="var(--text-4)"
+          fontFamily="IBM Plex Mono, monospace"
+          fontSize="7.5"
+          textAnchor="middle"
+          letterSpacing=".1em"
+        >
+          EVENT · {durLabel}
+        </text>
       </svg>
     </div>
   );
