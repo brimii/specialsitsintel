@@ -112,7 +112,7 @@ export default function TermsPage() {
       <h2>11. Contact</h2>
       <p>
         Questions about these Terms, or about anything else:{" "}
-        <a href="mailto:lbrimicombee@gmail.com">lbrimicombee@gmail.com</a>. Postal address available
+        <a href="mailto:contact@specialsitsintel.com">contact@specialsitsintel.com</a>. Postal address available
         on request.
       </p>
     </LegalShell>

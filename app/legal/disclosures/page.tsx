@@ -137,7 +137,7 @@ export default function DisclosuresPage() {
       <h2>11. Contact</h2>
       <p>
         Questions about these disclosures, or to report a data issue:{" "}
-        <a href="mailto:lbrimicombee@gmail.com">lbrimicombee@gmail.com</a>.
+        <a href="mailto:contact@specialsitsintel.com">contact@specialsitsintel.com</a>.
       </p>
     </LegalShell>
   );

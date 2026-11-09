@@ -154,7 +154,7 @@ export default function MethodologyPage() {
       <h2>9. Questions &amp; corrections</h2>
       <p>
         See a deal that looks wrong, or a methodology detail that needs clarification?{" "}
-        <a href="mailto:lbrimicombee@gmail.com">lbrimicombee@gmail.com</a>. Corrections are
+        <a href="mailto:contact@specialsitsintel.com">contact@specialsitsintel.com</a>. Corrections are
         documented in the audit log.
       </p>
     </LegalShell>

@@ -121,7 +121,7 @@ export default function PrivacyPage() {
       </ul>
       <p>
         To exercise any of these rights, email{" "}
-        <a href="mailto:lbrimicombee@gmail.com">lbrimicombee@gmail.com</a>. We respond within 30
+        <a href="mailto:contact@specialsitsintel.com">contact@specialsitsintel.com</a>. We respond within 30
         days. Identity verification may be required.
       </p>
 
@@ -163,7 +163,7 @@ export default function PrivacyPage() {
       <h2>13. Contact</h2>
       <p>
         Data protection questions, access or deletion requests:{" "}
-        <a href="mailto:lbrimicombee@gmail.com">lbrimicombee@gmail.com</a>.
+        <a href="mailto:contact@specialsitsintel.com">contact@specialsitsintel.com</a>.
       </p>
     </LegalShell>
   );
