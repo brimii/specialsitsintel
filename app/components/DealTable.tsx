@@ -1,5 +1,25 @@
 import { type Deal, pcol, ecol, dealCapUSD, fmtCap, BADGE_CL, CLS, SOURCE_BADGE_CL } from "../data/deals";
 
+// Compact relative-time formatter for the "updated X ago" indicator.
+// Returns "LIVE" when the row was touched within 5 minutes, otherwise
+// the shortest unit (m/h/d) under which the age fits.
+function relativeAge(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return null;
+  const ms = Date.now() - then;
+  if (ms < 0 || ms > 1000 * 60 * 60 * 24 * 365 * 5) return null;
+  if (ms < 1000 * 60 * 5) return "LIVE";
+  const min = Math.floor(ms / 60000);
+  if (min < 60) return `${min}M`;
+  const hrs = Math.floor(min / 60);
+  if (hrs < 48) return `${hrs}H`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}D`;
+  const mo = Math.floor(days / 30);
+  return `${mo}MO`;
+}
+
 export type SortField = "name" | "size" | "spread" | "prob" | "ev" | "date";
 
 const COLS: { key: SortField | null; label: string }[] = [
@@ -120,7 +140,25 @@ export default function DealTable({
                   </span>
                 </span>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
-                  {deal.pr?.ad || "—"}
+                  <div>{deal.pr?.ad || "—"}</div>
+                  {(() => {
+                    const age = relativeAge(deal.updated_at);
+                    if (!age) return null;
+                    const isLive = age === "LIVE";
+                    return (
+                      <div
+                        style={{
+                          fontSize: 8,
+                          color: isLive ? "var(--amber)" : "var(--text-4)",
+                          marginTop: 2,
+                          letterSpacing: ".08em",
+                        }}
+                        title={`Last updated · ${deal.updated_at}`}
+                      >
+                        {isLive ? "◉ LIVE" : `UPD ${age}`}
+                      </div>
+                    );
+                  })()}
                 </span>
               </div>
             );

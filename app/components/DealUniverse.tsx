@@ -33,6 +33,72 @@ function parseDate(s?: string): number {
   return 0;
 }
 
+// Download the current filter as CSV. Client-side blob — no server
+// round-trip, no PII leakage, no new route. Escapes double-quotes
+// per RFC 4180 so Excel + Numbers + Sheets all parse it cleanly.
+function exportDealsCsv(rows: Deal[]) {
+  if (rows.length === 0) return;
+  const headers = [
+    "Situation",
+    "Acquirer",
+    "Category",
+    "Status",
+    "Deal Value",
+    "Size USD",
+    "Spread %",
+    "Close Prob %",
+    "Expected Value %",
+    "Regulator",
+    "Score",
+    "Ticker",
+    "Current Px",
+    "Offer Px",
+    "Currency",
+    "Announced",
+    "Close Estimate",
+    "Last Updated",
+  ];
+  const esc = (v: unknown): string => {
+    const s = String(v ?? "");
+    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const csv = [
+    headers.join(","),
+    ...rows.map((d) =>
+      [
+        esc(d.nm),
+        esc(d.acq),
+        esc(d.c),
+        esc(d.st),
+        esc(d.v),
+        esc(dealCapUSD(d.v)),
+        esc(d.s.toFixed(1)),
+        esc(d.p),
+        esc(d.ev.toFixed(1)),
+        esc(d.r),
+        esc(d.sc),
+        esc(d.pr?.sym),
+        esc(d.pr?.c),
+        esc(d.pr?.o),
+        esc(d.pr?.cur),
+        esc(d.pr?.ad),
+        esc(d.cl),
+        esc(d.updated_at),
+      ].join(","),
+    ),
+  ].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ssi-deals-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // Statuses that mean the deal is settled — won, lost, or terminated.
 // Everything else (Review, Closing, Litigation, Active, Rumored, etc.) is
 // considered "active" / still moving.
@@ -185,6 +251,14 @@ export default function DealUniverse({
             <span className="count-pill" style={{ marginLeft: "auto", marginRight: "var(--sp-2)" }}>
               {filtered.length} situations
             </span>
+            <button
+              type="button"
+              className="filter-btn"
+              onClick={() => exportDealsCsv(filtered)}
+              title="Download the current filter as a CSV"
+            >
+              ⤓ CSV
+            </button>
             <button
               className={`filter-btn${view === "deals" ? " active" : ""}`}
               onClick={() => setView("deals")}

@@ -25,6 +25,7 @@ export type Deal = {
   tl: TimelineEntry[];
   min_tier?: string; // palier minimum requis (défaut: analyst)
   source?: string; // discovery source label (SEC / CMA / DG COMP / TDnet / HKEX / ASX / Seeded)
+  updated_at?: string; // ISO timestamp of last DB update — drives "updated Xm ago" indicator
 };
 
 // Bucket a deal_updates._creation source_url into a short label used by

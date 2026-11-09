@@ -1,10 +1,25 @@
 import Link from "next/link";
 import ModalButton from "@/app/components/ModalButton";
 import CheckoutButton from "@/app/components/CheckoutButton";
+import { getAllDeals } from "@/lib/deals";
 
-// Page Home (marketing). Les boutons "Request Access / Contact Sales" et le
-// formulaire e-mail ouvriront des modales — branchés à l'étape modales.
-export default function HomePage() {
+// Server component — reads the live deal set to populate hero stats
+// instead of hard-coding them. `force-dynamic` because the stats
+// shouldn't go stale between deploys.
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const deals = await getAllDeals();
+  const activeCount = deals.length;
+  const spreadsPositive = deals.filter((d) => d.s > 0);
+  const avgSpread = spreadsPositive.length
+    ? (spreadsPositive.reduce((sum, d) => sum + d.s, 0) / spreadsPositive.length).toFixed(1) + "%"
+    : "—";
+  const asOfLabel = new Date().toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
   return (
     <div className="page active" id="page-home">
       <div style={{ maxWidth: "var(--content-max)", margin: "0 auto", padding: "0 clamp(20px,3vw,32px) 80px" }}>
@@ -17,9 +32,9 @@ export default function HomePage() {
               <em>Special Situations.</em>
             </h1>
             <p className="hero-sub" style={{ marginBottom: "var(--sp-6)" }}>
-              150+ live situations tracked real-time. AI-scored merger arb, activism, distressed,
-              spin-offs — with regulatory monitoring, timeline prediction, and institutional
-              analytics. Built by practitioners, for practitioners.
+              {activeCount}+ live US situations tracked real-time. AI-scored merger arb, activism,
+              distressed, spin-offs — with regulatory monitoring, timeline prediction, and
+              institutional analytics. Built by practitioners, for practitioners.
             </p>
             <div style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
               <Link href="/" className="btn btn-primary btn-lg">
@@ -30,12 +45,12 @@ export default function HomePage() {
               </ModalButton>
             </div>
             <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
-              Currently onboarding event-driven funds · Institutional access only · as of Nov 2026
+              Currently onboarding event-driven funds · Institutional access only · as of {asOfLabel}
             </div>
           </div>
           <div className="home-stats">
             <div className="hstat">
-              <div className="hstat-v">200+</div>
+              <div className="hstat-v">{activeCount}</div>
               <div className="hstat-l">Active US event-driven situations</div>
             </div>
             <div className="hstat">
@@ -43,7 +58,7 @@ export default function HomePage() {
               <div className="hstat-l">Sub-strategies with regime analysis</div>
             </div>
             <div className="hstat">
-              <div className="hstat-v">—</div>
+              <div className="hstat-v">{avgSpread}</div>
               <div className="hstat-l">Avg annualized spread (active deals)</div>
             </div>
             <div className="hstat">
@@ -145,7 +160,7 @@ export default function HomePage() {
           </table>
         </div>
 
-        {/* PRICING */}
+        {/* PRICING teaser — full details on /pricing */}
         <div>
           <div className="section-hd">
             <div className="hero-eyebrow" style={{ justifyContent: "center" }}>
@@ -156,104 +171,68 @@ export default function HomePage() {
               <br />
               Challenger price.
             </h2>
-            <p>Bloomberg at under 7% of the cost. No per-seat surprises.</p>
-          </div>
-          <div className="pricing-grid stagger">
-            <div className="plan">
-              <div className="plan-nm">Free</div>
-              <div className="plan-desc">Preview for analysts evaluating the platform.</div>
-              <div className="plan-p">
-                €0<span>/mo</span>
-              </div>
-              <div className="plan-save">{" "}</div>
-              <div className="plan-feats">
-                <div className="plan-feat">5 live situations</div>
-                <div className="plan-feat">Gross spread + close probability</div>
-                <div className="plan-feat">Academy — 2 strategy modules</div>
-                <div className="plan-feat no">AI commentary & FTC scoring</div>
-                <div className="plan-feat no">Portfolio tracker</div>
-                <div className="plan-feat no">Price charts</div>
-              </div>
-              <ModalButton modal="access" className="plan-cta btn-secondary">
-                Get Started
-              </ModalButton>
-            </div>
-
-            <div className="plan featured">
-              <div className="plan-badge">MOST POPULAR</div>
-              <div className="plan-nm">Analyst</div>
-              <div className="plan-desc">For dedicated event-driven analysts.</div>
-              <div className="plan-p">
-                €150<span>/mo</span>
-              </div>
-              <div className="plan-save">€1,800/yr · Bloomberg at 6.7% of cost</div>
-              <div className="plan-feats">
-                <div className="plan-feat">All 150+ live situations</div>
-                <div className="plan-feat">AI scoring + FTC NLP signals</div>
-                <div className="plan-feat">Full price charts with zoom</div>
-                <div className="plan-feat">Portfolio tracker</div>
-                <div className="plan-feat">15-jurisdiction regulatory monitoring</div>
-                <div className="plan-feat">Real-time alerts (15 / day)</div>
-                <div className="plan-feat no">API access</div>
-                <div className="plan-feat no">Multi-seat</div>
-              </div>
-              <CheckoutButton tier="analyst" className="plan-cta btn btn-primary">
-                Subscribe →
-              </CheckoutButton>
-            </div>
-
-            <div className="plan">
-              <div className="plan-nm">Institutional</div>
-              <div className="plan-desc">For event-driven funds. Full workflow, multi-seat.</div>
-              <div className="plan-p">
-                €600<span>/mo</span>
-              </div>
-              <div className="plan-save">€7,200/yr · 3 seats · API included</div>
-              <div className="plan-feats">
-                <div className="plan-feat">Everything in Analyst</div>
-                <div className="plan-feat">Portfolio P&L + Kelly optimizer</div>
-                <div className="plan-feat">API access (REST + webhooks)</div>
-                <div className="plan-feat">3 analyst seats</div>
-                <div className="plan-feat">Strategy backtesting engine</div>
-                <div className="plan-feat">Priority support + custom coverage</div>
-              </div>
-              <ModalButton modal="contact" className="plan-cta btn-secondary">
-                Contact Sales
-              </ModalButton>
-            </div>
-
-            <div className="plan">
-              <div className="plan-nm">Enterprise</div>
-              <div className="plan-desc">White-label for allocators and prime brokers.</div>
-              <div className="plan-p">
-                €2,500<span>/mo</span>
-              </div>
-              <div className="plan-save">Custom SLA · SOC 2 roadmap</div>
-              <div className="plan-feats">
-                <div className="plan-feat">Everything in Institutional</div>
-                <div className="plan-feat">White-label + custom branding</div>
-                <div className="plan-feat">Unlimited seats</div>
-                <div className="plan-feat">On-premise option</div>
-                <div className="plan-feat">Custom OMS / PMS integrations</div>
-                <div className="plan-feat">Dedicated coverage team</div>
-              </div>
-              <ModalButton modal="contact" className="plan-cta btn-secondary">
-                Talk to Us
-              </ModalButton>
-            </div>
+            <p>From a free preview to full-scale enterprise. Bloomberg at under 7% of the cost.</p>
           </div>
 
-          <div style={{ textAlign: "center", padding: "var(--sp-7) 0 var(--sp-4)", borderTop: "1px solid var(--border)" }}>
-            <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.02em", marginBottom: 7 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "var(--sp-3)",
+              marginBottom: "var(--sp-6)",
+            }}
+          >
+            {[
+              { nm: "Free", p: "€0", sub: "5 deals · preview" },
+              { nm: "Analyst", p: "€150", sub: "/mo · full terminal", featured: true },
+              { nm: "Institutional", p: "€600", sub: "/mo · API + 3 seats" },
+              { nm: "Enterprise", p: "€2,500", sub: "/mo · white-label" },
+            ].map((t) => (
+              <div
+                key={t.nm}
+                style={{
+                  padding: "var(--sp-4)",
+                  background: t.featured ? "var(--navy-bg)" : "var(--bg-2)",
+                  border: `1px solid ${t.featured ? "var(--navy-bd)" : "var(--border)"}`,
+                  borderRadius: "var(--r-md)",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    letterSpacing: ".1em",
+                    textTransform: "uppercase",
+                    color: t.featured ? "var(--navy)" : "var(--text-3)",
+                    marginBottom: 6,
+                  }}
+                >
+                  {t.nm}
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-.02em" }}>
+                  {t.p}
+                </div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-3)", marginTop: 4 }}>
+                  {t.sub}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ textAlign: "center", padding: "var(--sp-5) 0 var(--sp-4)", borderTop: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-.02em", marginBottom: 7 }}>
               Currently onboarding event-driven funds.
             </div>
-            <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: "var(--sp-5)" }}>
+            <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: "var(--sp-4)" }}>
               Institutional access only · Priority to funds &gt;€50M AUM in event-driven strategies
             </div>
             <div style={{ display: "flex", gap: "var(--sp-3)", justifyContent: "center", flexWrap: "wrap" }}>
-              <input type="email" placeholder="your@fund.com" className="form-input" style={{ width: 240 }} />
-              <ModalButton modal="access" className="btn btn-primary">
-                Request Institutional Access →
+              <Link href="/pricing" className="btn btn-primary btn-lg">
+                See full pricing →
+              </Link>
+              <ModalButton modal="access" className="btn btn-secondary btn-lg">
+                Request Access
               </ModalButton>
             </div>
           </div>

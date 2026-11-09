@@ -52,6 +52,7 @@ type DealRow = {
   close_estimate: string | null;
   price: Price | null;
   timeline: TimelineEntry[] | null;
+  updated_at: string | null;
 };
 
 // Parse "Q3 2026", "H1 2027", "Mar 2027" → approximate months from
@@ -200,6 +201,7 @@ function rowToDeal(r: DealRow): Deal {
     ai: r.ai_commentary ?? "",
     tl: r.timeline ?? [],
     min_tier: r.min_tier ?? "analyst",
+    updated_at: r.updated_at ?? undefined,
   };
 }
 
