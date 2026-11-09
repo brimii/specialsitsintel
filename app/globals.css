@@ -128,9 +128,12 @@ a{color:inherit}
 
 /* ── SIDEBAR NAV ── */
 nav{
-  position:fixed;top:0;left:0;bottom:0;width:var(--nav-w);z-index:var(--z-nav);
+  position:fixed;top:0;left:0;bottom:calc(var(--statusbar-h) + 24px);width:var(--nav-w);z-index:var(--z-nav);
   background:var(--bg-1);border-right:1px solid var(--border);
   display:flex;flex-direction:column;overflow:hidden;
+}
+@media(max-width:768px){
+  nav{bottom:0}
 }
 body{padding-left:var(--nav-w)}
 
