@@ -91,12 +91,18 @@ function AccessModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [aum, setAum] = useState("");
   const [strat, setStrat] = useState("");
-  const [errs, setErrs] = useState<{ fn?: boolean; fund?: boolean; email?: boolean }>({});
+  const [qualified, setQualified] = useState(false);
+  const [errs, setErrs] = useState<{ fn?: boolean; fund?: boolean; email?: boolean; qualified?: boolean }>({});
 
   const submit = () => {
-    const e = { fn: !fn.trim(), fund: !fund.trim(), email: !isEmail(email) };
+    const e = {
+      fn: !fn.trim(),
+      fund: !fund.trim(),
+      email: !isEmail(email),
+      qualified: !qualified,
+    };
     setErrs(e);
-    if (e.fn || e.fund || e.email) return;
+    if (e.fn || e.fund || e.email || e.qualified) return;
     setSubmitted(true);
   };
 
@@ -148,6 +154,28 @@ function AccessModal({ onClose }: { onClose: () => void }) {
                   <option>Other</option>
                 </select>
               </div>
+            </div>
+            <label
+              className={`qi-attest${errs.qualified ? " invalid" : ""}`}
+              style={{ marginTop: "var(--sp-3)" }}
+            >
+              <input
+                type="checkbox"
+                checked={qualified}
+                onChange={(e) => setQualified(e.target.checked)}
+              />
+              <span>
+                I confirm I am a <strong>Qualified Investor</strong> (professional / institutional
+                investor as defined under MiFID II Annex II or SEC Rule 501) and that
+                SpecialSitsIntel is not retail investment advice. I have read the{" "}
+                <a href="/legal/disclosures" target="_blank" rel="noopener">
+                  disclosures
+                </a>
+                .
+              </span>
+            </label>
+            <div className={`form-error${errs.qualified ? " visible" : ""}`}>
+              Qualified Investor attestation is required.
             </div>
           </div>
           <div className="modal-footer">
@@ -245,6 +273,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<LoginMode>("login");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [qualified, setQualified] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -276,6 +305,10 @@ function LoginModal({ onClose }: { onClose: () => void }) {
         router.refresh();
       } else if (mode === "signup") {
         if (pass.length < 8) return setError("Password: 8 characters minimum.");
+        if (!qualified)
+          return setError(
+            "You must confirm the Qualified Investor attestation to open an account.",
+          );
         const { data, error } = await supabase.auth.signUp({
           email,
           password: pass,
@@ -350,6 +383,23 @@ function LoginModal({ onClose }: { onClose: () => void }) {
               Forgot password?
             </button>
           </div>
+        )}
+        {mode === "signup" && (
+          <label className="qi-attest" style={{ marginTop: "var(--sp-2)" }}>
+            <input
+              type="checkbox"
+              checked={qualified}
+              onChange={(e) => setQualified(e.target.checked)}
+            />
+            <span>
+              I confirm I am a <strong>Qualified Investor</strong> (professional / institutional,
+              MiFID II Annex II or SEC Rule 501). SpecialSitsIntel is not retail investment advice.{" "}
+              <a href="/legal/disclosures" target="_blank" rel="noopener">
+                Disclosures
+              </a>
+              .
+            </span>
+          </label>
         )}
         {error && <div className="form-error visible">{error}</div>}
         {info && <div style={{ fontSize: 11, color: "var(--navy)", lineHeight: 1.6, marginTop: 6 }}>{info}</div>}

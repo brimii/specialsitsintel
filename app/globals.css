@@ -1327,3 +1327,164 @@ body{padding-bottom:var(--statusbar-h)}
 
 /* Body padding reserves both the compliance footer AND status bar */
 body{padding-bottom:calc(var(--statusbar-h) + 24px)}
+
+/* ═══════════════════════════════════════════════
+   Cookie banner — fixed bottom-right card, shown
+   once per browser. Sits above the compliance
+   footer / statusbar so it never conflicts.
+   ═══════════════════════════════════════════════ */
+.cookie-banner{
+  position:fixed;
+  bottom:calc(var(--statusbar-h) + 24px + var(--sp-4));
+  right:var(--sp-4);left:auto;
+  max-width:460px;
+  display:flex;align-items:center;gap:var(--sp-3);
+  padding:14px 16px;
+  background:var(--bg-1);
+  border:1px solid var(--navy-bd);
+  border-radius:var(--r-md);
+  box-shadow:var(--shadow-lg);
+  z-index:calc(var(--z-statusbar) + 10);
+  animation:cookie-in .35s var(--ease-out);
+}
+@keyframes cookie-in{
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.cookie-banner-text{
+  flex:1;min-width:0;
+  font-size:12px;line-height:1.55;color:var(--text-2);
+  font-family:var(--font-sans);
+}
+.cookie-banner-text strong{color:var(--text);font-weight:600}
+.cookie-banner-ic{color:var(--amber);font-size:11px;margin-right:6px}
+.cookie-banner-link{color:var(--navy);text-decoration:underline}
+.cookie-banner-btn{
+  flex-shrink:0;
+  background:var(--navy);
+  border:0;color:var(--bg);
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+  padding:6px 12px;cursor:pointer;
+  border-radius:var(--r-sm);
+  text-transform:uppercase;font-weight:500;
+  transition:background var(--t-fast);
+}
+.cookie-banner-btn:hover{background:var(--navy-2)}
+
+@media(max-width:768px){
+  .cookie-banner{
+    left:var(--sp-3);right:var(--sp-3);max-width:none;
+    bottom:calc(var(--statusbar-h) + 24px + var(--sp-3) + env(safe-area-inset-bottom, 0px));
+    flex-direction:column;align-items:stretch;gap:var(--sp-2);
+  }
+  .cookie-banner-btn{align-self:flex-end}
+}
+
+/* ============================================================
+   Command palette (⌘K). Full-screen overlay with a centered
+   dark card, keyboard-first list of pages, deals, actions.
+   ============================================================ */
+.cmd-overlay{
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:12vh var(--sp-4) var(--sp-4);
+}
+.cmd-box{
+  width:min(680px,100%);
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  overflow:hidden;display:flex;flex-direction:column;
+  max-height:76vh;
+}
+.cmd-input-wrap{
+  display:flex;align-items:center;gap:var(--sp-2);
+  padding:var(--sp-3) var(--sp-4);
+  border-bottom:1px solid var(--border);
+  background:var(--bg-2);
+}
+.cmd-prompt{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;
+  color:var(--navy);background:var(--navy-bg);
+  padding:3px 6px;border:1px solid var(--navy-bd);border-radius:3px;
+}
+.cmd-input-wrap input{
+  flex:1;background:transparent;border:0;outline:0;
+  color:var(--text);font-family:var(--font-mono);font-size:13px;
+  padding:4px 0;
+}
+.cmd-input-wrap input::placeholder{color:var(--text-3)}
+.cmd-esc{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:.08em;
+  color:var(--text-3);border:1px solid var(--border);border-radius:3px;
+  padding:3px 6px;
+}
+.cmd-list{
+  flex:1;overflow-y:auto;padding:var(--sp-2) 0;
+}
+.cmd-item{
+  display:grid;grid-template-columns:28px 1fr auto auto;
+  gap:var(--sp-3);align-items:center;
+  width:100%;padding:8px var(--sp-4);
+  background:transparent;border:0;border-left:2px solid transparent;
+  cursor:pointer;text-align:left;
+  font-family:inherit;color:var(--text-2);
+  transition:background var(--t-fast),color var(--t-fast);
+}
+.cmd-item:hover,.cmd-item.active{
+  background:var(--bg-2);border-left-color:var(--navy);color:var(--text);
+}
+.cmd-ic{
+  font-size:14px;color:var(--navy);text-align:center;
+}
+.cmd-label{
+  font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cmd-hint{
+  font-family:var(--font-mono);font-size:10px;color:var(--text-3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  max-width:220px;
+}
+.cmd-kind{
+  font-family:var(--font-mono);font-size:8.5px;letter-spacing:.08em;
+  color:var(--text-3);padding:2px 5px;border:1px solid var(--border);border-radius:3px;
+}
+.cmd-empty{
+  padding:var(--sp-5) var(--sp-4);text-align:center;
+  color:var(--text-3);font-size:11px;font-family:var(--font-mono);
+}
+.cmd-foot{
+  display:flex;gap:var(--sp-3);align-items:center;
+  padding:8px var(--sp-4);border-top:1px solid var(--border);
+  background:var(--bg-2);
+  font-family:var(--font-mono);font-size:9.5px;color:var(--text-3);
+}
+.cmd-foot kbd{
+  font-family:inherit;font-size:9px;
+  padding:1px 4px;border:1px solid var(--border);border-radius:2px;
+  background:var(--bg);color:var(--text-2);margin-right:2px;
+}
+
+@media(max-width:768px){
+  .cmd-overlay{padding:6vh var(--sp-3) var(--sp-3)}
+  .cmd-item{grid-template-columns:24px 1fr auto}
+  .cmd-kind{display:none}
+  .cmd-hint{max-width:120px}
+}
+
+/* ============================================================
+   Qualified Investor attestation (checkbox in signup + access forms).
+   ============================================================ */
+.qi-attest{
+  display:flex;align-items:flex-start;gap:var(--sp-2);
+  padding:var(--sp-3);border:1px solid var(--border);border-radius:4px;
+  background:var(--bg-2);cursor:pointer;
+  font-size:11px;line-height:1.55;color:var(--text-2);
+  transition:border-color var(--t-fast),background var(--t-fast);
+}
+.qi-attest:hover{border-color:var(--navy-bd);background:var(--navy-bg)}
+.qi-attest input[type="checkbox"]{
+  margin-top:2px;flex-shrink:0;accent-color:var(--navy);
+}
+.qi-attest a{color:var(--navy);text-decoration:underline}
+.qi-attest.invalid{border-color:var(--crimson);background:rgba(255,80,120,.04)}

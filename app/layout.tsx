@@ -6,6 +6,8 @@ import Ticker from "./components/Ticker";
 import TopBar from "./components/TopBar";
 import StatusBar from "./components/StatusBar";
 import ComplianceFooter from "./components/ComplianceFooter";
+import CookieBanner from "./components/CookieBanner";
+import CommandPalette from "./components/CommandPalette";
 import { ModalProvider } from "./components/modals/ModalProvider";
 
 export const metadata: Metadata = {
@@ -61,6 +63,8 @@ export default function RootLayout({
           {children}
           <ComplianceFooter />
           <StatusBar />
+          <CookieBanner />
+          <CommandPalette />
         </ModalProvider>
       </body>
     </html>
