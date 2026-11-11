@@ -1488,3 +1488,118 @@ body{padding-bottom:calc(var(--statusbar-h) + 24px)}
 }
 .qi-attest a{color:var(--navy);text-decoration:underline}
 .qi-attest.invalid{border-color:var(--crimson);background:rgba(255,80,120,.04)}
+
+/* ============================================================
+   Mobile polish (phones ≤768 px, extra squeeze ≤480 px).
+   The audit on real-device widths surfaced five concrete issues:
+   1. Side panels (.side-panel, .port-side) rendered off-screen as
+      fixed drawers but still consumed layout + contributed to
+      document horizontal overflow — hidden outright on phones since
+      the Deal Detail is a desktop-only feature.
+   2. .universe-shell and .port-shell held a 50 vh min-height on
+      mobile, painting a dark empty strip below short lists.
+   3. The compliance footer wrapped "NOT INVESTMENT ADVICE" onto
+      three stacked lines on narrow viewports because the tag had
+      no white-space rule and the sibling legal links competed for
+      the same row.
+   4. Deal-table SITUATION column was too narrow for most names
+      ("Juniper Netwo", "Walgreens Boo") — adjusted track weights.
+   5. Cookie banner sat too close to the compliance footer, pushing
+      page content up into a narrow sandwich.
+   ============================================================ */
+
+@media (max-width: 768px) {
+  /* 1. Pure render removal of the side panels on phones. */
+  .side-panel,
+  .port-side { display: none !important; }
+  /* Universe + portfolio pages: trim the 50vh floor so short lists
+     don't paint empty darkness below the last row. */
+  .universe-shell,
+  .port-shell { min-height: 0; }
+
+  /* 2. Compliance footer: keep the amber tag intact on one line,
+     shrink gap so the inline legal links fit next to it. */
+  .compliance-footer {
+    gap: var(--sp-2);
+    padding-right: var(--sp-3);
+    overflow: hidden;
+  }
+  .compliance-footer .cf-tag {
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 8px;
+    padding: 1px 4px;
+  }
+  .compliance-footer a {
+    font-size: 8.5px;
+    letter-spacing: .04em;
+    white-space: nowrap;
+  }
+  .compliance-footer .cf-sep { font-size: 8.5px; }
+
+  /* 3. Cookie banner compacted on phones — the desktop card covered
+     3-4 deal rows when it stretched full-width at bottom. Flatten to
+     a single horizontal row with a short text + inline dismiss button
+     so it's a thin strip, not a card. */
+  .cookie-banner {
+    bottom: calc(var(--statusbar-h) + 22px + env(safe-area-inset-bottom, 0px));
+    left: 0; right: 0;
+    padding: 6px 10px;
+    gap: var(--sp-2);
+    border-radius: 0;
+    border-left: 0; border-right: 0;
+    flex-direction: row;
+    align-items: center;
+  }
+  .cookie-banner-text {
+    font-size: 10.5px;
+    line-height: 1.35;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .cookie-banner-ic { display: none; }
+  .cookie-banner-btn {
+    padding: 5px 9px;
+    font-size: 9.5px;
+    align-self: center;
+    flex-shrink: 0;
+  }
+
+  /* 4. Deal table columns: give SITUATION ~40% more width so most
+     names no longer end in "...". Prob-bar column shrinks slightly
+     to compensate. */
+  .table-head { grid-template-columns: minmax(0, 1.3fr) .55fr .7fr .7fr; }
+  .deal-row   { grid-template-columns: minmax(0, 1.3fr) .55fr .7fr .7fr; }
+  .deal-row > span:nth-child(n+5),
+  .table-head span:nth-child(n+5) { display: none; }
+
+  /* Tighten vertical rhythm on each deal row so more rows fit per
+     viewport without truncating anything. Allow the deal name to
+     wrap onto two lines rather than clipping mid-letter (Walgreens
+     Boots Alliance etc.) — on mobile two lines reads better than a
+     half-visible letter. */
+  .deal-row { padding: 8px var(--sp-4); }
+  .deal-name {
+    font-size: 13px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .deal-sub { font-size: 9.5px; }
+}
+
+@media (max-width: 480px) {
+  /* Deepest squeeze: hide the extra legal links in the compliance
+     footer; the sidebar + sitemap still carry them. The amber tag
+     stays — it's the one thing we always want in front of visitors. */
+  .compliance-footer a,
+  .compliance-footer .cf-sep { display: none; }
+  .compliance-footer { justify-content: flex-start; }
+
+  /* Filter-bar count pill wraps off-row on 393 wide viewports;
+     drop it to free the second row for the deals/catalysts toggles. */
+  .filter-bar .count-pill { display: none; }
+}
