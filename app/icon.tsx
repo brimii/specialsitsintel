@@ -1,13 +1,17 @@
 import { ImageResponse } from "next/og";
 
-// Browser-tab favicon. Transparent background so the mark sits on top
-// of whatever chrome the browser paints (light tabs in Safari/Chrome,
-// dark tabs in Firefox's dark mode). Navy mark is legible on both.
+// Browser-tab favicon. 32×32 filled Neon-Grid tile — deep-navy ground
+// with the cyan SSI "bar" mark. Must read on BOTH light and dark tabs
+// (modern browsers default to dark), which the earlier transparent /
+// navy-on-transparent version failed on — dark navy disappeared into
+// the dark tab chrome.
 
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
-const NAVY = "#162f68";
+// Neon-Grid palette tokens, same values the app uses in globals.css.
+const BG = "#0a0f28"; // deep navy ground
+const FG = "#4a9cff"; // cyan mark — legible on both dark and light tabs
 
 export default function Icon() {
   return new ImageResponse(
@@ -16,36 +20,38 @@ export default function Icon() {
         style={{
           width: "100%",
           height: "100%",
-          color: NAVY,
+          background: BG,
+          color: FG,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           position: "relative",
           fontFamily: "system-ui",
-          // NO background — transparent PNG so the host surface shows through.
+          borderRadius: 6,
         }}
       >
         <span
           style={{
-            fontSize: 32,
+            fontSize: 24,
             fontWeight: 900,
             lineHeight: 1,
             letterSpacing: -1,
-            paddingTop: 2,
-            color: NAVY,
+            paddingTop: 1,
+            color: FG,
+            display: "flex",
           }}
         >
           S
         </span>
-        {/* Horizontal rule — the "bar" that defines the mark. */}
         <div
           style={{
             position: "absolute",
-            left: 2,
-            right: 2,
-            top: 16,
+            left: 4,
+            right: 4,
+            top: 17,
             height: 2,
-            background: NAVY,
+            background: FG,
+            display: "flex",
           }}
         />
       </div>

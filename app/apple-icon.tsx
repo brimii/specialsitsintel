@@ -1,19 +1,16 @@
 import { ImageResponse } from "next/og";
 
-// iOS home-screen icon (Add to Home Screen). Rendered at 180x180, the
-// size Apple expects for modern retina displays. Transparent background
-// so the user's wallpaper shows through once iOS applies its rounded-
-// corner mask — no cream square frame against a dark wallpaper.
-//
-// This file serves the LIGHT variant (navy mark) which iOS uses by
-// default, and on light-mode home screens. The dark variant is served
-// by app/apple-icon-dark/route.tsx and wired via the metadata.icons.other
-// array in app/layout.tsx with a media query.
+// iOS home-screen icon (Add to Home Screen). 180×180 filled Neon-Grid
+// tile with iOS mask. Deep-navy ground + cyan "S" mark + cyan bar.
+// Unlike the earlier transparent-background variant, this stays
+// legible on every wallpaper and in every iOS theme. iOS will round
+// the corners itself via its standard mask.
 
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
-const NAVY = "#162f68";
+const BG = "#0a0f28";
+const FG = "#4a9cff";
 
 export default function AppleIcon() {
   return new ImageResponse(
@@ -22,36 +19,37 @@ export default function AppleIcon() {
         style={{
           width: "100%",
           height: "100%",
-          color: NAVY,
+          background: BG,
+          color: FG,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           position: "relative",
           fontFamily: "system-ui",
-          // NO background — transparent PNG.
         }}
       >
         <span
           style={{
-            fontSize: 150,
+            fontSize: 128,
             fontWeight: 900,
             lineHeight: 1,
-            letterSpacing: -6,
-            paddingTop: 10,
-            color: NAVY,
+            letterSpacing: -5,
+            paddingTop: 8,
+            color: FG,
+            display: "flex",
           }}
         >
           S
         </span>
-        {/* Horizontal rule across the middle of the icon. */}
         <div
           style={{
             position: "absolute",
-            left: 16,
-            right: 16,
-            top: 95,
-            height: 8,
-            background: NAVY,
+            left: 24,
+            right: 24,
+            top: 94,
+            height: 7,
+            background: FG,
+            display: "flex",
           }}
         />
       </div>
