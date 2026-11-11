@@ -27,11 +27,15 @@ export default function Icon() {
       >
         <span
           style={{
-            fontSize: 28,
+            fontSize: 34,
             fontWeight: 900,
             lineHeight: 1,
-            letterSpacing: -1,
+            letterSpacing: -1.5,
             color: FG,
+            // Additional 1.2px stroke on top of the 900 weight fattens the
+            // glyph past what the system font alone can do at 32×32, so it
+            // reads as a confident mark instead of a thin outline.
+            WebkitTextStroke: "1.2px #4a9cff",
             display: "flex",
           }}
         >
@@ -41,12 +45,12 @@ export default function Icon() {
         <div
           style={{
             position: "absolute",
-            left: 3,
-            right: 3,
-            top: 15,
-            height: 2,
+            left: 2,
+            right: 2,
+            top: 14,
+            height: 4,
             background: FG,
-            borderRadius: 1,
+            borderRadius: 2,
             display: "flex",
           }}
         />

@@ -26,11 +26,12 @@ export default function AppleIcon() {
       >
         <span
           style={{
-            fontSize: 150,
+            fontSize: 180,
             fontWeight: 900,
             lineHeight: 1,
-            letterSpacing: -5,
+            letterSpacing: -8,
             color: FG,
+            WebkitTextStroke: "6px #4a9cff",
             display: "flex",
           }}
         >
@@ -39,12 +40,12 @@ export default function AppleIcon() {
         <div
           style={{
             position: "absolute",
-            left: 18,
-            right: 18,
-            top: 86,
-            height: 9,
+            left: 12,
+            right: 12,
+            top: 82,
+            height: 16,
             background: FG,
-            borderRadius: 4.5,
+            borderRadius: 8,
             display: "flex",
           }}
         />
