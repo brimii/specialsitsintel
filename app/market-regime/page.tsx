@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { CUR_REGIME, MACRO, REGIMES } from "@/app/data/content";
 
 const mc = (c: string) =>
@@ -5,6 +6,30 @@ const mc = (c: string) =>
 const arr = (t: string) => (t === "up" ? "↗" : t === "down" ? "↘" : "→");
 const expoColor = (c: string) =>
   c === "g" ? "#162f68" : c === "a" ? "#9c6d2a" : c === "r" ? "#a83232" : "#374160";
+
+// Historical track-record descriptions embed a bolded prefix as literal
+// `<b>...</b>` tags in the data. React escapes those by default, which
+// is why they were rendering as visible "<b>Golden era.</b>" rather than
+// as actual bold text. Walk the string and emit the matched segments as
+// real <b> JSX while leaving the data file untouched.
+function renderBold(text: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /<b>([\s\S]*?)<\/b>/g;
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    out.push(
+      <b key={i++} style={{ color: "var(--text)", fontWeight: 600 }}>
+        {m[1]}
+      </b>,
+    );
+    last = re.lastIndex;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
 
 const mono8 = {
   fontFamily: "var(--font-mono)",
@@ -168,7 +193,7 @@ export default function MarketRegimePage() {
                 {s.history.map((h, i) => (
                   <div key={i} style={{ display: "flex", gap: "var(--sp-2)", marginBottom: 6, fontSize: 10, lineHeight: 1.5 }}>
                     <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-3)", minWidth: 72, flexShrink: 0 }}>{h.p}</span>
-                    <span style={{ color: "var(--text-2)" }}>{h.d}</span>
+                    <span style={{ color: "var(--text-2)" }}>{renderBold(h.d)}</span>
                   </div>
                 ))}
               </div>
