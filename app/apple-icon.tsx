@@ -1,15 +1,13 @@
 import { ImageResponse } from "next/og";
 
-// iOS home-screen icon (Add to Home Screen). 180×180 filled Neon-Grid
-// tile with iOS mask. Deep-navy ground + cyan "S" mark + cyan bar.
-// Unlike the earlier transparent-background variant, this stays
-// legible on every wallpaper and in every iOS theme. iOS will round
-// the corners itself via its standard mask.
+// iOS home-screen icon (Add to Home Screen). 180×180 transparent —
+// no filled square frame around the mark, per user request. The S +
+// rounded bar sit on the user's wallpaper directly. Cyan is readable
+// on every iOS background thanks to its saturation.
 
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
-const BG = "#0a0f28";
 const FG = "#4a9cff";
 
 export default function AppleIcon() {
@@ -19,8 +17,6 @@ export default function AppleIcon() {
         style={{
           width: "100%",
           height: "100%",
-          background: BG,
-          color: FG,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -30,11 +26,10 @@ export default function AppleIcon() {
       >
         <span
           style={{
-            fontSize: 128,
+            fontSize: 150,
             fontWeight: 900,
             lineHeight: 1,
             letterSpacing: -5,
-            paddingTop: 8,
             color: FG,
             display: "flex",
           }}
@@ -44,11 +39,12 @@ export default function AppleIcon() {
         <div
           style={{
             position: "absolute",
-            left: 24,
-            right: 24,
-            top: 94,
-            height: 7,
+            left: 18,
+            right: 18,
+            top: 86,
+            height: 9,
             background: FG,
+            borderRadius: 4.5,
             display: "flex",
           }}
         />
