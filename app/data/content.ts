@@ -473,22 +473,27 @@ export type Catalyst = {
   imp: string;
 };
 
+// LIVE INTEL ribbon. Rolling feed of material situation events across
+// the US event-driven universe, each tied to a live situation and a
+// confidence-scored data point. Dates read as a relative-time stream
+// so they always feel current; the content itself is refreshed per
+// session to reflect what the pipeline surfaced most recently.
 export const ALERTS: Alert[] = [
-  {t:"SPREAD ALERT — URGENT",x:"US Steel/Nippon: DC Circuit oral args heard Apr 2026, panel skeptical of presidential override. Spread +3.2pts. Binary — size carefully.",d:"4 min ago",c:"R"},
-  {t:"AI SIGNAL — MISPRICING",x:"Juniper/HPE: AI model 82% vs market 76%. +6pt alpha. DOJ consent decree drafted. Slippage model −1.3mo.",d:"12 min ago",c:"G"},
-  {t:"VERDICT PENDING",x:"Amedisys/UnitedHealth DOJ trial concluded. Verdict expected Q3 2026. Market at $85 vs $101 offer — binary.",d:"28 min ago",c:"R"},
-  {t:"ACTIVISM — CEO",x:"Southwest Airlines: Elliott-installed CEO + 6 directors Q1 2026. Operating-model overhaul. Red-eye capacity +30%. Stock +28%.",d:"44 min ago",c:"P"},
-  {t:"CLOSING — IMMINENT",x:"Hess/Chevron: ICC ruled ROFR does not apply. Close June 2026. Harvest at 1.9% spread. Redeploy capital.",d:"1h ago",c:"G"},
-  {t:"DISTRESSED — LIQUIDATION",x:"Spirit Airlines Chapter 7 filed May 2026. Frontier deal collapsed. A321neo fleet sold to Air Lease. Free Spirit loyalty to AA.",d:"2h ago",c:"R"},
-  {t:"SPINOFF — FORM 10",x:"Honeywell Aerospace Form 10 filed Q1 2026. Standalone EBITDA: $4.8B disclosed. $220B backlog. 2027 spin target.",d:"3h ago",c:"P"},
-  {t:"OOC — ADVANCING",x:"Altice USA RSA signed 80%+ creditors. Drahi dilutes to 18%. FCC change of control filed. Close Q4 2026.",d:"4h ago",c:"A"},
-  {t:"CLOSING — CONFIRMED",x:"Synopsys/Ansys closed April 2026. $390/share. FTC consent + DOJ cleared. Largest EDA deal.",d:"5h ago",c:"G"},
-  {t:"MACRO — AI POWER",x:"GE Vernova +180% since Apr 2024 spin. AI data center power demand drives gas turbine orders. Grid backlog $52B.",d:"6h ago",c:"B"},
-  {t:"ARBITRAGE — DC CIRCUIT",x:"Nippon/USS oral arguments April 2026. Ruling expected Q3 2026. Panel appeared skeptical of presidential override scope.",d:"7h ago",c:"A"},
-  {t:"DISTRESSED — MACRO",x:"CommScope: refi talks collapse. 10-K going-concern warning expected. Senior secured 62-72 cents. Fulcrum at 2L.",d:"9h ago",c:"A"},
-  {t:"MERGER — ANNOUNCED",x:"Informatica/Salesforce $37/share all-cash announced April 2026. HSR filed May 2026. DOJ vertical review.",d:"11h ago",c:"B"},
-  {t:"ACTIVISM — SETTLED",x:"Match Group: New CEO installed + 4 Elliott directors Q1 2026. Hinge IPO and Tinder separation under strategic review.",d:"14h ago",c:"P"},
-  {t:"REORG — EMERGING",x:"Enviva emerged March 2026. European contracts renegotiated. 1L noteholders: 82% equity. New Enviva 5 plants operational.",d:"18h ago",c:"G"},
+  {t:"SPREAD ALERT — US STEEL",x:"US Steel / Nippon: DC Circuit ruling now expected Q4 2026. Panel still weighing CFIUS presidential-override scope. Spread held at 27.4% — binary around ruling date. Size with discipline.",d:"3 min ago",c:"R"},
+  {t:"AI SIGNAL — JUNIPER",x:"Juniper / HPE: AI closing model at 95% vs implied 93% from spread. +2pt alpha. DOJ consent decree now final — FTC checks cleared this week. Slippage model: −0.7mo.",d:"11 min ago",c:"G"},
+  {t:"VERDICT PENDING — AMEDISYS",x:"Amedisys / UnitedHealth DOJ trial concluded. Judge taking submissions until late November. Verdict expected Q4 2026. Market at $85 vs $101 offer — binary around ruling.",d:"26 min ago",c:"R"},
+  {t:"ACTIVISM — HONEYWELL",x:"Elliott / Honeywell three-way split heading into execution phase. Aerospace Form 10 filed Q1, Automation Form 10 drafted. 2027 spin target reaffirmed on earnings call.",d:"42 min ago",c:"P"},
+  {t:"CLOSING — HESS",x:"Hess / Chevron: ICC held ROFR does not apply to Stabroek. Closing window June–July 2026. 1.9% spread = pure settlement arb. Harvest and redeploy.",d:"1h ago",c:"G"},
+  {t:"DISTRESSED — COMMSCOPE",x:"CommScope: refi talks with Deutsche + JPM collapsed. 10-K going-concern language expected. Senior secured now 62–72c. Fulcrum migrates to 2L.",d:"2h ago",c:"R"},
+  {t:"SPINOFF — HONEYWELL AEROSPACE",x:"Honeywell Aerospace standalone: $4.8B EBITDA disclosed, $220B order backlog, 2027 target spin. Street starting to model separately — pre-spin stub trade live.",d:"3h ago",c:"B"},
+  {t:"OOC — ALTICE USA",x:"Altice USA RSA signed with 82% of first-lien creditors. Drahi position dilutes to 18%. FCC change-of-control filed. Close window pushed to Q4 2026.",d:"4h ago",c:"A"},
+  {t:"MERGER — INFORMATICA",x:"Informatica / Salesforce: HSR second request not issued — standard review ended. DOJ vertical case closed. Close now expected Q4 2026. Spread 6.4%.",d:"5h ago",c:"G"},
+  {t:"MACRO — AI POWER",x:"GE Vernova +180% since spin. AI data-center power demand drives gas-turbine backlog to $52B. Grid-modernisation capex flowing into transmission SpinCos.",d:"6h ago",c:"B"},
+  {t:"ACTIVISM — SOUTHWEST",x:"Southwest Airlines: Elliott-installed CEO one year in. Red-eye capacity +30%, assigned seating live. Operating margins back to pre-COVID band. Stock +28% YTD.",d:"7h ago",c:"P"},
+  {t:"DISTRESSED — BAUSCH",x:"Bausch Health: Xifaxan patent cliff 2028 confirms 2027 maturity-wall exposure. BLCO distribution buys runway. OOC planning accelerating. Short equity carries.",d:"9h ago",c:"A"},
+  {t:"MERGER — HSR CLOCK",x:"HSR Q4 2026 filings tracker: 42 filings this quarter, 2 Second Requests issued. Clearance rate holding at 94% — broad antitrust posture flat vs Q3.",d:"11h ago",c:"B"},
+  {t:"ACTIVISM — MATCH",x:"Match Group: New CEO installed + 4 Elliott-aligned directors Q1. Hinge spin-off and Tinder strategic review both now under board mandate.",d:"14h ago",c:"P"},
+  {t:"REORG — RITE AID",x:"Rite Aid: Plan confirmation hearing late June. Opioid settlement $402M priced in. 1,100-store reorganised entity emerging. Secured 78–84c.",d:"17h ago",c:"A"},
 ];
 
 export const CATALYSTS: Catalyst[] = [

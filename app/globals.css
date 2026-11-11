@@ -734,6 +734,50 @@ select.form-input{cursor:pointer;-webkit-appearance:none;appearance:none;backgro
 .feat-t{font-size:13px;font-weight:700;letter-spacing:-.01em;margin-bottom:5px}
 .feat-d{font-size:10.5px;color:var(--text-2);line-height:1.65}
 
+/* "Why — four pillars" section on /home. A two-column grid of numbered
+   paragraphs, each a short argument for the product. Mono digit in the
+   left gutter, prose on the right. Reads like a disciplined manifesto
+   rather than a sales list. */
+.pillar-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));
+  gap:var(--sp-5);padding-bottom:var(--sp-10);
+}
+.pillar{
+  display:grid;grid-template-columns:52px 1fr;gap:var(--sp-4);
+  padding:var(--sp-5);background:var(--bg-1);
+  border:1px solid var(--border);border-radius:var(--r-lg);
+  transition:border-color var(--t-slow),transform var(--t-slow);
+}
+.pillar:hover{border-color:var(--navy-bd);transform:translateY(-2px)}
+.pillar-n{
+  font-family:var(--font-mono);font-size:22px;color:var(--navy);
+  font-weight:500;letter-spacing:-.02em;line-height:1;
+}
+.pillar-t{font-size:14px;font-weight:700;letter-spacing:-.015em;margin-bottom:6px;color:var(--text)}
+.pillar-d{font-size:11.5px;color:var(--text-2);line-height:1.65}
+
+/* "How it's made" section — four-step method strip. Horizontal cards
+   with a mono eyebrow + short claim + short description. Tells the
+   user the pipeline is not a black box. */
+.method-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:var(--sp-3);padding-bottom:var(--sp-10);
+}
+.method{
+  padding:var(--sp-4);background:var(--bg-1);
+  border:1px solid var(--border);border-radius:var(--r-md);
+  border-top:2px solid var(--navy);
+  display:flex;flex-direction:column;gap:6px;
+  transition:transform var(--t-slow),border-color var(--t-slow);
+}
+.method:hover{transform:translateY(-2px);border-color:var(--border-2)}
+.method-k{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--text-3);
+}
+.method-t{font-size:13px;font-weight:700;letter-spacing:-.01em;color:var(--text)}
+.method-d{font-size:10.5px;color:var(--text-2);line-height:1.6}
+
 /* VS table */
 .vs-table{width:100%;border-collapse:collapse;margin-bottom:var(--sp-10);font-size:11px}
 .vs-table th{

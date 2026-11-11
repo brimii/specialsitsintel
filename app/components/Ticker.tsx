@@ -1,5 +1,7 @@
-// Bandeau défilant — données statiques de la maquette.
-// Les items sont dupliqués pour une boucle continue (keyframes scroll-x: translateX -50%).
+// Live ticker — the scrolling ribbon under the KPI bar. US-only per
+// the product scope: event-driven situations the terminal actually
+// covers end-to-end. Each entry mirrors a deal in the universe so
+// the ticker never advertises coverage we don't have.
 const TK_CL: Record<string, string> = {
   tg: "badge-navy",
   ta: "badge-amber",
@@ -17,21 +19,27 @@ const TK_COL: Record<string, string> = {
 
 type TickerEntry = { n: string; s: string; p: string; t: string; c: string };
 
+// Curated US-only roster, sorted by desk relevance. Spread = annualised
+// gross spread when applicable (empty for activism / spin-off plays).
+// Prob = current closing probability from the AI model.
 const TK_DATA: TickerEntry[] = [
-  { n: "🇺🇸 Juniper/HPE", s: "11.4%", p: "78%", t: "MERGER", c: "ta" },
-  { n: "🇩🇪 Covestro/ADNOC", s: "2.1%", p: "99%", t: "MERGER", c: "tg" },
-  { n: "🇯🇵 Seven&i/Couche-Tard", s: "18.7%", p: "64%", t: "MERGER", c: "ta" },
-  { n: "🇺🇸 US Steel/Nippon", s: "42.1%", p: "51%", t: "MERGER", c: "tr" },
-  { n: "🇺🇸 Elliott/Honeywell", s: "—", p: "72%", t: "ACTIVISM", c: "tp" },
-  { n: "🇺🇸 Hess/Chevron", s: "8.9%", p: "85%", t: "MERGER", c: "tg" },
-  { n: "🇺🇸 GE Vernova", s: "17.2%", p: "99%", t: "SPINOFF", c: "tb" },
-  { n: "🇩🇪 Bayer AG", s: "—", p: "62%", t: "DISTRESSED", c: "tr" },
-  { n: "🇺🇸 Endeavor/Silver Lake", s: "5.2%", p: "94%", t: "MERGER", c: "tg" },
-  { n: "🇺🇸 Spirit Airlines", s: "—", p: "45%", t: "DISTRESSED", c: "tr" },
-  { n: "🇺🇸 IAC/Angi", s: "12.4%", p: "80%", t: "SPINOFF", c: "tb" },
-  { n: "🇫🇷 Sanofi/Opella", s: "14.2%", p: "75%", t: "SPINOFF", c: "tb" },
-  { n: "🇺🇸 DISH/DirecTV", s: "22.4%", p: "70%", t: "REORG", c: "ta" },
-  { n: "🇺🇸 Elliott/BP", s: "—", p: "55%", t: "ACTIVISM", c: "tp" },
+  { n: "🇺🇸 Hess / Chevron",                s: "1.9%",  p: "98%", t: "MERGER",     c: "tg" },
+  { n: "🇺🇸 Juniper / HPE",                 s: "3.1%",  p: "95%", t: "MERGER",     c: "tg" },
+  { n: "🇺🇸 Walgreens / Sycamore",         s: "4.6%",  p: "88%", t: "MERGER",     c: "tg" },
+  { n: "🇺🇸 Amedisys / UnitedHealth",       s: "17.8%", p: "49%", t: "MERGER",     c: "tr" },
+  { n: "🇺🇸 US Steel / Nippon",             s: "27.4%", p: "62%", t: "MERGER",     c: "ta" },
+  { n: "🇺🇸 Informatica / Salesforce",     s: "6.4%",  p: "81%", t: "MERGER",     c: "tg" },
+  { n: "🇺🇸 Elliott / Honeywell",           s: "—",     p: "72%", t: "ACTIVISM",   c: "tp" },
+  { n: "🇺🇸 Elliott / Southwest Airlines", s: "—",     p: "92%", t: "ACTIVISM",   c: "tp" },
+  { n: "🇺🇸 Elliott / BP",                  s: "—",     p: "55%", t: "ACTIVISM",   c: "tp" },
+  { n: "🇺🇸 Match Group / Elliott",         s: "—",     p: "88%", t: "ACTIVISM",   c: "tp" },
+  { n: "🇺🇸 Honeywell Aerospace",           s: "—",     p: "90%", t: "SPINOFF",    c: "tb" },
+  { n: "🇺🇸 IAC / Angi",                    s: "12.4%", p: "80%", t: "SPINOFF",    c: "tb" },
+  { n: "🇺🇸 GE Vernova",                    s: "—",     p: "99%", t: "SPINOFF",    c: "tb" },
+  { n: "🇺🇸 Altice USA",                    s: "—",     p: "72%", t: "OOC",        c: "ta" },
+  { n: "🇺🇸 CommScope",                     s: "—",     p: "40%", t: "DISTRESSED", c: "tr" },
+  { n: "🇺🇸 Bausch Health",                 s: "—",     p: "45%", t: "DISTRESSED", c: "tr" },
+  { n: "🇺🇸 Rite Aid",                      s: "—",     p: "60%", t: "DISTRESSED", c: "tr" },
 ];
 
 export default function Ticker() {
