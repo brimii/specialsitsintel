@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx scripts/seed-deals.ts",
     "stripe:setup": "tsx scripts/stripe-setup.ts"
   },
   "dependencies": {
@@ -17,8 +16,7 @@
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "stripe": "^22.1.1",
-    "unpdf": "^1.6.2"
+    "stripe": "^22.1.1"
   },
   "devDependencies": {
     "@types/node": "^20",
