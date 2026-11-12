@@ -27,6 +27,30 @@ function parseDurationMonths(dur: string | undefined): number {
   return num < 24 ? num : num * 12;
 }
 
+// Parse the human-readable `ret` field into a signed percent number.
+// The earlier inline parser double-negated signs — `parseFloat("-65")`
+// returned -65, then `* (includes("-") ? -1 : 1)` flipped it to +65, so
+// every negative-return deal (Daimler-Chrysler, AOL/TWX, Kenvue, US
+// Steel…) was rendered as if it had gained. It also concatenated multi-
+// number strings ("+30% / +50%" → "3050") into absurd magnitudes.
+//
+// Rules:
+//   • Non-numeric statuses (Variable / Wild / Live / Ongoing) → 0, which
+//     draws a flat chart. The outcome text still tells the story.
+//   • Grab the FIRST signed decimal in the string. Preserves the real
+//     sign without any post-hoc multiplier.
+//   • Clamp to ±500% so one wild entry can't blow out the y-axis.
+function parseReturnPct(ret: string | undefined): number {
+  if (!ret) return 0;
+  const s = ret.trim();
+  if (/^(variable|wild|live|ongoing|n\/a|tbd)/i.test(s)) return 0;
+  const m = s.match(/([+-]?\d+(?:\.\d+)?)/);
+  if (!m) return 0;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(-500, Math.min(500, n));
+}
+
 function addMonths(d: Date, months: number): Date {
   const dd = new Date(d);
   const whole = Math.floor(months);
@@ -48,7 +72,7 @@ const fmtDateLong = (d: Date) =>
 // ─────────────────────────────────────────────────────────────────────
 function useHistPrices(h: HistDeal) {
   return useMemo(() => {
-    const retNum = parseFloat(h.ret.replace(/[^0-9.-]/g, "")) * (h.ret.includes("-") ? -1 : 1) || 0;
+    const retNum = parseReturnPct(h.ret);
     let seed = h.nm.length * 17 + parseInt(h.yr) * 3;
     const rng = () => {
       seed = (seed * 9301 + 49297) % 233280;
@@ -375,7 +399,7 @@ function HistChartModal({ h, idx, onClose }: { h: HistDeal; idx: number; onClose
                 fontFamily: "var(--font-mono)",
                 fontSize: 18,
                 fontWeight: 700,
-                color: h.ret.includes("-") ? "#ff5078" : "#4a9cff",
+                color: parseReturnPct(h.ret) < 0 ? "#ff5078" : parseReturnPct(h.ret) > 0 ? "#4a9cff" : "#ffa94d",
                 letterSpacing: ".02em",
               }}
             >
@@ -481,7 +505,7 @@ function HistChartModal({ h, idx, onClose }: { h: HistDeal; idx: number; onClose
 // ─────────────────────────────────────────────────────────────────────
 function HistChart({ h, idx }: { h: HistDeal; idx: number }) {
   const [open, setOpen] = useState(false);
-  const retNum = parseFloat(h.ret.replace(/[^0-9.-]/g, "")) * (h.ret.includes("-") ? -1 : 1) || 0;
+  const retNum = parseReturnPct(h.ret);
   const cssCol = retNum > 0 ? "var(--navy)" : retNum < 0 ? "var(--crimson)" : "var(--amber)";
   const startYear = parseInt(h.yr) || 2015;
   const start = new Date(startYear, 0, 15);
@@ -656,7 +680,7 @@ export default function HistoricalPage() {
                     </div>
                     <div className="hist-stat">
                       <div className="hist-stat-l">Return</div>
-                      <div className="hist-stat-v" style={{ color: h.ret.includes("-") ? "var(--crimson)" : "var(--navy)" }}>
+                      <div className="hist-stat-v" style={{ color: parseReturnPct(h.ret) < 0 ? "var(--crimson)" : parseReturnPct(h.ret) > 0 ? "var(--navy)" : "var(--amber)" }}>
                         {h.ret}
                       </div>
                     </div>
