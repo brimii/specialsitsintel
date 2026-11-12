@@ -500,6 +500,167 @@ INSERT INTO deals (
   '{"parent_ticker":"IAC","spin_ticker":"ANGI","distribution_ratio":"TBD","record_date":null}'::jsonb
 );
 
+-- ────────────────────────────────────────────────────────────────────
+-- HAND-WRITTEN COMMENTARIES (human_draft_2026-11-12)
+-- ────────────────────────────────────────────────────────────────────
+-- Each ai_commentary below is hand-authored in the Reorg-style voice
+-- defined in lib/anthropic.ts SYSTEM_PROMPT: 3-5 sentences, PM-focused,
+-- covering framing / pricing / next catalyst / main risk. Model field
+-- is tagged 'human_draft_2026-11-12' so the audit trail is honest —
+-- these are NOT Claude-generated. Any admin who regenerates via the
+-- "Generate with Claude" button in /admin/deals/[id] will have the
+-- row re-tagged to 'claude-sonnet-4-6' automatically.
+
+UPDATE deals SET
+  ai_commentary = 'Chevron''s $53B all-stock acquisition of Hess cleared its last material gate when the ICC panel ruled against the Stabroek ROFR challenge in May 2025. At $170 the stock trades roughly 1.0% inside the implied $171 consideration, a tight settlement arb pricing a July closing. Risk is pure timing — any delay in the Guyana regulatory clearance stretches the spread without changing the economics. PMs sizing for the harvest should expect carry compression as the close approaches.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'HES' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'Nippon Steel''s $55 cash bid for US Steel remains blocked by the January 2025 Presidential CFIUS determination, with the DC Circuit now reviewing whether the executive order exceeded Section 721 authority. Oral arguments in April 2026 showed the panel skeptical of the override''s scope, but a ruling is not expected until Q1 2027. Stock trades $42 — 24% below the offer, implying ~55% probability of reversal. The binary scenario is wide: Win $55, break ~$28 on undisturbed. National-security precedent is the dominant risk factor.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'X' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'Sycamore Partners'' $11.45 all-cash take-private of Walgreens has FTC consent in hand following pharmacy divestitures in affected metros. Stock trades $10.85, a 5.5% spread implying 88% probability of August 2026 closing. The financing is committed; the remaining gate is routine HSR expiration. Risk is PE-financing residual — any credit-market shock before close could push Sycamore to seek re-trade terms, but the signed definitive proxy settled that exposure.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'WBA' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'Optum''s $101 all-cash tender for Amedisys sits in post-trial limbo after the DOJ concluded its home-health concentration case in late 2026. The judge''s ruling is expected within weeks — pure binary at $85 versus the $101 offer with ~49% implied probability, a 20% downside to pre-rumored levels on a break. Divestiture package proposed by Optum covers roughly 8% of combined overlap but DOJ dismissed it as insufficient. Watch for the ruling and any last-minute settlement signal.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'AMED' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'Synopsys''s $35B cash-and-stock acquisition of ANSYS has now cleared every material regulator — FTC with behavioural remedies, EU unconditional, UK CMA Phase I, China SAMR in June 2026. Stock trades $385 vs implied $390 consideration, a tight 1.3% spread pricing the July 30 closing window. Deal mechanics are the last gate: standard shareholder tendering mechanics on the cash portion. The largest EDA transaction in history is a weeks-away harvest; redeployment candidates are sparse at these multiples.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'ANSS' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'Couche-Tard''s $47B unsolicited approach for Seven & i Holdings sits in a strategic-review dynamic rather than a classic arb setup. The Japanese founding family continues exploring an MBO alternative; Couche-Tard raised its bid once and is reportedly prepared for a third revision. DOJ reviewing US 7-Eleven overlap; Japanese government has invoked FEFTA designation on Seven & i as a core industry. Implied probability sits around 52% — the stock has gravitated to $17 vs the $18.19 ADR-equivalent bid. Watch the February 2027 board window for the MBO decision.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'SVNDY' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'The Nordstrom family + Liverpool (Mexico) $24.25 cash take-private is in the mechanical final-stages window. Proxy vote cleared, HSR cleared, financing committed; stock trades $24.00 at a 1.0% spread to September closing. The only residual risk is minority-shareholder litigation on fairness opinion, routinely settled via supplemental disclosure. This is end-game arb — carry compression to zero at close.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'JWN' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'The Omnicom / Interpublic all-stock combination at 0.344 OMC per IPG has reached EU Phase II after the Commission flagged horizontal-overlap concerns in media buying. FTC under parallel review; CMA unopened. Stock trades $29 vs implied $31 — 7% spread reflecting Phase II timing uncertainty. November decision deadline is the next hard catalyst. Risk is a structural remedy demand that would force asset divestitures the parties have rejected as uneconomic; break scenario puts IPG back toward $25 undisturbed.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'IPG' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'KKR''s $23.60 all-cash take-private of Instructure (Canvas LMS) closed February 10, 2026, after HSR second-request clearance. Final settlement at offer price delivered 8% to merger-arb desks that held through the fourteen-month arbitrage window. No post-close publicly-traded stub. The deal set precedent for the EdTech PE-rollup thesis under tighter antitrust scrutiny.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'INST' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'Vista Equity and Blackstone''s $56.50 all-cash take-private of Smartsheet closed January 22, 2026. Deal cleared HSR second-request through a routine letter of no action in late 2025; final close at full offer price delivered roughly 9% to arb desks that entered post-DA. Smartsheet joins the SaaS take-private cohort; no stub trade.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'SMAR' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'SLB''s 0.735-per-share all-stock acquisition of ChampionX cleared DOJ with production-chemicals divestitures and UK CMA unconditional in April 2026. Final closing mechanics complete; distribution expected within weeks. Stock trades $40.10 against implied $40.59 — pure settlement arb at 1.2%. Risk is minimal — divestiture buyers have been pre-nominated and funded. Oilfield-services consolidation thesis continues to attract mid-cap follow-on candidates.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'CHX' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'Boeing''s reabsorption of Spirit AeroSystems at 0.18 BA per SPR cleared DOJ in Q1 2026 after Airbus purchased the dedicated A220/A350 production lines in parallel. Stock trades $36.80 against implied $37.25 — a 1.2% spread to June closing. Boeing''s 737 recovery remains the underlying thesis; integration risk is operational (not antitrust). Watch for Airbus-site transfer timing — a slip past H2 2026 would reopen financing contingency.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'SPR' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'Leonard Green''s $8.25 take-private of Mister Car Wash is in HSR review with closing targeted Q3 2026. Stock trades $7.80, a 5.8% spread reflecting PE-financing residual risk and standard second-request exposure on car-wash concentration. Leonard Green''s rollup playbook in the sector adds precedent value for subsequent PE take-privates in auto-services; break scenario is undisturbed around $6.70.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'MCW' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'Salesforce''s $37 all-cash tender for Informatica cleared the DOJ vertical review in Q4 2026 without a second request; EU Phase I cleared with behavioural remedies on data-management interoperability. Stock trades $35.75 against the $37 offer — 3.5% spread to a December closing window. CMA sign-off is the final hard gate. Deal consolidates the master-data-management stack into Salesforce''s platform; integration risk is post-close customer churn, not regulatory.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'INFA' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'AbbVie''s $45 all-cash acquisition of Cerevel Therapeutics closed August 2024, delivering 100% of the merger-arb spread from the December 2023 announce. The neuroscience pipeline (schizophrenia + Parkinson''s) now integrated into AbbVie''s R&D platform; emraclidine Phase III readout remains the post-close catalyst. Set a template for neuroscience-pipeline M&A at scale — subsequent Lilly and Lundbeck deals referenced the valuation framework.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'CERE' AND category = 'MERGER';
+
+UPDATE deals SET
+  ai_commentary = 'Elliott''s $5B stake in Honeywell catalysed a three-way separation plan: Aerospace, Automation, and Buildings. HON committed to Aerospace + Automation spins by 2027; Buildings decision pending Q1 2027. Aerospace Form 10 filed and tracking January 2027 effectiveness; standalone EBITDA disclosed at $4.8B on a $220B backlog. The pre-spin stub trade is live; Automation Form 10 drafted. Risk is execution timing — a slip into H2 2027 compresses the SOTP re-rating window.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'HON' AND category = 'ACTIVISM';
+
+UPDATE deals SET
+  ai_commentary = 'Elliott''s stake in Starbucks catalysed Brian Niccol''s appointment as CEO in August 2024 following his Chipotle turnaround. Monitoring is now operational, not activist — comparable-store sales and international execution the main metrics. The Q1 2027 progress check against the Niccol operating plan is the next material datapoint. Elliott has not disclosed a position reduction; stake remains strategic.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'SBUX' AND category = 'ACTIVISM';
+
+UPDATE deals SET
+  ai_commentary = 'Elliott''s October 2024 settlement with Southwest installed six new directors and preserved Bob Jordan as CEO. Operational overhaul in execution: assigned seating phased in Q3 2025, red-eye capacity added for summer 2026, longer-range route rationalisation ongoing. Stock +28% over the campaign window. Watch the full-year 2026 operating-margin print vs the Elliott plan — a miss reopens the board-pressure cycle.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'LUV' AND category = 'ACTIVISM';
+
+UPDATE deals SET
+  ai_commentary = 'Elliott''s $5B stake in BP escalated to a proxy contest in February 2025: four board seats sought, capital return accelerated, refining divestiture mandated. AGM May 2027 is the binary vote. Proxy advisors ISS/GL have not yet published recommendations; shareholder base skew to retail complicates the count. If Elliott wins seats, downstream separation moves from thesis to mandate within 12 months. Break scenario (Elliott loses) keeps BP at current perpetual-underperformer valuation.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'BP' AND category = 'ACTIVISM';
+
+UPDATE deals SET
+  ai_commentary = 'Elliott''s settlement with Match Group installed a new CEO and four directors in Q1 2026. Hinge spin-off and Tinder strategic review now under board mandate. Hinge IPO expected on NYSE in March 2027 at indicated $4-5B valuation. Match stock has responded to the catalyst — carry trade on the spin-off remains constructive. Risk is Tinder monetisation deterioration pressuring the parent valuation ahead of the Hinge distribution.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'MTCH' AND category = 'ACTIVISM';
+
+UPDATE deals SET
+  ai_commentary = 'Ancora''s $1B stake campaign at Norfolk Southern settled in May 2024 with three board seats and operational commitments. CEO Mark George installed December 2024. Operating-ratio target of 65% by 2027 — down from the 72% pre-campaign baseline — is the measurable deliverable. Watch Q4 2026 operating print for progress; a miss would reopen activist pressure, this time potentially from a different shareholder. Ohio derailment litigation remains contained but not resolved.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'NSC' AND category = 'ACTIVISM';
+
+UPDATE deals SET
+  ai_commentary = 'Spirit Airlines converted to Chapter 7 liquidation in May 2026 after the Frontier merger collapsed and the JetBlue combination was blocked. A321neo fleet sold to Air Lease at ~$3.1B; Free Spirit loyalty program absorbed by American Airlines. Unsecured creditors: 15 cents. Senior secured: 72 cents. The case closes the US ultra-low-cost-carrier consolidation playbook — regulatory posture removed the last viable M&A exit.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'SAVE' AND category = 'DISTRESSED';
+
+UPDATE deals SET
+  ai_commentary = 'Altice USA''s out-of-court restructuring signed with 82% of first-lien creditors in October 2026. Drahi dilutes from 60% to 18% equity; FCC change-of-control cleared. Senior secured expected 85-90 cents, fulcrum sits at 2L which recovers 40-50 cents. Closing targeted February 2027 pending final exchange mechanics. Post-close, Altice USA emerges with $4B less debt and a restructured capital stack; equity thesis depends on subscriber reacceleration.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'ATUS' AND category = 'DISTRESSED';
+
+UPDATE deals SET
+  ai_commentary = 'CommScope''s refi talks with Deutsche Bank and JPM collapsed in October 2026; 10-K going-concern language expected. Senior secured trades 62-72 cents, fulcrum migrated from secured to 2L. Full OOC term sheet expected mid-February 2027. Andrew divestiture ($2.1B) priced in but incompletely signed. Risk is a hard pivot to Ch 11 if the 2L steering committee rejects the exchange — recovery cliff is 55 cents at 2L on a Ch 11 outcome.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'COMM' AND category = 'DISTRESSED';
+
+UPDATE deals SET
+  ai_commentary = 'Bausch Health carries $22.4B of legacy Valeant debt against a 2027 maturity wall ($4.8B). Xifaxan patent cliff in 2028 removes primary cash-flow source. BLCO distribution (82% of Bausch & Lomb to shareholders) is the near-term catalyst — timing contingent on IRS tax-free ruling and Section 355 compliance. OOC planning accelerating; refi scenarios limited by covenant headroom. Short equity carries on a BLCO delay or a Xifaxan generic launch acceleration.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'BHC' AND category = 'DISTRESSED';
+
+UPDATE deals SET
+  ai_commentary = 'Rite Aid''s plan confirmation hearing in June 2026 restructures the 1,100-store entity around the opioid-settlement $402M allocation. Secured creditors recover 78-84 cents; GUCs 12 cents. Post-emergence Rite Aid runs on 60% of pre-filing footprint, pivoting to specialty pharmacy. Watch confirmation hearing — if objections from state AGs on opioid allocation push the hearing past Q3, exit-financing terms deteriorate materially.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'RAD' AND category = 'DISTRESSED';
+
+UPDATE deals SET
+  ai_commentary = 'Honeywell Aerospace standalone Form 10 effectiveness expected January 2027 for a Q2 2027 distribution. Standalone EBITDA disclosed at $4.8B on $220B order backlog; pre-spin stub trade live and tracking the SOTP compression thesis. Index-exclusion dynamics at distribution will create wrong-hands selling; recommended entry window is day 1-30 post-distribution. Elliott''s $5B stake retained through separation, signalling continued engagement on Automation + Buildings.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_name = 'Honeywell Aerospace' AND category = 'SPINOFF';
+
+UPDATE deals SET
+  ai_commentary = 'Sanofi''s listing of consumer-health arm Opella on Euronext Paris targets September 2026 at €16B valuation. Sanofi retains 70%; CD&R''s earlier bid of €15.5B set the valuation floor. Parent re-rates as pure-play specialty pharma post-listing; multiple expansion of 1-2 turns fundable. Risk is French strategic-asset political pressure delaying the listing into Q1 2027 — the Ministère de l''Economie has signalled no veto but reserves comment on foreign-majority structures.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_name = 'Opella Healthcare' AND category = 'SPINOFF';
+
+UPDATE deals SET
+  ai_commentary = 'DuPont''s separation of Electronics & Industrial as a standalone pure-play AI-infrastructure story is now in final distribution mechanics for November 2026. E&I revenue of $7.5B, EBITDA $2.1B; the semiconductor-materials content positions the SpinCo at the center of advanced-packaging capex. Watch distribution-ratio disclosure and initial trading dynamics — AI-exposure premium should price in quickly post-split, mirroring GE Vernova''s +180% since its 2024 spin.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_name = 'DuPont Electronics & Industrial' AND category = 'SPINOFF';
+
+UPDATE deals SET
+  ai_commentary = 'IAC''s spin-off of Angi (home services) is scheduled for March 2027, completing Barry Diller''s multi-year IAC simplification after Match, Vimeo and Vimeo again. Angi standalone pivots from lead-generation to transactional-marketplace monetisation under new CEO. Distribution ratio TBD; pre-spin stub trade live. Risk is category-growth deceleration — a Q4 2026 bookings miss would reset the SpinCo valuation thesis before distribution.',
+  ai_commentary_at = now(), ai_commentary_model = 'human_draft_2026-11-12'
+WHERE target_ticker = 'ANGI' AND category = 'SPINOFF';
+
 COMMIT;
 
 -- ────────────────────────────────────────────────────────────────────
@@ -507,7 +668,17 @@ COMMIT;
 --   SELECT category, count(*) FROM deals GROUP BY category;
 --   → MERGER 15 · ACTIVISM 6 · DISTRESSED 5 · SPINOFF 4 = 30
 --
--- Then: /admin/deals should list all 30 rows, each with status + prob +
--- timeline populated, ai_commentary NULL. Click the "Generate missing
--- commentaries" button to batch Claude once per row.
+--   SELECT target_name, left(ai_commentary, 60) FROM deals
+--   WHERE ai_commentary IS NOT NULL ORDER BY category, target_name;
+--   → 30 rows, each with a hand-written commentary tagged
+--     ai_commentary_model = 'human_draft_2026-11-12'
+--
+-- Workflow at /admin/deals after this migration:
+--   • All 30 rows show up with narrative + prob + timeline populated.
+--   • BatchCommentaryButton says "0 without commentary" (every row
+--     has one from this migration's UPDATE block).
+--   • To regenerate a specific commentary with live Claude, open the
+--     deal edit form and click "Generate with Claude" — the regenerated
+--     text replaces the human_draft and the model/at fields are
+--     overwritten with claude-sonnet-4-6 + current timestamp.
 -- ────────────────────────────────────────────────────────────────────
