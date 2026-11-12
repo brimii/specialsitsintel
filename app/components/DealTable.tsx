@@ -1,8 +1,17 @@
-import { type Deal, pcol, dealCapUSD, fmtCap, BADGE_CL, CLS, SOURCE_BADGE_CL, partyLabels } from "../data/deals";
+import {
+  type Deal,
+  pcol,
+  fmtCap,
+  BADGE_CL,
+  CLS,
+  partyLabels,
+  countryFlag,
+  annualisedSpread,
+} from "../data/deals";
 
-// Compact relative-time formatter for the "updated X ago" indicator.
-// Returns "LIVE" when the row was touched within 5 minutes, otherwise
-// the shortest unit (m/h/d) under which the age fits.
+// "LIVE" when touched within 5 min, else shortest unit under which the
+// age fits. Powers the small "updated Xm ago" pill in the Announced
+// cell — reads deal.updated_at directly.
 function relativeAge(iso: string | undefined): string | null {
   if (!iso) return null;
   const then = new Date(iso).getTime();
@@ -20,12 +29,10 @@ function relativeAge(iso: string | undefined): string | null {
   return `${mo}MO`;
 }
 
-export type SortField = "name" | "size" | "spread" | "prob" | "ev" | "date";
+export type SortField = "name" | "size" | "spread" | "prob" | "date";
 
-// EV column dropped — 34 of 178 deals had ev:0, so the column read as
-// "+0.0%" on ~20% of rows and misled the eye. Keep "ev" in SortField
-// for backwards compat (DealUniverse still accepts the type) but no
-// longer surface it here.
+// 7 cols — EV removed in a previous pass. Size + Spread + Close Prob
+// are still the three most-looked-at numbers on the row.
 const COLS: { key: SortField | null; label: string }[] = [
   { key: "name", label: "Situation" },
   { key: "size", label: "Size" },
@@ -87,13 +94,18 @@ export default function DealTable({
         ) : (
           deals.map((deal) => {
             const pc = pcol(deal);
-            const roles = partyLabels(deal.c);
-            // Sub-line now leads with an explicit counterparty glyph + name
-            // so the reader sees "target → acquirer" at a glance instead of
-            // guessing which side of the deal the acquirer line represents.
-            const sub = deal.acq
-              ? `${roles.counterGlyph} ${deal.acq}${deal.c === "MERGER" && deal.v ? ` · ${deal.v}` : ""}`
-              : deal.v;
+            const roles = partyLabels(deal.category);
+            const flag = countryFlag(deal.target_country);
+            const sub = deal.counterparty_name
+              ? `${roles.counterGlyph} ${deal.counterparty_name}${
+                  deal.category === "MERGER" && deal.transaction_value_usd
+                    ? ` · ${fmtCap(deal.transaction_value_usd)}`
+                    : ""
+                }`
+              : "";
+            const annSpread = annualisedSpread(deal);
+            const prob = deal.closing_probability ?? null;
+
             return (
               <div
                 key={deal.id}
@@ -101,46 +113,39 @@ export default function DealTable({
                 onClick={() => onSelect(deal.id)}
               >
                 <div>
-                  <div className="deal-name" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span>{deal.f} {deal.nm}</span>
-                    {deal.source ? (
-                      <span
-                        className={`badge ${SOURCE_BADGE_CL[deal.source] ?? "badge-gray"}`}
-                        style={{ fontSize: 7.5, padding: "1px 5px", letterSpacing: ".06em" }}
-                        title={`Discovery source: ${deal.source}`}
-                      >
-                        {deal.source}
-                      </span>
-                    ) : null}
+                  <div className="deal-name">
+                    <span>
+                      {flag} {deal.target_name}
+                    </span>
                   </div>
                   <div className="deal-sub">{sub}</div>
                 </div>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--text-2)", fontWeight: 600 }}>
-                  {fmtCap(dealCapUSD(deal.v))}
+                  {fmtCap(deal.transaction_value_usd)}
                 </span>
-                <span className="deal-spread" style={{ color: deal.s > 0 ? pc : "var(--text-3)" }}>
-                  {deal.s > 0 ? deal.s.toFixed(1) + "%" : "—"}
+                <span className="deal-spread" style={{ color: annSpread != null ? pc : "var(--text-3)" }}>
+                  {annSpread != null ? `${annSpread.toFixed(1)}%` : "—"}
                 </span>
                 <span>
                   <div className="prob-bar">
                     <div className="prob-track">
-                      <div className="prob-fill" style={{ width: `${deal.p}%`, background: pc }} />
+                      <div className="prob-fill" style={{ width: `${prob ?? 0}%`, background: pc }} />
                     </div>
                     <span className="prob-label" style={{ color: pc }}>
-                      {deal.p}%
+                      {prob != null ? `${Math.round(prob)}%` : "—"}
                     </span>
                   </div>
                 </span>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, color: "var(--text-2)" }}>
-                  {deal.r}
+                  {deal.primary_regulators?.[0] ?? "—"}
                 </span>
                 <span>
-                  <span className={`badge ${BADGE_CL[deal.c] || "badge-gray"}`}>
-                    {CLS[deal.c] || deal.c}
+                  <span className={`badge ${BADGE_CL[deal.category] || "badge-gray"}`}>
+                    {CLS[deal.category] || deal.category}
                   </span>
                 </span>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)" }}>
-                  <div>{deal.pr?.ad || "—"}</div>
+                  <div>{deal.announce_date ?? "—"}</div>
                   {(() => {
                     const age = relativeAge(deal.updated_at);
                     if (!age) return null;

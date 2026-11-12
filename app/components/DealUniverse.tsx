@@ -2,7 +2,13 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { type Deal, dealCapUSD, fmtCap } from "../data/deals";
+import {
+  type Deal,
+  fmtCap,
+  partyLabels,
+  countryFlag,
+  annualisedSpread,
+} from "../data/deals";
 import { type Alert } from "../data/content";
 import DealTable, { type SortField } from "./DealTable";
 import DealDetail from "./DealDetail";
@@ -19,44 +25,14 @@ const CATS: { id: string; label: string; style?: CSSProperties }[] = [
   { id: "TENDER", label: "Tender" },
 ];
 
-const MONTHS: Record<string, number> = {
-  Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
-  Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
-};
-
-// Reproduit le tri par date approximatif de la maquette.
-function parseDate(s?: string): number {
-  if (!s) return 0;
-  const p = s.split(/[\s,]+/);
-  if (p.length >= 2 && MONTHS[p[0]]) return parseInt(p[1] || p[2] || "2026") * 100 + MONTHS[p[0]];
-  if (p.length >= 2 && MONTHS[p[1]]) return parseInt(p[2] || p[0] || "2026") * 100 + MONTHS[p[1]];
-  return 0;
-}
-
-// Download the current filter as CSV. Client-side blob — no server
-// round-trip, no PII leakage, no new route. Escapes double-quotes
-// per RFC 4180 so Excel + Numbers + Sheets all parse it cleanly.
+// Client-side CSV export against the new schema's named columns.
 function exportDealsCsv(rows: Deal[]) {
   if (rows.length === 0) return;
   const headers = [
-    "Situation",
-    "Acquirer",
-    "Category",
-    "Status",
-    "Deal Value",
-    "Size USD",
-    "Spread %",
-    "Close Prob %",
-    "Expected Value %",
-    "Regulator",
-    "Score",
-    "Ticker",
-    "Current Px",
-    "Offer Px",
-    "Currency",
-    "Announced",
-    "Close Estimate",
-    "Last Updated",
+    "Target", "Target Ticker", "Counterparty", "Category", "Sub-type",
+    "Status", "Transaction Value USD", "Ann. Spread %", "Close Prob %",
+    "Regulators", "Current Px", "Offer Px", "Currency",
+    "Announced", "Expected Close", "Last Updated",
   ];
   const esc = (v: unknown): string => {
     const s = String(v ?? "");
@@ -65,28 +41,27 @@ function exportDealsCsv(rows: Deal[]) {
   };
   const csv = [
     headers.join(","),
-    ...rows.map((d) =>
-      [
-        esc(d.nm),
-        esc(d.acq),
-        esc(d.c),
-        esc(d.st),
-        esc(d.v),
-        esc(dealCapUSD(d.v)),
-        esc(d.s.toFixed(1)),
-        esc(d.p),
-        esc(d.ev.toFixed(1)),
-        esc(d.r),
-        esc(d.sc),
-        esc(d.pr?.sym),
-        esc(d.pr?.c),
-        esc(d.pr?.o),
-        esc(d.pr?.cur),
-        esc(d.pr?.ad),
-        esc(d.cl),
+    ...rows.map((d) => {
+      const spread = annualisedSpread(d);
+      return [
+        esc(d.target_name),
+        esc(d.target_ticker),
+        esc(d.counterparty_name),
+        esc(d.category),
+        esc(d.sub_type),
+        esc(d.status),
+        esc(d.transaction_value_usd),
+        esc(spread != null ? spread.toFixed(2) : ""),
+        esc(d.closing_probability),
+        esc((d.primary_regulators || []).join("|")),
+        esc(d.current_price),
+        esc(d.offer_total_per_share),
+        esc(d.currency),
+        esc(d.announce_date),
+        esc(d.expected_close),
         esc(d.updated_at),
-      ].join(","),
-    ),
+      ].join(",");
+    }),
   ].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -99,16 +74,7 @@ function exportDealsCsv(rows: Deal[]) {
   URL.revokeObjectURL(url);
 }
 
-// Statuses that mean the deal is settled — won, lost, or terminated.
-// Everything else (Review, Closing, Litigation, Active, Rumored, etc.) is
-// considered "active" / still moving.
-const CLOSED_STATUSES = new Set([
-  "closed",
-  "blocked",
-  "dead",
-  "terminated",
-  "withdrawn",
-]);
+const CLOSED_STATUSES = new Set(["closed", "blocked", "dead", "terminated", "withdrawn"]);
 
 function StatsCell({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -123,14 +89,11 @@ function StatsCell({ label, value, hint }: { label: string; value: string; hint?
 function StatsStrip({ deals }: { deals: Deal[] }) {
   const total = deals.length;
   if (total === 0) return null;
-  const closed = deals.filter((d) => CLOSED_STATUSES.has((d.st ?? "").toLowerCase())).length;
+  const closed = deals.filter((d) => CLOSED_STATUSES.has((d.status ?? "").toLowerCase())).length;
   const active = total - closed;
-  const withValue = deals.filter((d) => {
-    const v = (d.v ?? "").trim().toUpperCase();
-    return v !== "" && v !== "TBD";
-  }).length;
-  const withPrice = deals.filter((d) => (d.pr?.o ?? 0) > 0).length;
-  const totalCap = deals.reduce((sum, d) => sum + dealCapUSD(d.v), 0);
+  const withOffer = deals.filter((d) => (d.offer_total_per_share ?? 0) > 0).length;
+  const withValue = deals.filter((d) => (d.transaction_value_usd ?? 0) > 0).length;
+  const totalCap = deals.reduce((sum, d) => sum + (d.transaction_value_usd ?? 0), 0);
   const pct = (n: number) => `${Math.round((n / total) * 100)}%`;
   return (
     <div
@@ -151,7 +114,7 @@ function StatsStrip({ deals }: { deals: Deal[] }) {
       <StatsCell label="Active" value={String(active)} hint={`(${pct(active)})`} />
       <StatsCell label="Closed" value={String(closed)} hint={`(${pct(closed)})`} />
       <StatsCell label="With value" value={pct(withValue)} hint={`(${withValue})`} />
-      <StatsCell label="With offer price" value={pct(withPrice)} hint={`(${withPrice})`} />
+      <StatsCell label="With offer price" value={pct(withOffer)} hint={`(${withOffer})`} />
       <StatsCell label="Total cap" value={fmtCap(totalCap)} />
     </div>
   );
@@ -177,17 +140,25 @@ export default function DealUniverse({
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
     const d = deals.filter((x) => {
-      if (cat !== "ALL" && x.c !== cat) return false;
-      if (ql && !(x.nm + x.acq + x.c + x.r).toLowerCase().includes(ql)) return false;
+      if (cat !== "ALL" && x.category !== cat) return false;
+      if (ql) {
+        const hay = `${x.target_name} ${x.counterparty_name ?? ""} ${x.category} ${(x.primary_regulators ?? []).join(" ")}`.toLowerCase();
+        if (!hay.includes(ql)) return false;
+      }
       return true;
     });
     d.sort((a, b) => {
-      if (sortF === "spread") return (b.s - a.s) * sortD;
-      if (sortF === "prob") return (b.p - a.p) * sortD;
-      if (sortF === "ev") return (b.ev - a.ev) * sortD;
-      if (sortF === "size") return (dealCapUSD(b.v) - dealCapUSD(a.v)) * sortD;
-      if (sortF === "name") return a.nm.localeCompare(b.nm) * sortD;
-      if (sortF === "date") return (parseDate(b.pr?.ad) - parseDate(a.pr?.ad)) * sortD;
+      const sa = annualisedSpread(a) ?? -Infinity;
+      const sb = annualisedSpread(b) ?? -Infinity;
+      if (sortF === "spread") return (sb - sa) * sortD;
+      if (sortF === "prob") return ((b.closing_probability ?? 0) - (a.closing_probability ?? 0)) * sortD;
+      if (sortF === "size") return ((b.transaction_value_usd ?? 0) - (a.transaction_value_usd ?? 0)) * sortD;
+      if (sortF === "name") return a.target_name.localeCompare(b.target_name) * sortD;
+      if (sortF === "date") {
+        const ad = a.announce_date ?? "";
+        const bd = b.announce_date ?? "";
+        return bd.localeCompare(ad) * sortD;
+      }
       return 0;
     });
     return d;
@@ -295,9 +266,8 @@ export default function DealUniverse({
                 onReset={onReset}
               />
             ) : (
-              <Catalysts />
+              <Catalysts deals={deals} />
             )}
-            {null}
           </div>
         </div>
 
@@ -305,7 +275,7 @@ export default function DealUniverse({
           <div className="side-panel-hd">
             <span className="side-panel-title">Deal Detail</span>
             <span className="side-panel-sub">
-              {selDeal ? `${selDeal.f} ${selDeal.nm}` : "Select a deal"}
+              {selDeal ? `${countryFlag(selDeal.target_country)} ${selDeal.target_name}` : "Select a deal"}
             </span>
           </div>
           <div id="side">
@@ -316,3 +286,6 @@ export default function DealUniverse({
     </div>
   );
 }
+// partyLabels is used inside DealTable/DealDetail; keep the import here
+// as a reminder of the shared vocabulary surface.
+void partyLabels;

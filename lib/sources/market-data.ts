@@ -597,13 +597,17 @@ const COLD_STATUSES = new Set([
 export type Tier = "hot" | "active" | "cold";
 
 export function dealTier(row: {
-  spread: number | null;
-  statut: string | null;
+  status: string | null;
+  current_price?: number | null;
+  offer_total_per_share?: number | null;
 }): Tier {
-  const st = row.statut ?? "";
+  const st = row.status ?? "";
   if (COLD_STATUSES.has(st)) return "cold";
-  const s = row.spread ?? 0;
-  if (s > 0 && HOT_STATUSES.has(st)) return "hot";
+  const hasSpread =
+    typeof row.current_price === "number" &&
+    typeof row.offer_total_per_share === "number" &&
+    row.offer_total_per_share > row.current_price;
+  if (hasSpread && HOT_STATUSES.has(st)) return "hot";
   return "active";
 }
 
@@ -628,33 +632,24 @@ export async function runMarketPriceRefresh(opts?: {
   const admin = createAdminClient();
   const { data: rows, error } = await admin
     .from("deals")
-    .select("id, price, flag, region, statut, spread, close_estimate");
+    .select(
+      "id, target_ticker, target_exchange, target_country, status, currency, current_price, offer_total_per_share",
+    );
   if (error) {
     console.error("[refreshMarketPrices] deals query failed:", error.message);
     return { scanned: 0, requested: 0, updated: 0, errors: 0, skippedCold: 0, skippedNoTicker: 0 };
   }
   type DealRow = {
     id: number;
-    price: { sym?: string; cur?: string; u?: number; c?: number; o?: number; ad?: string } | null;
-    flag: string | null;
-    region: string | null;
-    statut: string | null;
-    spread: number | null;
-    close_estimate: string | null;
+    target_ticker: string | null;
+    target_exchange: string | null;
+    target_country: string | null;
+    status: string | null;
+    currency: string | null;
+    current_price: number | null;
+    offer_total_per_share: number | null;
   };
   const dealRows = (rows ?? []) as DealRow[];
-
-  const { bucketSourceFromUrl, deriveSourceFromDeal } = await import("@/app/data/deals");
-  const dealIds = dealRows.map((r) => r.id);
-  const { data: creations } = await admin
-    .from("deal_updates")
-    .select("deal_id, source_url")
-    .eq("champ_modifie", "_creation")
-    .in("deal_id", dealIds);
-  const sourceByDealId = new Map<number, string>();
-  for (const c of (creations ?? []) as Array<{ deal_id: number; source_url: string | null }>) {
-    if (c.source_url) sourceByDealId.set(c.deal_id, bucketSourceFromUrl(c.source_url));
-  }
 
   const requests: Array<{ id: number; ticker: string; exchange: ExchangeHint }> = [];
   let skippedCold = 0;
@@ -665,15 +660,27 @@ export async function runMarketPriceRefresh(opts?: {
       if (tier === "cold") skippedCold++;
       continue;
     }
-    const ticker = raw.price?.sym;
+    const ticker = raw.target_ticker;
     if (!ticker) {
       skippedNoTicker++;
       continue;
     }
-    const source =
-      sourceByDealId.get(raw.id) ??
-      deriveSourceFromDeal({ f: raw.flag ?? "", reg: raw.region ?? "" });
-    const exchange = guessExchange(source, raw.flag ?? undefined);
+    // Exchange hint: use the stored exchange column directly when set,
+    // else fall back to the target country. Covers the US-only default.
+    const exchange: ExchangeHint =
+      raw.target_exchange === "NYSE" || raw.target_exchange === "NASDAQ"
+        ? "US"
+        : raw.target_country === "US"
+          ? "US"
+          : raw.target_country === "GB"
+            ? "LSE"
+            : raw.target_country === "JP"
+              ? "TSE"
+              : raw.target_country === "HK"
+                ? "HKEX"
+                : raw.target_country === "AU"
+                  ? "ASX"
+                  : "US";
     requests.push({ id: raw.id, ticker, exchange });
   }
 
@@ -723,29 +730,10 @@ export async function runMarketPriceRefresh(opts?: {
     }
   }
 
-  // Currency mismatch guard: if the deal's offer was extracted in ¥
-  // (JP), £ (UK), €, HK$, A$, etc. but Yahoo returns USD, our ticker
-  // matched the wrong instrument (typically a similarly-named US
-  // penny stock). Writing that price pollutes pr.c and drops the deal
-  // out of the spread average. Guard here at write time.
-  const CUR_SYMBOL_TO_ISO: Record<string, string> = {
-    "$": "USD",
-    "€": "EUR",
-    "£": "GBP",
-    "¥": "JPY",
-    "HK$": "HKD",
-    "A$": "AUD",
-    "S$": "SGD",
-    "CHF": "CHF",
-    "CA$": "CAD",
-    "SAR": "SAR",
-    "AED": "AED",
-    "₹": "INR",
-    "₩": "KRW",
-    "R$": "BRL",
-    "$MX": "MXN",
-    "R": "ZAR",
-  };
+  // Currency guard: if the deal already carries a non-USD currency (set
+  // by the admin at creation) and Yahoo returns a different currency,
+  // this is almost certainly a wrong-ticker match. Skip the write rather
+  // than corrupt the stored price.
   let updated = 0;
   let errors = 0;
   let skippedCurrency = 0;
@@ -754,35 +742,22 @@ export async function runMarketPriceRefresh(opts?: {
     if (!price) continue;
     const row = dealRows.find((r) => r.id === req.id);
     if (!row) continue;
-    const existingPrice = row.price ?? { u: 0, c: 0, o: 0, sym: "", cur: "$", ad: "" };
-    const existingCurSym = existingPrice.cur ?? "$";
-    const existingCurIso = CUR_SYMBOL_TO_ISO[existingCurSym] ?? existingCurSym;
-    const yahooCurIso = (price.currency ?? "USD").toUpperCase();
-    // Only enforce the guard when the deal already carries a non-default
-    // currency (i.e. the extractor knew the deal's real currency). A
-    // default "$" means we haven't confirmed the currency yet — trust
-    // Yahoo. This lets US deals still populate on the first refresh.
-    if (existingCurSym !== "$" && existingCurIso !== yahooCurIso) {
+    const dealCurrency = (row.currency ?? "USD").toUpperCase();
+    const yahooCurrency = (price.currency ?? "USD").toUpperCase();
+    if (dealCurrency !== "USD" && dealCurrency !== yahooCurrency) {
       console.log(
-        `[refreshMarketPrices] currency mismatch skip :: id=${req.id} sym=${req.ticker} expected=${existingCurIso} got=${yahooCurIso} — likely wrong-ticker match`,
+        `[refreshMarketPrices] currency mismatch skip :: id=${req.id} sym=${req.ticker} expected=${dealCurrency} got=${yahooCurrency} — likely wrong-ticker match`,
       );
       skippedCurrency++;
       continue;
     }
-    // Data model: pr.u = undisturbed (pre-announce baseline, stays as-is),
-    // pr.c = current market price (updated every refresh), pr.o = offer.
-    // For newly-discovered deals u might be 0 — seed it from c so the
-    // PriceChart has a baseline to draw from until a proper historical
-    // pre-announce price is backfilled.
-    const newPrice = {
-      ...existingPrice,
-      c: price.price,
-      u: (existingPrice.u ?? 0) > 0 ? existingPrice.u : price.price,
-      cur: existingPrice.cur && existingPrice.cur !== "$" ? existingPrice.cur : price.currency,
-    };
+    const nowIso = new Date().toISOString();
     const { error: upErr } = await admin
       .from("deals")
-      .update({ price: newPrice, updated_at: new Date().toISOString() })
+      .update({
+        current_price: price.price,
+        current_price_at: nowIso,
+      })
       .eq("id", req.id);
     if (upErr) {
       console.error(`[refreshMarketPrices] update failed ${req.id}: ${upErr.message}`);

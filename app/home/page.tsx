@@ -1,6 +1,7 @@
 import Link from "next/link";
 import ModalButton from "@/app/components/ModalButton";
 import { getAllDeals } from "@/lib/deals";
+import { annualisedSpread } from "@/app/data/deals";
 
 // Server component — reads the live deal set to populate hero stats
 // instead of hard-coding them. `force-dynamic` because the stats
@@ -10,9 +11,13 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const deals = await getAllDeals();
   const activeCount = deals.length;
-  const spreadsPositive = deals.filter((d) => d.s > 0);
-  const avgSpread = spreadsPositive.length
-    ? (spreadsPositive.reduce((sum, d) => sum + d.s, 0) / spreadsPositive.length).toFixed(1) + "%"
+  const spreads: number[] = [];
+  for (const d of deals) {
+    const s = annualisedSpread(d);
+    if (s != null && s > 0) spreads.push(s);
+  }
+  const avgSpread = spreads.length
+    ? (spreads.reduce((a, b) => a + b, 0) / spreads.length).toFixed(1) + "%"
     : "—";
   const asOfLabel = new Date().toLocaleDateString("en-US", {
     month: "short",
