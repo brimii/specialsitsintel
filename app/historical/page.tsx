@@ -137,7 +137,11 @@ function HistChartSVG({
   const indexToDate = (i: number) => addMonths(start, (i / (N - 1)) * durMonths);
   const annDate = indexToDate(ann);
 
-  const pL = expanded ? 14 : 10;
+  // Expanded view gets a wider left gutter to host a Y-axis scale of
+  // indexed values (synthetic series normalised to 100 at start — the
+  // Hall-of-Fame charts aren't real EOD data, so a %-based price-index
+  // scale is the honest thing to show rather than a fake $-axis).
+  const pL = expanded ? 54 : 10;
   const pR = expanded ? 14 : 10;
   const pT = expanded ? 14 : 10;
   const pB = expanded ? 42 : 30;
@@ -200,14 +204,31 @@ function HistChartSVG({
         </linearGradient>
       </defs>
 
-      {/* Horizontal gridlines on expanded view */}
-      {expanded && (
-        <>
-          <line x1={pL} y1={pT + iH * 0.25} x2={pL + iW} y2={pT + iH * 0.25} stroke="rgba(74,156,255,.08)" strokeWidth="0.5" />
-          <line x1={pL} y1={pT + iH * 0.5} x2={pL + iW} y2={pT + iH * 0.5} stroke="rgba(74,156,255,.08)" strokeWidth="0.5" />
-          <line x1={pL} y1={pT + iH * 0.75} x2={pL + iW} y2={pT + iH * 0.75} stroke="rgba(74,156,255,.08)" strokeWidth="0.5" />
-        </>
-      )}
+      {/* Horizontal gridlines on expanded view — paired with Y-axis
+         labels in the left gutter. Levels are the synthetic series'
+         own min/max range, shown as a price index where 100 = the
+         opening value (what you'd have bought at). */}
+      {expanded &&
+        Array.from({ length: 5 }, (_, i) => {
+          const p = mn + ((mx - mn) * i) / 4;
+          const y = ys(p);
+          return (
+            <g key={`hyt-${i}`}>
+              <line x1={pL} y1={y} x2={pL + iW} y2={y} stroke="rgba(74,156,255,.08)" strokeWidth="0.5" />
+              <text
+                x={pL - 8}
+                y={y + 3}
+                textAnchor="end"
+                fill="#8a9bc8"
+                fontFamily="IBM Plex Mono, monospace"
+                fontSize="10"
+                letterSpacing=".04em"
+              >
+                {p >= 100 ? `+${(p - 100).toFixed(0)}%` : `${(p - 100).toFixed(0)}%`}
+              </text>
+            </g>
+          );
+        })}
 
       <line x1={pL} y1={pT + iH} x2={pL + iW} y2={pT + iH} stroke="rgba(74,156,255,.25)" strokeWidth="0.6" />
 

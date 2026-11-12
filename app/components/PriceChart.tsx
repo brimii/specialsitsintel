@@ -87,7 +87,10 @@ function ChartSVG({
   const patchedDeal: Deal = { ...deal, pr: { ...deal.pr, u, c } };
   const hasOffer = o > 0;
 
-  const padL = expanded ? 14 : 8;
+  // Expanded view gets a left gutter wide enough for a $-price Y-axis
+  // scale. Compact view keeps the previous tight padding — no Y-axis
+  // labels there, it's a thumbnail.
+  const padL = expanded ? 58 : 8;
   const padR = expanded ? 72 : 44;
   const padT = expanded ? 12 : 8;
   const padB = expanded ? 36 : 22;
@@ -154,31 +157,38 @@ function ChartSVG({
         </linearGradient>
       </defs>
 
-      {/* Horizontal gridlines — subtle cyan hints over the dark ground */}
-      <line
-        x1={padL}
-        y1={padT + innerH * 0.25}
-        x2={padL + innerW}
-        y2={padT + innerH * 0.25}
-        stroke="rgba(74,156,255,.08)"
-        strokeWidth="0.5"
-      />
-      <line
-        x1={padL}
-        y1={padT + innerH * 0.5}
-        x2={padL + innerW}
-        y2={padT + innerH * 0.5}
-        stroke="rgba(74,156,255,.08)"
-        strokeWidth="0.5"
-      />
-      <line
-        x1={padL}
-        y1={padT + innerH * 0.75}
-        x2={padL + innerW}
-        y2={padT + innerH * 0.75}
-        stroke="rgba(74,156,255,.08)"
-        strokeWidth="0.5"
-      />
+      {/* Horizontal gridlines — subtle cyan hints over the dark ground.
+         Compact view keeps the 3-line decorative grid; expanded view
+         switches to a proper 5-tick Y-axis with $-labels on the left. */}
+      {!expanded && (
+        <>
+          <line x1={padL} y1={padT + innerH * 0.25} x2={padL + innerW} y2={padT + innerH * 0.25} stroke="rgba(74,156,255,.08)" strokeWidth="0.5" />
+          <line x1={padL} y1={padT + innerH * 0.5} x2={padL + innerW} y2={padT + innerH * 0.5} stroke="rgba(74,156,255,.08)" strokeWidth="0.5" />
+          <line x1={padL} y1={padT + innerH * 0.75} x2={padL + innerW} y2={padT + innerH * 0.75} stroke="rgba(74,156,255,.08)" strokeWidth="0.5" />
+        </>
+      )}
+
+      {expanded &&
+        Array.from({ length: 5 }, (_, i) => {
+          const p = minP + ((maxP - minP) * i) / 4;
+          const y = yScale(p);
+          return (
+            <g key={`yt-${i}`}>
+              <line x1={padL} y1={y} x2={padL + innerW} y2={y} stroke="rgba(74,156,255,.08)" strokeWidth="0.5" />
+              <text
+                x={padL - 8}
+                y={y + 3}
+                textAnchor="end"
+                fill="#8a9bc8"
+                fontFamily="IBM Plex Mono, monospace"
+                fontSize="10"
+                letterSpacing=".04em"
+              >
+                {fmtP(p)}
+              </text>
+            </g>
+          );
+        })}
 
       {/* Vertical announce marker */}
       <line
