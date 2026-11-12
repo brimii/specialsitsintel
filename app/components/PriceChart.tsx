@@ -3,34 +3,101 @@
 import { useEffect, useState } from "react";
 import { type Deal, partyLabels } from "../data/deals";
 
-// Deterministic price-path synth (seeded by deal.id) — ported from the mock.
-// Points 0..annIdx cover the pre-announce window, annIdx is the announcement
-// spike, annIdx+1..N-1 cover the post-announce arbitrage path.
+// Deterministic merger-arb price path seeded by deal.id. Three phases:
+//
+//   [0 .. ann-1]   pre-announce — target drifts around the undisturbed
+//                  price (`u`) with small noise.
+//   [ann]          announcement — a visible gap up to ~90% of the offer
+//                  distance. Real tapes show a near-vertical jump the
+//                  moment the deal hits the wire.
+//   [ann+1 .. N-1] post-announce arbitrage — shape depends on the deal
+//                  status + closing probability, always lands on `c`.
+//
+// Status-driven trajectory (what the user described):
+//   closing / cleared → smooth ease toward offer, spread tightens to 0
+//   active / review   → modest drift to c, random walk around the mean
+//   litigation / low  → spread WIDENS mid-window as doubts price in,
+//                       recovers partially if prob > 50%, stays wide
+//                       below offer if prob low
+//   blocked / dead    → price CRASHES back toward u in the last quarter
+//   closed            → pinned at offer at the final point
 function genPrices(deal: Deal, N = 100) {
   const { u, c, o } = deal.pr;
   const hasOffer = o > 0;
-  const target = hasOffer ? o : c;
+  const prob = deal.p ?? 70;
+  const st = (deal.st || "").toLowerCase();
+  const isClosed = /closed|completed|cleared/.test(st);
+  const isBlocked = /blocked|dead|terminated|withdrawn|failed/.test(st);
+  const isLitigation = /litig|court|appeal|trial|cfius|second request/.test(st);
+  const isClosing = /closing|imminent/.test(st);
+
   const ann = Math.floor(N * 0.3);
-  const prices: number[] = [];
+  const target = hasOffer ? o : c;
+  const annPx = u + (target - u) * 0.9; // leave a small residual spread on announce
+
   let seed = deal.id * 17 + 3;
   const rng = () => {
     seed = (seed * 9301 + 49297) % 233280;
     return seed / 233280;
   };
-  let px = u;
+
+  const prices: number[] = [];
+
+  // Pre-announce: random walk around u, ±2% band.
   for (let i = 0; i < ann; i++) {
-    px += u * (rng() - 0.5) * 0.018;
-    px = Math.max(u * 0.94, Math.min(u * 1.06, px));
-    prices.push(px);
+    const noise = (rng() - 0.5) * u * 0.035;
+    prices.push(u + noise);
   }
-  const annPx = u + (target - u) * 0.85 + (rng() - 0.5) * u * 0.02;
+
+  // Announce bar — pinned (the vertical gap is the story).
   prices.push(annPx);
-  for (let i = ann + 1; i < N; i++) {
-    const t = (i - ann) / (N - ann);
-    const targetT = annPx + (c - annPx) * Math.pow(t, 1.2);
-    px = prices[i - 1] + (targetT - prices[i - 1]) * 0.18 + (rng() - 0.5) * Math.abs(c) * 0.012;
-    prices.push(px);
+
+  // Final price always lands on `c`. The trajectory between annPx and c
+  // carries the narrative, parameterised by status.
+  const postN = N - ann - 1;
+  const spreadMag = Math.abs(annPx - c) || Math.abs(c) * 0.02;
+  const vol = spreadMag * 0.18 + Math.abs(c) * 0.004;
+
+  for (let i = 1; i <= postN; i++) {
+    const t = i / postN; // 0 → 1
+    let base: number;
+
+    if (isClosed) {
+      // Already closed — settle at offer across the back half.
+      base = i < postN * 0.5 ? annPx + (target - annPx) * (i / (postN * 0.5)) : target;
+    } else if (isBlocked) {
+      // Hold around annPx, then CRASH back toward u in the last ~25%.
+      if (t < 0.75) {
+        base = annPx + (annPx * 0.97 - annPx) * (t / 0.75);
+      } else {
+        const crashT = (t - 0.75) / 0.25;
+        base = annPx * (1 - crashT) + c * crashT;
+      }
+    } else if (isLitigation) {
+      // Spread widens into a mid-window sag, then partially recovers to c.
+      // Depth of the sag scales with how low the probability is.
+      const linear = annPx + (c - annPx) * t;
+      const sagDepth = spreadMag * (1 - prob / 100) * 1.2;
+      const sag = Math.sin(t * Math.PI) * sagDepth;
+      base = linear - sag;
+    } else if (isClosing || prob >= 85) {
+      // Smooth ease-out convergence toward c (which is near offer).
+      const eased = 1 - Math.pow(1 - t, 2.2);
+      base = annPx + (c - annPx) * eased;
+    } else {
+      // Active / normal — gentle drift toward c with mild oscillation.
+      base = annPx + (c - annPx) * t;
+    }
+
+    const noise = (rng() - 0.5) * vol;
+    prices.push(base + noise);
   }
+
+  // Ensure the series ends exactly at the known current price — otherwise
+  // the KPI strip ("current $X") would disagree with the chart's last
+  // point, which no analyst would forgive.
+  if (prices.length >= N) prices[N - 1] = c;
+
   return { prices, annIdx: ann, annPx };
 }
 
