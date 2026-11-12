@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { HIST, type HistDeal } from "@/app/data/content";
 
 const CATS = ["ALL", "MERGER", "ACTIVISM", "DISTRESSED", "SPINOFF", "REORG"];
@@ -304,8 +305,12 @@ function HistChartModal({ h, idx, onClose }: { h: HistDeal; idx: number; onClose
     [durMonths],
   );
   const [period, setPeriod] = useState(available[available.length - 1].label);
+  // Mount flag so createPortal doesn't try to touch document.body during
+  // the SSR render pass — client-only.
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -330,7 +335,17 @@ function HistChartModal({ h, idx, onClose }: { h: HistDeal; idx: number; onClose
   const visStart = indexToDate(sliceStart);
   const visEnd = indexToDate(sliceEnd);
 
-  return (
+  // Portal the overlay out of the .hist-card ancestor. That card runs
+  // the `card-rise` stagger animation, which leaves `transform:
+  // translateY(0)` on the element with animation-fill-mode:both —
+  // enough to create a positioning context, which trapped the modal's
+  // `position: fixed` inside the card instead of the viewport. Deal
+  // Universe's chart modal doesn't have this problem because its
+  // PriceChart isn't inside a staggered grid, so we mirror its exact
+  // overlay recipe but route the DOM through a portal to document.body.
+  if (!mounted) return null;
+
+  const overlay = (
     <div
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -498,6 +513,8 @@ function HistChartModal({ h, idx, onClose }: { h: HistDeal; idx: number; onClose
       </div>
     </div>
   );
+
+  return createPortal(overlay, document.body);
 }
 
 // ─────────────────────────────────────────────────────────────────────
