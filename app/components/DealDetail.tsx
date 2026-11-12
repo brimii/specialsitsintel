@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { type Deal, pcol, ecol, SC, SC_HEX, SOURCE_BADGE_CL } from "../data/deals";
+import { type Deal, pcol, ecol, SC, SC_HEX, SOURCE_BADGE_CL, partyLabels } from "../data/deals";
 import { STRATS } from "../data/content";
 import PriceChart from "./PriceChart";
 
@@ -31,12 +31,7 @@ export default function DealDetail({ deal, locked = false }: { deal: Deal | null
   const sHex = SC_HEX[deal.sc] || "#6e7a96";
   const tlCol = SC[deal.sc] || "var(--navy)";
   const strat = STRATS.find((s) => s.cat === deal.c) || STRATS[0];
-  const meta =
-    deal.c === "MERGER"
-      ? `Acq: ${deal.acq} · ${deal.v}`
-      : deal.c === "ACTIVISM"
-        ? deal.acq
-        : deal.v;
+  const roles = partyLabels(deal.c);
 
   // Build a small "ticker · announced" suffix that doesn't leak the
   // discovery URL but still gives the analyst the public listing reference
@@ -80,9 +75,6 @@ export default function DealDetail({ deal, locked = false }: { deal: Deal | null
           </span>
         ) : null}
       </div>
-      <div className="deal-detail-meta">
-        {meta} · {deal.cl}
-      </div>
       {tickerLine ? (
         <div
           style={{
@@ -95,6 +87,68 @@ export default function DealDetail({ deal, locked = false }: { deal: Deal | null
           {tickerLine}
         </div>
       ) : null}
+
+      {/* TARGET / ACQUIRER structured block — makes the two sides of the
+         situation unambiguous instead of hiding the acquirer behind a
+         generic meta line. Category-aware labels (Target/Acquirer for
+         mergers, Target/Activist for 13Ds, SpinCo/Parent for spin-offs,
+         etc.) via partyLabels(). */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr auto 1fr",
+          alignItems: "center",
+          gap: "var(--sp-2)",
+          marginTop: "var(--sp-3)",
+          padding: "var(--sp-3)",
+          background: "var(--bg-2)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--r-sm)",
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: ".12em", color: "var(--text-3)", textTransform: "uppercase", marginBottom: 3 }}>
+            {roles.target}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.25 }}>
+            {deal.nm}
+          </div>
+          {deal.pr?.sym ? (
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--navy)", marginTop: 2, letterSpacing: ".04em" }}>
+              {deal.pr.sym}
+            </div>
+          ) : null}
+        </div>
+        <div style={{ fontFamily: "var(--font-mono)", color: "var(--text-3)", fontSize: 14, textAlign: "center" }}>
+          {roles.counterGlyph}
+        </div>
+        <div style={{ minWidth: 0, textAlign: "right" }}>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, letterSpacing: ".12em", color: "var(--text-3)", textTransform: "uppercase", marginBottom: 3 }}>
+            {roles.counter}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.25 }}>
+            {deal.acq || "—"}
+          </div>
+          {deal.v ? (
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-3)", marginTop: 2, letterSpacing: ".04em" }}>
+              {deal.v}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 9,
+          color: "var(--text-3)",
+          marginTop: 6,
+          letterSpacing: ".06em",
+          textTransform: "uppercase",
+        }}
+      >
+        Close estimate · {deal.cl || "TBD"}
+      </div>
       {showPrices ? (
         <div
           style={{

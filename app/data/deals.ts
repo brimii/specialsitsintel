@@ -122,6 +122,30 @@ export const CLS: Record<string, string> = {
   REORG: "REORG",
   TENDER: "TENDER",
 };
+
+// Role labels for the two parties in a special situation. `nm` is always
+// the entity whose stock we chart (the target / spin-off / distressed
+// issuer), `acq` is the counterparty (acquirer / activist / parent /
+// bondholders) whose label depends on the strategy category. Centralised
+// here so DealTable, DealDetail and PriceChart stay in lockstep.
+export type PartyLabels = { target: string; counter: string; counterGlyph: string };
+export function partyLabels(category: string): PartyLabels {
+  switch (category) {
+    case "ACTIVISM":
+      return { target: "Target", counter: "Activist", counterGlyph: "✦" };
+    case "SPINOFF":
+      return { target: "SpinCo", counter: "Parent", counterGlyph: "⊕" };
+    case "DISTRESSED":
+      return { target: "Issuer", counter: "Counterparty", counterGlyph: "⊟" };
+    case "REORG":
+      return { target: "Issuer", counter: "Plan sponsor", counterGlyph: "⊜" };
+    case "TENDER":
+      return { target: "Target", counter: "Tenderer", counterGlyph: "→" };
+    case "MERGER":
+    default:
+      return { target: "Target", counter: "Acquirer", counterGlyph: "→" };
+  }
+}
 export const SC: Record<string, string> = {
   G: "var(--navy)",
   A: "var(--amber)",

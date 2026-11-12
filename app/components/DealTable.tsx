@@ -1,4 +1,4 @@
-import { type Deal, pcol, ecol, dealCapUSD, fmtCap, BADGE_CL, CLS, SOURCE_BADGE_CL } from "../data/deals";
+import { type Deal, pcol, ecol, dealCapUSD, fmtCap, BADGE_CL, CLS, SOURCE_BADGE_CL, partyLabels } from "../data/deals";
 
 // Compact relative-time formatter for the "updated X ago" indicator.
 // Returns "LIVE" when the row was touched within 5 minutes, otherwise
@@ -84,12 +84,13 @@ export default function DealTable({
         ) : (
           deals.map((deal) => {
             const pc = pcol(deal);
-            const sub =
-              deal.c === "MERGER"
-                ? `${deal.acq} · ${deal.v}`
-                : deal.c === "ACTIVISM"
-                  ? deal.acq
-                  : deal.v;
+            const roles = partyLabels(deal.c);
+            // Sub-line now leads with an explicit counterparty glyph + name
+            // so the reader sees "target → acquirer" at a glance instead of
+            // guessing which side of the deal the acquirer line represents.
+            const sub = deal.acq
+              ? `${roles.counterGlyph} ${deal.acq}${deal.c === "MERGER" && deal.v ? ` · ${deal.v}` : ""}`
+              : deal.v;
             return (
               <div
                 key={deal.id}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type Deal } from "../data/deals";
+import { type Deal, partyLabels } from "../data/deals";
 
 // Deterministic price-path synth (seeded by deal.id) — ported from the mock.
 // Points 0..annIdx cover the pre-announce window, annIdx is the announcement
@@ -345,6 +345,7 @@ function ChartModal({ deal, onClose }: { deal: Deal; onClose: () => void }) {
 
   const announceDate = parseAnnounceDate(deal.pr.ad);
   const { c, u, o, sym, cur } = deal.pr;
+  const roles = partyLabels(deal.c);
   const fmtP = (p: number) =>
     p >= 1000 ? cur + (p / 1000).toFixed(2) + "k" : p >= 100 ? cur + p.toFixed(0) : cur + p.toFixed(2);
 
@@ -395,12 +396,13 @@ function ChartModal({ deal, onClose }: { deal: Deal; onClose: () => void }) {
               style={{
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
-                letterSpacing: ".1em",
+                letterSpacing: ".12em",
                 color: "#4a9cff",
                 marginBottom: 4,
+                textTransform: "uppercase",
               }}
             >
-              {sym || "—"} · PRICE CHART
+              {roles.target} stock · {sym || "—"}
             </div>
             <div
               style={{
@@ -410,7 +412,11 @@ function ChartModal({ deal, onClose }: { deal: Deal; onClose: () => void }) {
                 letterSpacing: ".04em",
               }}
             >
-              {deal.nm} <span style={{ color: "var(--text-3)" }}>· {deal.acq}</span>
+              {deal.nm}{" "}
+              <span style={{ color: "var(--text-3)" }}>
+                · {roles.counter.toLowerCase()}:
+              </span>{" "}
+              <span style={{ color: "var(--text-2)" }}>{deal.acq || "—"}</span>
             </div>
             <div
               style={{
@@ -489,7 +495,9 @@ export default function PriceChart({ deal }: { deal: Deal }) {
       <div className="chart-box">
         <div className="chart-hd">
           <div>
-            <div className="chart-title">{sym} · PRICE CHART</div>
+            <div className="chart-title">
+              {partyLabels(deal.c).target.toUpperCase()} · {sym}
+            </div>
             <div style={{ fontSize: 9, color: "var(--text-3)", marginTop: 2 }}>
               Pre-announce → current · announce: {ad}
             </div>
