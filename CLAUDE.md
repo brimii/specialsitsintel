@@ -2,7 +2,81 @@
 
 > Ce fichier est lu automatiquement par Claude Code à chaque session.
 > Il décrit le produit, la stack, les règles et la méthode de travail.
-> **Tiens-le à jour** : à la fin de chaque phase, mets à jour la section « État d’avancement ».
+> **Tiens-le à jour** : à la fin de chaque phase, mets à jour la section « État d'avancement ».
+
+-----
+
+## 0. v2 REBUILD — état courant (2026-11-12)
+
+**Le pipeline Claude de discovery est mort.** On repart from scratch avec un workflow manuel + un seul appel Claude par deal pour générer un commentary. L'historique Phases 1-5 ci-dessous décrit l'architecture précédente et reste en archive mais **ne pas l'exécuter** — le code correspondant est supprimé.
+
+### Nouveau workflow (actif)
+
+1. **Entrée manuelle** via `/admin/deals/new`. Form single-page avec sections repliables :
+   - Identity (category, sub_type, target name+ticker+exchange, counterparty, status, min_tier)
+   - Pricing (undisturbed / current / offer / tx value / currency / closing probability)
+   - Dates (announce / HSR / 2nd request / verdict / expected close / hard deadline)
+   - Narrative (short_desc + AI commentary avec bouton **"Generate with Claude"**)
+   - Regulatory (regulators, phase, key risks)
+   - Timeline (events {date, event_type, summary} — dérive automatiquement les Upcoming Catalysts)
+   - Provenance (source_url + feed + accession — admin-only, jamais exposé client)
+
+2. **Génération commentary** : click explicite sur le bouton → 1 appel Claude Sonnet (~$0.002/call) → texte retourné dans le textarea → admin review/edit/discard → Save écrit la valeur approuvée dans Supabase avec `ai_commentary_model` + `ai_commentary_at`.
+
+3. **Édition** via `/admin/deals/[id]` même form, trigger `log_deal_change()` log chaque field change dans `deal_updates` (audit trail).
+
+4. **Prix de marché** continue de se refresher via le cron Yahoo/Finnhub/Twelve Data (gratuit) → écrit `current_price` + `current_price_at`.
+
+5. **Catalysts** : plus de table séparée. Dérivés en temps réel de `deal.timeline[]` filtré sur `date >= today`.
+
+6. **Alerts** : static daily pour l'instant (`ALERTS` dans `app/data/content.ts`). Real-time plus tard si besoin.
+
+### Ce qui est SUPPRIMÉ
+
+- **Code pipeline discovery** : `lib/pipeline.ts`, `lib/discovery.ts`, `lib/discovery-eu.ts`, `lib/discovery-apac.ts`, `lib/enrich.ts`, `lib/pdf.ts`
+- **Sources feeds** : `lib/sources/sec-edgar.ts`, `lib/sources/cma.ts`, `lib/sources/dg-comp.ts`, `lib/sources/tdnet.ts`, `lib/sources/hkex.ts`, `lib/sources/asx.ts`, `lib/sources/sgx.ts`, `lib/sources/press-release.ts`
+- **Cron automation discovery** : `app/api/cron/run` (`vercel.json` crons table réduite à `refresh-prices` seule)
+- **Review queue** : `app/admin/review/` + table `review_queue` dans Supabase
+- **Seeded array** : `app/data/deals.ts` DEALS = `[]` (était 178 deals en fallback, maintenant vide)
+- **Scripts** : `scripts/seed-deals.ts`
+- **Alerts live blend** : `lib/alerts.ts` (lisait les `_auto_publish` du pipeline)
+
+### Ce qui est CONSERVÉ
+
+- Market data refresh : `lib/sources/market-data.ts` + cron `refresh-prices` (free, utile pour `current_price`)
+- Admin pages overview + users + deals form
+- Stripe (checkout, portal, webhook — intacts)
+- Auth Supabase (SSR cookies, confirmation email, reset password)
+- Tous les composants publics (DealTable, DealDetail, PriceChart, Ticker, KpiBar, Catalysts, AlertStrip, Historical, Market Regime, etc.)
+- Historical page (Hall of Fame, HIST array statique — c'est éditorial, pas live data)
+
+### Nouveau schéma Supabase
+
+Voir `supabase/migrations/0005_rebuild_deals.sql`. Les colonnes clés :
+
+- Identity : `category`, `sub_type`, `target_name`, `target_ticker`, `target_exchange`, `target_country`, `counterparty_name`, `counterparty_ticker`
+- Pricing : `undisturbed_price`, `current_price`, `offer_total_per_share` + break-down (cash/stock/exchange_ratio/cvr), `transaction_value_usd`, `currency`
+- Dates : `announce_date`, `hsr_filing_date`, `second_request_date`, `verdict_date`, `expected_close`, `hard_deadline`
+- Regulatory : `primary_regulators[]`, `regulatory_phase`, `key_risks[]`
+- Narrative : `status`, `short_desc`, `ai_commentary`, `ai_commentary_at`, `ai_commentary_model`, `closing_probability`
+- JSONB bags : `timeline[]`, `category_data`
+- Provenance (ADMIN ONLY) : `source_url`, `source_feed`, `source_accession`
+
+**Spread et days-to-close sont DÉRIVÉS** à la demande (`annualisedSpread()`, `daysToClose()` dans `app/data/schema.ts`), pas stockés — sinon ils désynchronisent dès que `current_price` bouge.
+
+### Data sources approuvées (macro / market / news — PAS discovery)
+
+Pour la Market Regime page et les widgets macro (BLS indicators, news feed, etc.) — fetchers à construire plus tard :
+
+- **BLS** (bls.gov) : CPI, employment, PPI — données officielles US
+- **OANDA** : FX rates (si besoin pour deals multi-currency)
+- **Kitco** : spot metals
+- **CoinGecko** : crypto
+- **Trading Economics** : macro global
+- **Investing.com** : backup universal
+- **Reuters** : news feed pour alerts
+
+Ces sources NE servent PAS à peupler la table deals (c'est manuel). Elles servent uniquement à enrichir le contexte macro + le ticker + les alerts.
 
 -----
 
@@ -582,3 +656,24 @@ Six tables. RLS activée sur **toutes**. Voir le guide pour le SQL complet ; rap
 - **Reste (hors Phase 0)** : seul *nice-to-have* non porté = chart plein écran (zoom). Pour la prod, prévoir `export const dynamic` sur `/` quand le filtrage par palier par utilisateur arrivera (Phase 1).
 - **Validé en local** (Windows, Node 24) : `npm install` + `npm run dev` → `http://localhost:3000`. Supabase activé côté humain.
 - **Branche de dev** : `claude/create-claude-md-memory-o4d1u`. Vérifs faites à chaque étape : `tsc --noEmit`, `npm run lint`, `npm run build`, rendu HTTP. ⚠️ Conteneur headless : aucun contrôle visuel pixel-près ni interaction réelle — à confirmer en local.
+
+---
+
+**Session 2026-11-12 — v2 REBUILD (5 steps)** :
+
+Voir Section 0 en tête de ce fichier pour le workflow courant. Historique des commits pour contexte :
+
+- `c727135` — SQL migration 0005 : nouveau schéma deals avec 40+ colonnes nommées, timeline + category_data en JSONB, triggers auto pour `updated_at` et `log_deal_change()`. Drop `review_queue`, `sources`. `deal_updates` simplifié.
+- `65f6746` — Step 1/5 : nouveau `app/data/schema.ts` (Deal type + derived helpers `annualisedSpread`, `daysToClose`, `impliedProbability`, `upcomingCatalysts`, `scoreGrade`) + `lib/deals-v2.ts` (Supabase reads + `sanitiseForClient` qui strip les Tier 7 provenance fields).
+- `444f65e` — Step 2/5 : suppression du pipeline Claude complet (20 fichiers, 5908 deletions). `lib/pipeline.ts`, `lib/discovery*.ts`, `lib/enrich.ts`, `lib/pdf.ts`, `lib/sources/{sec,cma,dg,tdnet,hkex,asx,sgx,press}.ts`, `app/admin/review/`, `app/api/cron/run`, `scripts/seed-deals.ts`. Dependency `unpdf` retirée.
+- `e3284f8` — Step 3/5 : migration de tous les composants au nouveau schéma. `app/data/deals.ts` devient un re-export mince de schema.ts + helpers UI (BADGE_CL, CLS, pcol, fmtCap, partyLabels, countryFlag). `lib/deals.ts` re-export de deals-v2.ts. DealTable, DealDetail, PriceChart, KpiBar, DealUniverse, Catalysts, Portfolio, home/page, root page tous migrés. `lib/sources/market-data.ts` runMarketPriceRefresh refactorisé pour le nouveau schéma. `lib/alerts.ts` supprimé.
+- `d2074ae` — Step 4/5 : admin rewrite. Nouveau `DealForm.tsx` single-page avec sections repliables, `app/admin/deals/{page,new,[id]}/page.tsx`, server actions (createDeal, updateDeal, deleteDeal, generateCommentary). `lib/anthropic.ts` refactorisé pour `generateDealCommentary()` seule (Reorg-style terse voice, ~120 mots, ~$0.002/call).
+
+**Branche** : `claude/create-claude-md-memory-o4d1u` + `main` synchronisés. Dernier commit = `d2074ae`.
+
+**Ce qui reste à faire côté user avant utilisation live** :
+1. **Run `supabase/migrations/0005_rebuild_deals.sql`** dans Supabase SQL Editor (wipe les 82 deals actuels + crée le nouveau schéma, drop `review_queue` + `sources`).
+2. Vérifier que ton profile a bien `role='admin'` dans la table `profiles` — sinon la RLS bloque les writes immédiatement après migration.
+3. Vérifier que `ANTHROPIC_API_KEY` reste présent dans Vercel env vars (pour le bouton Generate commentary).
+4. Aller sur `/admin/deals/new` et créer le premier deal manuellement.
+5. **Sources macro** (BLS, OANDA, Kitco, CoinGecko, Trading Economics, Investing, Reuters) pas encore intégrées — à construire plus tard quand on veut enrichir la Market Regime page ou le ticker.
