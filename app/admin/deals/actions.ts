@@ -175,3 +175,93 @@ export async function generateCommentary(input: {
   await requireAdmin();
   return generateDealCommentary(input);
 }
+
+// Batch helper used by the "Generate missing commentaries" button on
+// the deal list page. Iterates every deal whose ai_commentary is NULL
+// or empty, calls Claude once per row, writes the result straight back
+// to Supabase with the model + timestamp fields tracked in the audit
+// trail. Serial execution (not parallel) to stay under any one-shot
+// Anthropic concurrency guardrails and to keep the log readable.
+export async function batchGenerateMissing(): Promise<{
+  processed: number;
+  skipped: number;
+  errors: Array<{ id: number; reason: string }>;
+}> {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const { data: rows, error } = await admin
+    .from("deals")
+    .select(
+      "id, category, sub_type, target_name, target_ticker, counterparty_name, undisturbed_price, current_price, offer_total_per_share, currency, announce_date, expected_close, status, regulatory_phase, primary_regulators, short_desc, ai_commentary",
+    );
+  if (error) throw new Error(`List failed: ${error.message}`);
+
+  const candidates = (rows ?? []).filter(
+    (r: { ai_commentary: string | null }) =>
+      !r.ai_commentary || r.ai_commentary.trim() === "",
+  );
+
+  let processed = 0;
+  let skipped = 0;
+  const errors: Array<{ id: number; reason: string }> = [];
+
+  for (const r of candidates as Array<{
+    id: number;
+    category: string;
+    sub_type: string | null;
+    target_name: string;
+    target_ticker: string | null;
+    counterparty_name: string | null;
+    undisturbed_price: number | null;
+    current_price: number | null;
+    offer_total_per_share: number | null;
+    currency: string;
+    announce_date: string | null;
+    expected_close: string | null;
+    status: string;
+    regulatory_phase: string | null;
+    primary_regulators: string[] | null;
+    short_desc: string | null;
+  }>) {
+    try {
+      const text = await generateDealCommentary({
+        category: r.category,
+        sub_type: r.sub_type ?? undefined,
+        target_name: r.target_name,
+        target_ticker: r.target_ticker ?? undefined,
+        counterparty_name: r.counterparty_name ?? undefined,
+        undisturbed_price: r.undisturbed_price ?? undefined,
+        current_price: r.current_price ?? undefined,
+        offer_total_per_share: r.offer_total_per_share ?? undefined,
+        currency: r.currency,
+        announce_date: r.announce_date ?? undefined,
+        expected_close: r.expected_close ?? undefined,
+        status: r.status,
+        regulatory_phase: r.regulatory_phase ?? undefined,
+        primary_regulators: (r.primary_regulators ?? []).join(", "),
+        short_desc: r.short_desc ?? undefined,
+      });
+      const now = new Date().toISOString();
+      const { error: upErr } = await admin
+        .from("deals")
+        .update({
+          ai_commentary: text,
+          ai_commentary_at: now,
+          ai_commentary_model: "claude-sonnet-4-6",
+          last_reviewed_at: now,
+        })
+        .eq("id", r.id);
+      if (upErr) {
+        errors.push({ id: r.id, reason: `update: ${upErr.message}` });
+        continue;
+      }
+      processed++;
+    } catch (e) {
+      errors.push({ id: r.id, reason: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  skipped = (rows?.length ?? 0) - candidates.length;
+  revalidatePath("/admin/deals");
+  revalidatePath("/");
+  return { processed, skipped, errors };
+}

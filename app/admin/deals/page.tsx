@@ -2,36 +2,44 @@ import Link from "next/link";
 import { getAllDealsRaw } from "@/lib/deals-v2";
 import { annualisedSpread } from "@/app/data/schema";
 import { fmtCap, countryFlag } from "@/app/data/deals";
+import BatchCommentaryButton from "./BatchCommentaryButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDealsList() {
   const deals = await getAllDealsRaw();
+  const missingCommentary = deals.filter(
+    (d) => !d.ai_commentary || d.ai_commentary.trim() === "",
+  ).length;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--sp-3)" }}>
         <div>
           <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: ".12em", color: "var(--text-3)", textTransform: "uppercase" }}>
             {deals.length} deal{deals.length === 1 ? "" : "s"} in the terminal
+            {missingCommentary > 0 ? ` · ${missingCommentary} without commentary` : ""}
           </div>
         </div>
-        <Link
-          href="/admin/deals/new"
-          style={{
-            background: "var(--navy)",
-            color: "var(--bg)",
-            padding: "8px 16px",
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            letterSpacing: ".08em",
-            textTransform: "uppercase",
-            borderRadius: "var(--r-sm)",
-            textDecoration: "none",
-            fontWeight: 600,
-          }}
-        >
-          + New deal
-        </Link>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <BatchCommentaryButton missingCount={missingCommentary} />
+          <Link
+            href="/admin/deals/new"
+            style={{
+              background: "var(--navy)",
+              color: "var(--bg)",
+              padding: "8px 16px",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              letterSpacing: ".08em",
+              textTransform: "uppercase",
+              borderRadius: "var(--r-sm)",
+              textDecoration: "none",
+              fontWeight: 600,
+            }}
+          >
+            + New deal
+          </Link>
+        </div>
       </div>
 
       <div style={{ background: "var(--bg-1)", border: "1px solid var(--border)", borderRadius: "var(--r-md)", overflow: "hidden" }}>
