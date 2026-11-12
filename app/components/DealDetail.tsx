@@ -207,11 +207,13 @@ export default function DealDetail({ deal, locked = false }: { deal: Deal | null
         </div>
         <div className="kpi-mini">
           <div className="kpi-mini-label">Expected Value</div>
-          <div className="kpi-mini-value" style={{ color: ec }}>
-            {deal.ev > 0 ? "+" : ""}
-            {deal.ev.toFixed(1)}%
+          <div
+            className="kpi-mini-value"
+            style={{ color: deal.ev === 0 ? "var(--text-3)" : ec }}
+          >
+            {deal.ev === 0 ? "—" : `${deal.ev > 0 ? "+" : ""}${deal.ev.toFixed(1)}%`}
           </div>
-          <div className="kpi-mini-note">3-scenario</div>
+          <div className="kpi-mini-note">{deal.ev === 0 ? "Not modeled" : "3-scenario"}</div>
         </div>
         <div className="kpi-mini">
           <div className="kpi-mini-label">Status</div>

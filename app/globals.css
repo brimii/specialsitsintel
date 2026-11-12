@@ -366,7 +366,10 @@ body{padding-left:var(--nav-w)}
 
 /* ── DEAL TABLE ── */
 .table-head{
-  display:grid;grid-template-columns:minmax(0,1fr) .48fr .58fr .64fr .46fr .5fr .48fr .54fr;
+  /* 7 columns: Situation · Size · Ann.Spread · Close Prob · Regulator ·
+     Category · Announced. The EV column was removed — 19% of rows had
+     ev:0 and rendered as "+0.0%", too noisy to keep around. */
+  display:grid;grid-template-columns:minmax(0,1fr) .55fr .62fr .7fr .5fr .5fr .55fr;
   gap:var(--sp-3);
   padding:9px var(--sp-5);
   font-family:var(--font-mono);font-size:7.5px;text-transform:uppercase;
@@ -383,7 +386,7 @@ body{padding-left:var(--nav-w)}
 .table-head span:hover .sort-arrow,.sort-active .sort-arrow{opacity:1}
 
 .deal-row{
-  display:grid;grid-template-columns:minmax(0,1fr) .48fr .58fr .64fr .46fr .5fr .48fr .54fr;
+  display:grid;grid-template-columns:minmax(0,1fr) .55fr .62fr .7fr .5fr .5fr .55fr;
   gap:var(--sp-3);
   padding:10px var(--sp-5);border-bottom:1px solid var(--border);
   align-items:center;cursor:pointer;transition:background var(--t-fast),box-shadow var(--t-fast);

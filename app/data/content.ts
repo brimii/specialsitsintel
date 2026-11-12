@@ -546,5 +546,18 @@ export const CATALYSTS: Catalyst[] = [
   {mo:"DEC 2026",d:"15",m:"Dec",tag:"FERC",tagC:"r",deal:"Dominion / NextEra",evt:"FERC utility mega-merger filing",desc:"World's largest utility merger. 5 regulators. FERC review begins. 12-18 months.",imp:"H"},
   {mo:"DEC 2026",d:"20",m:"Dec",tag:"DOJ",tagC:"a",deal:"Valaris / Transocean",evt:"HSR Second Request compliance",desc:"Offshore drillship divestitures. DOJ reviewing rig-count concentration. 71%.",imp:"H"},
   {mo:"DEC 2026",d:"22",m:"Dec",tag:"CLOSE",tagC:"g",deal:"RE/MAX / Real Brokerage",evt:"Real estate franchise merger close",desc:"DOJ real estate cleared. H2 2026.",imp:"L"},
+  // ─── Q1 2027 ──────────────────────────────────────────────────────
+  {mo:"JAN 2027",d:"08",m:"Jan",tag:"CFIUS",tagC:"r",deal:"US Steel / Nippon",evt:"DC Circuit ruling expected",desc:"Panel appeared skeptical of presidential override scope at Apr oral arguments. Binary — Win $55 vs Break $28. 62% probability.",imp:"H"},
+  {mo:"JAN 2027",d:"14",m:"Jan",tag:"VERDICT",tagC:"r",deal:"Amedisys / UnitedHealth",evt:"DOJ antitrust verdict",desc:"Federal judge rules on home-health concentration. 49% probability. Break $70, win $101.",imp:"H"},
+  {mo:"JAN 2027",d:"20",m:"Jan",tag:"HSR",tagC:"a",deal:"Informatica / Salesforce",evt:"Final clearance expected",desc:"DOJ vertical review closed in Q4. Behavioral remedies in place. Close window Jan-Feb 2027.",imp:"M"},
+  {mo:"JAN 2027",d:"28",m:"Jan",tag:"SPINOFF",tagC:"b",deal:"Honeywell Aerospace",evt:"Form 10 effectiveness",desc:"Standalone Aerospace Co registered with SEC. $4.8B EBITDA, $220B backlog. Distribution target Q2 2027.",imp:"H"},
+  {mo:"FEB 2027",d:"04",m:"Feb",tag:"FCC",tagC:"a",deal:"EchoStar / DISH",evt:"FCC spectrum transfer ruling",desc:"Public interest review on 5G consolidation. Rural broadband commitments on file. 68% probability.",imp:"H"},
+  {mo:"FEB 2027",d:"10",m:"Feb",tag:"ACTIVISM",tagC:"p",deal:"Elliott / BP",evt:"Board nomination deadline",desc:"Elliott filed proxy contest for 4 BP seats. Push for refining divestiture + capital return. AGM May 2027.",imp:"M"},
+  {mo:"FEB 2027",d:"18",m:"Feb",tag:"OOC",tagC:"a",deal:"CommScope",evt:"Exchange offer launch",desc:"Senior secured 62-72c. Fulcrum migrates to 2L. Full OOC term sheet expected mid-Feb.",imp:"H"},
+  {mo:"FEB 2027",d:"24",m:"Feb",tag:"CLOSE",tagC:"g",deal:"Altice USA",evt:"OOC exchange close",desc:"82% RSA complete. Drahi dilutes to 18%. FCC change-of-control cleared. Post-close recapitalisation.",imp:"H"},
+  {mo:"MAR 2027",d:"03",m:"Mar",tag:"DOJ",tagC:"a",deal:"Valaris / Transocean",evt:"HSR Second Request compliance",desc:"Offshore drillship divestitures under review. 71% probability. $8.5B combined fleet.",imp:"M"},
+  {mo:"MAR 2027",d:"10",m:"Mar",tag:"ACTIVISM",tagC:"p",deal:"Elliott / Honeywell",evt:"Buildings separation decision",desc:"Third HON leg. Aerospace + Automation spin paths confirmed. Buildings TBD board vote.",imp:"H"},
+  {mo:"MAR 2027",d:"18",m:"Mar",tag:"SPINOFF",tagC:"b",deal:"IAC / Angi",evt:"Angi distribution to holders",desc:"Angi parent spin under Barry Diller. Home services pure-play vs IAC digital media.",imp:"M"},
+  {mo:"MAR 2027",d:"25",m:"Mar",tag:"CLOSE",tagC:"g",deal:"Match Group / Elliott",evt:"Hinge separation close",desc:"Hinge IPO on NYSE. Tinder strategic review finalised. Elliott campaign conclusion.",imp:"M"},
 ];
 

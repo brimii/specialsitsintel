@@ -1,4 +1,4 @@
-import { type Deal, pcol, ecol, dealCapUSD, fmtCap, BADGE_CL, CLS, SOURCE_BADGE_CL, partyLabels } from "../data/deals";
+import { type Deal, pcol, dealCapUSD, fmtCap, BADGE_CL, CLS, SOURCE_BADGE_CL, partyLabels } from "../data/deals";
 
 // Compact relative-time formatter for the "updated X ago" indicator.
 // Returns "LIVE" when the row was touched within 5 minutes, otherwise
@@ -22,12 +22,15 @@ function relativeAge(iso: string | undefined): string | null {
 
 export type SortField = "name" | "size" | "spread" | "prob" | "ev" | "date";
 
+// EV column dropped — 34 of 178 deals had ev:0, so the column read as
+// "+0.0%" on ~20% of rows and misled the eye. Keep "ev" in SortField
+// for backwards compat (DealUniverse still accepts the type) but no
+// longer surface it here.
 const COLS: { key: SortField | null; label: string }[] = [
   { key: "name", label: "Situation" },
   { key: "size", label: "Size" },
   { key: "spread", label: "Ann. Spread" },
   { key: "prob", label: "Close Prob" },
-  { key: "ev", label: "EV" },
   { key: null, label: "Regulator" },
   { key: null, label: "Category" },
   { key: "date", label: "Announced" },
@@ -127,10 +130,6 @@ export default function DealTable({
                       {deal.p}%
                     </span>
                   </div>
-                </span>
-                <span className="deal-spread" style={{ color: ecol(deal) }}>
-                  {deal.ev > 0 ? "+" : ""}
-                  {deal.ev.toFixed(1)}%
                 </span>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, color: "var(--text-2)" }}>
                   {deal.r}
